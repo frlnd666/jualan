@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { CartItem, Product } from '@/lib/types'
 
 interface CartStore {
@@ -20,14 +20,17 @@ export const useCart = create<CartStore>()(
 
       addItem: (product, storeSlug) => {
         const { items, storeSlug: current } = get()
+
         if (current && current !== storeSlug) {
           set({ items: [{ product, qty: 1 }], storeSlug })
           return
         }
-        const existing = items.find(i => i.product.id === product.id)
+
+        const existing = items.find((i) => i.product.id === product.id)
+
         if (existing) {
           set({
-            items: items.map(i =>
+            items: items.map((i) =>
               i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i
             ),
           })
@@ -37,15 +40,16 @@ export const useCart = create<CartStore>()(
       },
 
       removeItem: (productId) =>
-        set({ items: get().items.filter(i => i.product.id !== productId) }),
+        set({ items: get().items.filter((i) => i.product.id !== productId) }),
 
       updateQty: (productId, qty) =>
         set({
-          items: qty === 0
-            ? get().items.filter(i => i.product.id !== productId)
-            : get().items.map(i =>
-                i.product.id === productId ? { ...i, qty } : i
-              ),
+          items:
+            qty === 0
+              ? get().items.filter((i) => i.product.id !== productId)
+              : get().items.map((i) =>
+                  i.product.id === productId ? { ...i, qty } : i
+                ),
         }),
 
       clearCart: () => set({ items: [], storeSlug: null }),
@@ -53,6 +57,10 @@ export const useCart = create<CartStore>()(
       subtotal: () =>
         get().items.reduce((sum, i) => sum + i.product.price * i.qty, 0),
     }),
-    { name: 'umkm-cart' }
+    {
+      name: 'umkm-cart',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 )

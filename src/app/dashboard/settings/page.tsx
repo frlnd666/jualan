@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadToCloudinary } from '@/lib/cloudinary'
+import { normalizeStoreSlug, validateStoreSlug } from '@/lib/store-slug'
 import { useRouter } from 'next/navigation'
 
 export default function SettingsPage() {
@@ -20,6 +21,7 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
   const [message, setMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -58,14 +60,28 @@ export default function SettingsPage() {
     e.preventDefault()
     setSaving(true)
     setMessage('')
+    setErrorMessage('')
+
+    const normalizedSlug = normalizeStoreSlug(slug)
+    const slugError = validateStoreSlug(normalizedSlug)
+    if (slugError) {
+      setErrorMessage(slugError)
+      setSaving(false)
+      return
+    }
+    setSlug(normalizedSlug)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setErrorMessage('Sesi login tidak ditemukan. Silakan login ulang.')
+      setSaving(false)
+      return
+    }
 
     const payload = {
       owner_id: user.id,
       name,
-      slug: slug.toLowerCase().replace(/\s+/g, '-'),
+      slug: normalizedSlug,
       description,
       whatsapp,
       theme,
@@ -73,16 +89,35 @@ export default function SettingsPage() {
       banner_url: bannerUrl,
     }
 
+    let saveError: { code?: string; message: string } | null = null
+
     if (storeId) {
       // Batasi ke toko milik user yang login, bukan sekadar id dari state.
-      await supabase.from('stores').update(payload).eq('id', storeId).eq('owner_id', user.id)
+      const { error } = await supabase
+        .from('stores')
+        .update(payload)
+        .eq('id', storeId)
+        .eq('owner_id', user.id)
+      saveError = error
     } else {
-      const { data } = await supabase.from('stores').insert(payload).select().single()
+      const { data, error } = await supabase.from('stores').insert(payload).select().single()
+      saveError = error
       if (data) setStoreId(data.id)
     }
 
-    setMessage('Toko berhasil disimpan')
     setSaving(false)
+
+    if (saveError) {
+      // Jangan pernah mengklaim sukses saat database menolak.
+      setErrorMessage(
+        saveError.code === '23505'
+          ? 'Slug toko sudah dipakai toko lain. Gunakan slug yang berbeda.'
+          : `Gagal menyimpan pengaturan: ${saveError.message}`
+      )
+      return
+    }
+
+    setMessage('Toko berhasil disimpan')
     router.refresh()
   }
 
@@ -173,6 +208,7 @@ export default function SettingsPage() {
         </div>
 
         {message && <p className="text-green-600 text-sm">{message}</p>}
+        {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
 
         <button
           type="submit"

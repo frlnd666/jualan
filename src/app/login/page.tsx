@@ -68,7 +68,12 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <Link href="/forgot-password" className="text-xs font-medium text-indigo-600">
+                Lupa password?
+              </Link>
+            </div>
             <input
               type="password"
               value={password}

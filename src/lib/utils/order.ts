@@ -15,7 +15,7 @@ export function calculateOrderTotal(subtotal: number, shippingCost: number) {
 }
 
 export function normalizePhoneNumber(phone: string) {
-  const cleaned = phone.replace(/D/g, '')
+  const cleaned = phone.replace(/\D/g, '')
 
   if (!cleaned) return ''
   if (cleaned.startsWith('0')) return `62${cleaned.slice(1)}`

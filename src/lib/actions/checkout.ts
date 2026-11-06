@@ -1,7 +1,9 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
+import { checkRateLimit } from '@/lib/rate-limit'
 import type { CheckoutFormInput, PaymentMethod } from '@/lib/types/order'
 import { normalizePhoneNumber } from '@/lib/utils/order'
 
@@ -69,6 +71,22 @@ export async function createOrderAction(input: CheckoutFormInput) {
   if (!input.shippingMethodId?.trim()) throw new Error('Metode pengiriman wajib dipilih.')
   if (!isValidPaymentMethod(input.paymentMethod)) throw new Error('Metode pembayaran tidak valid.')
   if (!input.items?.length) throw new Error('Cart kosong.')
+
+  // Anti-spam order: batasi per nomor WhatsApp dan per alamat IP.
+  // (Limiter in-memory per instance — lihat lib/rate-limit.ts.)
+  const rateLimitPhone = normalizePhoneNumber(input.customerPhone)
+  const phoneLimit = checkRateLimit(`checkout:phone:${rateLimitPhone}`, 5, 10 * 60 * 1000)
+  if (!phoneLimit.allowed) {
+    throw new Error('Terlalu banyak pesanan dari nomor ini. Coba lagi beberapa menit lagi.')
+  }
+
+  const requestHeaders = await headers()
+  const clientIp =
+    requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const ipLimit = checkRateLimit(`checkout:ip:${clientIp}`, 20, 10 * 60 * 1000)
+  if (!ipLimit.allowed) {
+    throw new Error('Terlalu banyak pesanan dari koneksi ini. Coba lagi beberapa menit lagi.')
+  }
 
   const { data: shippingMethod, error: shippingError } = await supabase
     .from('shipping_methods')

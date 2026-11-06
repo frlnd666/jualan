@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import OrderFulfillment from '@/components/dashboard/OrderFulfillment'
+import { resolvePaymentProofUrl } from '@/lib/payment-proof'
 
 type DashboardOrderDetailPageProps = {
   params: Promise<{
@@ -22,7 +24,7 @@ type OrderItem = {
 function formatRupiah(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0)
   if (Number.isNaN(numberValue)) return '0'
-  return numberValue.toString().replace(/B(?=(d{3})+(?!d))/g, '.')
+  return numberValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
 function formatDate(dateValue: string | null | undefined) {
@@ -41,6 +43,8 @@ function getOrderStatusLabel(status: string) {
   switch (status) {
     case 'PENDING_PAYMENT':
       return 'Menunggu pembayaran'
+    case 'WAITING_VERIFICATION':
+      return 'Menunggu verifikasi'
     case 'PAID':
       return 'Sudah dibayar'
     case 'PROCESSING':
@@ -60,6 +64,8 @@ function getOrderStatusStyle(status: string) {
   switch (status) {
     case 'PENDING_PAYMENT':
       return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'WAITING_VERIFICATION':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
     case 'PAID':
       return 'bg-emerald-50 text-emerald-700 border-emerald-200'
     case 'PROCESSING':
@@ -204,6 +210,14 @@ export default async function DashboardOrderDetailPage({
     .eq('order_id', order.id)
     .maybeSingle()
 
+  const { data: shipment } = await supabase
+    .from('shipments')
+    .select('courier, tracking_number')
+    .eq('order_id', order.id)
+    .maybeSingle()
+
+  const proofUrl = await resolvePaymentProofUrl(invoice?.payment_proof_url)
+
   const hasItems = (orderItems ?? []).length > 0
 
   return (
@@ -336,7 +350,7 @@ export default async function DashboardOrderDetailPage({
                 </p>
                 {order.customer_phone ? (
                   <a
-                    href={`https://wa.me/${order.customer_phone.replace(/D/g, '')}`}
+                    href={`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-1 block text-sm font-semibold text-indigo-600 hover:underline"
@@ -502,7 +516,16 @@ export default async function DashboardOrderDetailPage({
           <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
             <h2 className="text-lg font-bold text-gray-900">Aksi seller</h2>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-4">
+              <OrderFulfillment
+                orderId={order.id}
+                currentStatus={order.status}
+                initialCourier={shipment?.courier}
+                initialTrackingNumber={shipment?.tracking_number}
+              />
+            </div>
+
+            <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
               {invoice ? (
                 <>
                   <Link
@@ -563,19 +586,19 @@ export default async function DashboardOrderDetailPage({
                   </span>
                 </div>
 
-                {invoice.payment_proof_url ? (
+                {proofUrl ? (
                   <div className="pt-1">
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
                       Bukti transfer
                     </p>
                     <a
-                      href={invoice.payment_proof_url}
+                      href={proofUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block overflow-hidden rounded-2xl border border-gray-100"
                     >
                       <img
-                        src={invoice.payment_proof_url}
+                        src={proofUrl}
                         alt="Bukti transfer"
                         className="w-full object-cover"
                         loading="lazy"

@@ -8,6 +8,7 @@ export type OrderStatus =
 
 export type PaymentStatus =
   | 'PENDING_PAYMENT'
+  | 'WAITING_VERIFICATION'
   | 'PAID'
   | 'FAILED'
   | 'REFUNDED'

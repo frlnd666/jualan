@@ -12,16 +12,33 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setInfo('')
 
-    const { error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${location.origin}/auth/callback` },
+    })
 
     if (error) {
       setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    // Bila konfirmasi email aktif di Supabase, signUp tidak menghasilkan
+    // sesi. Dulu kode langsung push ke /dashboard dan user terpental ke
+    // /login tanpa penjelasan.
+    if (!data.session) {
+      setInfo(
+        'Pendaftaran berhasil. Cek email kamu untuk tautan verifikasi, lalu masuk dengan akun yang baru dibuat.'
+      )
       setLoading(false)
       return
     }
@@ -81,6 +98,9 @@ export default function RegisterPage() {
           </div>
 
           {error && <p className="text-red-500 text-xs">{error}</p>}
+          {info && (
+            <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{info}</p>
+          )}
 
           <button
             type="submit"

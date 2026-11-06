@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ConfirmPaymentButton from '@/components/dashboard/ConfirmPaymentButton'
+import { resolvePaymentProofUrl } from '@/lib/payment-proof'
 
 type DashboardPaymentsPageProps = {
   searchParams: Promise<{
@@ -14,6 +15,8 @@ function getPaymentStatusLabel(status: string) {
   switch (status) {
     case 'PENDING_PAYMENT':
       return 'Menunggu pembayaran'
+    case 'WAITING_VERIFICATION':
+      return 'Menunggu verifikasi'
     case 'PAID':
       return 'Sudah dibayar'
     case 'FAILED':
@@ -29,6 +32,8 @@ function getPaymentStatusStyle(status: string) {
   switch (status) {
     case 'PENDING_PAYMENT':
       return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'WAITING_VERIFICATION':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
     case 'PAID':
       return 'bg-emerald-50 text-emerald-700 border-emerald-200'
     case 'FAILED':
@@ -78,6 +83,36 @@ function getOrderStatusStyle(status: string) {
   }
 }
 
+interface PaymentOrderEmbed {
+  id: string
+  store_id: string
+  customer_name: string
+  customer_phone: string
+  status: string
+  shipping_method_name: string | null
+  created_at: string | null
+}
+
+interface PaymentInvoiceRow {
+  id: string
+  order_id: string
+  invoice_number: string
+  payment_status: string
+  payment_proof_url: string | null
+  total: number
+  payment_method: string | null
+  created_at: string | null
+  orders: PaymentOrderEmbed | PaymentOrderEmbed[] | null
+}
+
+/** Join many-to-one terbaca TS sebagai array; runtime objek tunggal. */
+function embedOrder(invoice: PaymentInvoiceRow): PaymentOrderEmbed | null {
+  if (!invoice.orders) return null
+  return Array.isArray(invoice.orders)
+    ? invoice.orders[0] ?? null
+    : invoice.orders
+}
+
 function getPaymentMethodLabel(method: string | null) {
   switch (method) {
     case 'BANK_TRANSFER':
@@ -91,8 +126,9 @@ function getPaymentMethodLabel(method: string | null) {
   }
 }
 
-function InvoiceCard({ invoice }: { invoice: any }) {
-  const order = invoice.orders
+async function InvoiceCard({ invoice }: { invoice: PaymentInvoiceRow }) {
+  const order = embedOrder(invoice)
+  const proofUrl = await resolvePaymentProofUrl(invoice.payment_proof_url)
 
   return (
     <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
@@ -113,11 +149,13 @@ function InvoiceCard({ invoice }: { invoice: any }) {
                 {order?.customer_phone || '-'}
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                {new Date(invoice.created_at).toLocaleDateString('id-ID', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
+                {invoice.created_at
+                  ? new Date(invoice.created_at).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                  : '-'}
               </p>
             </div>
 
@@ -185,11 +223,11 @@ function InvoiceCard({ invoice }: { invoice: any }) {
           <div className="rounded-3xl border border-gray-100 bg-gray-50 p-4">
             <p className="text-sm font-bold text-gray-900">Bukti transfer</p>
 
-            {invoice.payment_proof_url ? (
+            {proofUrl ? (
               <div className="mt-3 space-y-3">
                 <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
                   <Image
-                    src={invoice.payment_proof_url}
+                    src={proofUrl}
                     alt={`Bukti transfer ${invoice.invoice_number}`}
                     width={800}
                     height={1000}
@@ -198,7 +236,7 @@ function InvoiceCard({ invoice }: { invoice: any }) {
                 </div>
 
                 <a
-                  href={invoice.payment_proof_url}
+                  href={proofUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-center text-sm font-semibold text-gray-900 hover:bg-gray-50"
@@ -293,22 +331,24 @@ export default async function DashboardPaymentsPage({
     )
   }
 
-  const storeInvoices = (invoices || []).filter(
-    (invoice: any) => invoice.orders?.store_id === store.id,
+  const storeInvoices = ((invoices || []) as PaymentInvoiceRow[]).filter(
+    (invoice) => embedOrder(invoice)?.store_id === store.id,
   )
 
   const selectedInvoices = orderId
-    ? storeInvoices.filter((invoice: any) => invoice.order_id === orderId)
+    ? storeInvoices.filter((invoice) => invoice.order_id === orderId)
     : storeInvoices
 
   const activeInvoice = orderId ? selectedInvoices[0] ?? null : null
 
   const totalInvoices = storeInvoices.length
   const pendingPayments = storeInvoices.filter(
-    (inv: any) => inv.payment_status === 'PENDING_PAYMENT' && inv.payment_proof_url,
+    (inv) =>
+      inv.payment_status === 'WAITING_VERIFICATION' ||
+      (inv.payment_status === 'PENDING_PAYMENT' && inv.payment_proof_url),
   ).length
   const paidPayments = storeInvoices.filter(
-    (inv: any) => inv.payment_status === 'PAID',
+    (inv) => inv.payment_status === 'PAID',
   ).length
 
   return (
@@ -377,7 +417,7 @@ export default async function DashboardPaymentsPage({
         </div>
       ) : (
         <div className="grid gap-4">
-          {storeInvoices.map((invoice: any) => (
+          {storeInvoices.map((invoice) => (
             <InvoiceCard key={invoice.id} invoice={invoice} />
           ))}
         </div>

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ConfirmPaymentButton from '@/components/dashboard/ConfirmPaymentButton'
+import { resolvePaymentProofUrl } from '@/lib/payment-proof'
 
 type DashboardPaymentDetailPageProps = {
   params: Promise<{
@@ -56,6 +57,8 @@ function getPaymentStatusLabel(status: string) {
   switch (status) {
     case 'PENDING_PAYMENT':
       return 'Menunggu pembayaran'
+    case 'WAITING_VERIFICATION':
+      return 'Menunggu verifikasi'
     case 'PAID':
       return 'Sudah dibayar'
     case 'FAILED':
@@ -71,6 +74,8 @@ function getPaymentStatusStyle(status: string) {
   switch (status) {
     case 'PENDING_PAYMENT':
       return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'WAITING_VERIFICATION':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
     case 'PAID':
       return 'bg-emerald-50 text-emerald-700 border-emerald-200'
     case 'FAILED':
@@ -221,6 +226,8 @@ export default async function DashboardPaymentDetailPage({
   if (itemsError) {
     notFound()
   }
+
+  const proofUrl = await resolvePaymentProofUrl(invoice.payment_proof_url)
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -417,11 +424,11 @@ export default async function DashboardPaymentDetailPage({
           <section className="rounded-3xl border border-gray-100 bg-gray-50 p-4">
             <p className="text-sm font-bold text-gray-900">Bukti transfer</p>
 
-            {invoice.payment_proof_url ? (
+            {proofUrl ? (
               <div className="mt-3 space-y-3">
                 <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
                   <Image
-                    src={invoice.payment_proof_url}
+                    src={proofUrl}
                     alt={`Bukti transfer ${invoice.invoice_number}`}
                     width={800}
                     height={1000}
@@ -430,7 +437,7 @@ export default async function DashboardPaymentDetailPage({
                 </div>
 
                 <a
-                  href={invoice.payment_proof_url}
+                  href={proofUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-center text-sm font-semibold text-gray-900 hover:bg-gray-50"

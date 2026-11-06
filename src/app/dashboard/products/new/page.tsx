@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { removeProductImageObject } from '@/lib/product-image'
 
 function sanitizeNumberInput(value: string) {
   return value.replace(/\D/g, '')
@@ -83,19 +84,27 @@ export default function NewProductPage() {
     loadStore()
   }, [supabase])
 
-  useEffect(() => {
-    if (!imageFile) {
+  const objectUrlRef = useRef<string | null>(null)
+
+  function setLocalPreview(file: File | null) {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+    if (!file) {
       setImagePreview('')
       return
     }
-
-    const objectUrl = URL.createObjectURL(imageFile)
+    const objectUrl = URL.createObjectURL(file)
+    objectUrlRef.current = objectUrl
     setImagePreview(objectUrl)
+  }
 
+  useEffect(() => {
     return () => {
-      URL.revokeObjectURL(objectUrl)
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
     }
-  }, [imageFile])
+  }, [])
 
   async function uploadProductImage(file: File) {
     const fileExt = file.name.split('.').pop() || 'jpg'
@@ -127,12 +136,16 @@ export default function NewProductPage() {
     setImageUrl('')
     setImageFile(file)
 
-    if (!file) return
+    if (!file) {
+      setLocalPreview(null)
+      return
+    }
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
     if (!allowedTypes.includes(file.type)) {
       setErrorMessage('File harus berupa JPG, PNG, atau WEBP.')
       setImageFile(null)
+      setLocalPreview(null)
       return
     }
 
@@ -140,8 +153,11 @@ export default function NewProductPage() {
     if (file.size > maxSize) {
       setErrorMessage('Ukuran file maksimal 2MB.')
       setImageFile(null)
+      setLocalPreview(null)
       return
     }
+
+    setLocalPreview(file)
 
     try {
       setUploadingImage(true)
@@ -157,6 +173,16 @@ export default function NewProductPage() {
     } finally {
       setUploadingImage(false)
     }
+  }
+
+  async function handleRemoveImage() {
+    setErrorMessage('')
+    setSuccessMessage('')
+    await removeProductImageObject(supabase, imageUrl)
+    setImageUrl('')
+    setLocalPreview(null)
+    setImageFile(null)
+    setSuccessMessage('Foto produk dihapus.')
   }
 
   async function handleSubmit() {
@@ -419,12 +445,21 @@ export default function NewProductPage() {
           </div>
 
           {imagePreview ? (
-            <div className="overflow-hidden rounded-[28px] border border-[var(--line)] bg-white">
-              <img
-                src={imagePreview}
-                alt="Preview foto produk"
-                className="h-56 w-full object-cover"
-              />
+            <div className="space-y-2">
+              <div className="overflow-hidden rounded-[28px] border border-[var(--line)] bg-white">
+                <img
+                  src={imagePreview}
+                  alt="Preview foto produk"
+                  className="h-56 w-full object-cover"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+              >
+                Hapus foto
+              </button>
             </div>
           ) : null}
         </div>

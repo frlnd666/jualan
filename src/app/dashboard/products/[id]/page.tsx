@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { removeProductImageObject } from '@/lib/product-image'
 
 type EditProductPageProps = {
   params: Promise<{
@@ -107,16 +108,22 @@ export default function EditProductPage({ params }: EditProductPageProps) {
     bootstrap()
   }, [params, supabase])
 
-  useEffect(() => {
-    if (!imageFile) return
+  const objectUrlRef = useRef<string | null>(null)
 
-    const objectUrl = URL.createObjectURL(imageFile)
-    setImagePreview(objectUrl)
-
-    return () => {
-      URL.revokeObjectURL(objectUrl)
+  function setLocalPreview(file: File) {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
     }
-  }, [imageFile])
+    const objectUrl = URL.createObjectURL(file)
+    objectUrlRef.current = objectUrl
+    setImagePreview(objectUrl)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    }
+  }, [])
 
   async function uploadProductImage(file: File) {
     const fileExt = file.name.split('.').pop() || 'jpg'
@@ -166,6 +173,8 @@ export default function EditProductPage({ params }: EditProductPageProps) {
       return
     }
 
+    setLocalPreview(file)
+
     try {
       setUploadingImage(true)
       const uploadedUrl = await uploadProductImage(file)
@@ -180,6 +189,18 @@ export default function EditProductPage({ params }: EditProductPageProps) {
     } finally {
       setUploadingImage(false)
     }
+  }
+
+  async function handleRemoveImage() {
+    setErrorMessage('')
+    setSuccessMessage('')
+    // Hapus objek dari storage (best-effort) lalu kosongkan referensinya;
+    // perubahan tersimpan permanen saat seller menekan Simpan.
+    await removeProductImageObject(supabase, imageUrl)
+    setImageUrl('')
+    setImagePreview('')
+    setImageFile(null)
+    setSuccessMessage('Foto produk dihapus. Tekan Simpan untuk menerapkan.')
   }
 
   async function handleSubmit() {
@@ -387,12 +408,21 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         </div>
 
         {imagePreview ? (
-          <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-            <img
-              src={imagePreview}
-              alt="Preview foto produk"
-              className="h-52 w-full object-cover"
-            />
+          <div className="space-y-2">
+            <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+              <img
+                src={imagePreview}
+                alt="Preview foto produk"
+                className="h-52 w-full object-cover"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+            >
+              Hapus foto
+            </button>
           </div>
         ) : null}
 

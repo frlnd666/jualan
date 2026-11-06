@@ -17,6 +17,9 @@ export default function SettingsPage() {
   const [slug, setSlug] = useState('')
   const [description, setDescription] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [city, setCity] = useState('')
+  const [address, setAddress] = useState('')
+  const [instagram, setInstagram] = useState('')
   const [theme, setTheme] = useState('default')
   const [logoUrl, setLogoUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
@@ -41,6 +44,9 @@ export default function SettingsPage() {
         setSlug(store.slug)
         setDescription(store.description ?? '')
         setWhatsapp(store.whatsapp ?? '')
+        setCity(store.city ?? '')
+        setAddress(store.address ?? '')
+        setInstagram(store.instagram ?? '')
         setTheme(store.theme)
         setLogoUrl(store.logo_url ?? '')
         setBannerUrl(store.banner_url ?? '')
@@ -84,6 +90,9 @@ export default function SettingsPage() {
       slug: normalizedSlug,
       description,
       whatsapp,
+      city: city.trim() || null,
+      address: address.trim() || null,
+      instagram: instagram.trim().replace(/^@/, '') || null,
       theme,
       logo_url: logoUrl,
       banner_url: bannerUrl,
@@ -170,6 +179,39 @@ export default function SettingsPage() {
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="08123456789"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Kota</label>
+          <input
+            value={city}
+            onChange={e => setCity(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Jakarta Selatan"
+          />
+          <p className="text-xs text-gray-400 mt-1">Tampil di header halaman toko.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+          <textarea
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            rows={2}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Jl. Contoh No. 1, Kel. ..., Kec. ..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+          <input
+            value={instagram}
+            onChange={e => setInstagram(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="tokokamu (tanpa @)"
+          />
+          <p className="text-xs text-gray-400 mt-1">Tampil sebagai tautan di header halaman toko.</p>
         </div>
 
         <div>

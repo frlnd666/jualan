@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 function sanitizeNumberInput(value: string) {
-  return value.replace(/D/g, '')
+  return value.replace(/\D/g, '')
 }
 
 function parseNumberInput(value: string) {
@@ -22,8 +22,8 @@ function generateSlug(value: string) {
   return value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9s-]/g, '')
-    .replace(/s+/g, '-')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
 }

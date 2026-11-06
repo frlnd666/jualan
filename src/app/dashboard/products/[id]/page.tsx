@@ -14,8 +14,8 @@ function toSlug(value: string) {
   return value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9s-]/g, '')
-    .replace(/s+/g, '-')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
 }
 
@@ -312,7 +312,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
             </label>
             <input
               value={price}
-              onChange={(e) => setPrice(e.target.value.replace(/[^d]/g, ''))}
+              onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ''))}
               className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-indigo-500"
               placeholder="Harga"
               inputMode="numeric"
@@ -326,7 +326,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
             </label>
             <input
               value={stock}
-              onChange={(e) => setStock(e.target.value.replace(/[^d]/g, ''))}
+              onChange={(e) => setStock(e.target.value.replace(/[^\d]/g, ''))}
               className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-indigo-500"
               placeholder="Stok"
               inputMode="numeric"

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
+import LogoutButton from '@/components/dashboard/LogoutButton'
 
 export default async function DashboardLayout({
   children,
@@ -44,6 +45,7 @@ export default async function DashboardLayout({
                 Lihat Toko
               </Link>
             )}
+            <LogoutButton />
           </div>
         </div>
       </header>

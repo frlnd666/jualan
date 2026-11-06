@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, subtotal, clearCart } = useCart()
+  const { items, subtotal, clearCart, storeId: cartStoreId } = useCart()
 
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -27,17 +27,9 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isPending, startTransition] = useTransition()
 
-  const storeId = useMemo(() => {
-    const firstItem = items[0]
-    if (!firstItem) return ''
-
-    return (
-      firstItem.product.store_id ||
-      firstItem.product.storeId ||
-      firstItem.product.store?.id ||
-      ''
-    )
-  }, [items])
+  // Store diambil dari identitas yang disimpan cart saat produk ditambahkan
+  // (fallback: store_id di produk pertama, untuk cart lama di localStorage).
+  const storeId = cartStoreId || items[0]?.product.store_id || ''
 
   const selectedShipping = useMemo(() => {
     return shippingMethods.find((method) => method.id === shippingMethodId) || null

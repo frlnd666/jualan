@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import StoreChatWidget from '@/components/storefront/StoreChatWidget'
 
 type StorefrontPageProps = {
   params: Promise<{
@@ -12,6 +13,17 @@ function formatRupiah(value: number | string | null | undefined) {
   const numeric = Number(value ?? 0)
   if (Number.isNaN(numeric)) return '0'
   return numeric.toLocaleString('id-ID')
+}
+
+function getCategoryName(product: { categories?: unknown }): string | null {
+  const raw = product.categories as
+    | { name?: string | null }
+    | { name?: string | null }[]
+    | null
+    | undefined
+  if (!raw) return null
+  const single = Array.isArray(raw) ? raw[0] : raw
+  return single?.name ?? null
 }
 
 function getInitials(name: string) {
@@ -39,7 +51,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
 
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, slug, price, images, badge, description')
+    .select('id, name, slug, price, images, badge, description, categories ( name )')
     .eq('store_id', store.id)
     .eq('available', true)
     .order('created_at', { ascending: false })
@@ -107,6 +119,21 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 <p className="mt-2 max-w-xl text-sm leading-6 text-white/75">
                   {store.description?.trim() || 'Produk pilihan yang disiapkan rapi, cepat, dan siap dipesan.'}
                 </p>
+                {(store.city || store.instagram) ? (
+                  <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
+                    {store.city ? <span>📍 {store.city}</span> : null}
+                    {store.instagram ? (
+                      <a
+                        href={`https://instagram.com/${String(store.instagram).replace(/^@/, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-white/85 underline decoration-white/30 underline-offset-2 hover:text-white"
+                      >
+                        @{String(store.instagram).replace(/^@/, '')}
+                      </a>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -265,6 +292,11 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                     </div>
 
                     <div className="p-3.5">
+                      {getCategoryName(product) ? (
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8d7f73]">
+                          {getCategoryName(product)}
+                        </p>
+                      ) : null}
                       <p className="line-clamp-2 min-h-[2.75rem] text-sm font-bold leading-5 text-[#241b17]">
                         {product.name}
                       </p>
@@ -284,6 +316,8 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
           </section>
         </main>
       </div>
+
+      <StoreChatWidget storeId={store.id} storeName={store.name} />
     </div>
   )
 }

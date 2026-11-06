@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # --legacy-peer-deps: next-pwa membawa peer webpack lama yang
+      # konflik dengan toolchain saat ini (sudah begitu sebelum CI ada).
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # Build butuh env Supabase agar client tidak melempar saat prerender
+      # /login — nilai dummy cukup untuk verifikasi kompilasi.
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: placeholder
+          NEXT_PUBLIC_CLOUDINARY_PRESET: placeholder
+        run: npm run build

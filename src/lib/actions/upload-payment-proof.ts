@@ -85,7 +85,10 @@ export async function uploadPaymentProof(formData: FormData) {
     return { error: 'Token akses invoice tidak valid. Buka ulang link invoice kamu.' }
   }
 
-  if (invoice.payment_status !== 'PENDING_PAYMENT') {
+  if (
+    invoice.payment_status !== 'PENDING_PAYMENT' &&
+    invoice.payment_status !== 'WAITING_VERIFICATION'
+  ) {
     return { error: 'Invoice ini sudah tidak menunggu pembayaran.' }
   }
 
@@ -114,9 +117,13 @@ export async function uploadPaymentProof(formData: FormData) {
     .from('invoices')
     .update({
       payment_proof_url: publicUrl,
+      // Bukti masuk = antre verifikasi seller. Status ini dipakai konsisten
+      // di dashboard, halaman invoice publik, dan halaman tracking.
+      payment_status: 'WAITING_VERIFICATION',
     })
     .eq('id', invoiceId)
     .eq('invoice_number', invoiceNumber)
+    .in('payment_status', ['PENDING_PAYMENT', 'WAITING_VERIFICATION'])
 
   if (updateError) {
     // Bersihkan file yatim agar bucket tidak penuh sampah.

@@ -7,12 +7,14 @@ type Props = {
   invoiceId: string
   invoiceNumber: string
   paymentProofUrl: string | null
+  accessToken?: string
 }
 
 export default function UploadPaymentProofForm({
   invoiceId,
   invoiceNumber,
   paymentProofUrl,
+  accessToken = '',
 }: Props) {
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -47,6 +49,7 @@ export default function UploadPaymentProofForm({
       >
         <input type="hidden" name="invoiceId" value={invoiceId} />
         <input type="hidden" name="invoiceNumber" value={invoiceNumber} />
+        <input type="hidden" name="accessToken" value={accessToken} />
 
         <div>
           <label className="mb-2 block text-sm font-medium text-neutral-700">

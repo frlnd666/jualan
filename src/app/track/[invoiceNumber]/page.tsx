@@ -1,10 +1,23 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import {
+  createPublicInvoiceClient,
+  getInvoiceAccessToken,
+  isInvoiceTokenValid,
+  tokenQuery,
+} from '@/lib/invoice-access'
+import {
+  maskCustomerName,
+  maskPhoneNumber,
+  publicAddressLine,
+} from '@/lib/utils/privacy'
 
 type TrackPageProps = {
   params: Promise<{
     invoiceNumber: string
+  }>
+  searchParams: Promise<{
+    t?: string
   }>
 }
 
@@ -121,9 +134,10 @@ function buildTimeline(orderStatus: string, paymentStatus: string) {
   ]
 }
 
-export default async function TrackOrderPage({ params }: TrackPageProps) {
+export default async function TrackOrderPage({ params, searchParams }: TrackPageProps) {
   const { invoiceNumber } = await params
-  const supabase = await createClient()
+  const { t } = await searchParams
+  const supabase = await createPublicInvoiceClient()
 
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
@@ -141,6 +155,12 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
     .maybeSingle()
 
   if (invoiceError || !invoice) {
+    notFound()
+  }
+
+  // Gerbang token: nomor invoice saja tidak cukup membuka halaman ini.
+  const storedToken = await getInvoiceAccessToken(supabase, invoice.id)
+  if (!isInvoiceTokenValid(storedToken, t)) {
     notFound()
   }
 
@@ -294,7 +314,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
                     Nama
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-900">
-                    {order.customer_name}
+                    {maskCustomerName(order.customer_name)}
                   </p>
                 </div>
 
@@ -303,7 +323,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
                     WhatsApp
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-900">
-                    {order.customer_phone}
+                    {maskPhoneNumber(order.customer_phone)}
                   </p>
                 </div>
 
@@ -312,10 +332,10 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
                     Alamat
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-900">
-                    {order.address}
+                    {publicAddressLine(order)}
                   </p>
                   <p className="mt-2 text-sm text-neutral-600">
-                    {order.city}, {order.province} {order.postal_code}
+                    Alamat lengkap hanya tampil di dashboard seller demi keamanan data customer.
                   </p>
                 </div>
 
@@ -324,7 +344,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
                     Catatan
                   </p>
                   <p className="mt-1 text-sm text-neutral-900">
-                    {order.notes || '-'}
+                    {order.notes ? 'Ada catatan untuk seller' : '-'}
                   </p>
                 </div>
               </div>
@@ -403,7 +423,7 @@ export default async function TrackOrderPage({ params }: TrackPageProps) {
 
               <div className="mt-4 space-y-3">
                 <Link
-                  href={`/invoice/${invoice.invoice_number}`}
+                  href={`/invoice/${invoice.invoice_number}${tokenQuery(storedToken)}`}
                   className="block w-full rounded-2xl border border-neutral-200 bg-white px-5 py-3 text-center text-sm font-semibold text-neutral-900"
                 >
                   Lihat invoice

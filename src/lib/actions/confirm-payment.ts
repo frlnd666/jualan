@@ -14,14 +14,54 @@ export async function confirmPayment(formData: FormData) {
 
   const supabase = await createClient()
 
+  // Server Action bisa dipanggil lewat POST langsung di luar UI (panduan
+  // keamanan data Next.js), jadi autentikasi + otorisasi WAJIB dicek ulang
+  // di dalam action — cek login di halaman dashboard saja tidak cukup.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'Kamu harus login untuk mengonfirmasi pembayaran.' }
+  }
+
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
-    .select('id, payment_status, payment_proof_url')
+    .select('id, order_id, payment_status, payment_proof_url')
     .eq('id', invoiceId)
+    .eq('invoice_number', invoiceNumber)
     .maybeSingle()
 
   if (invoiceError || !invoice) {
     return { error: 'Invoice tidak ditemukan.' }
+  }
+
+  // Pasangan invoice <-> order harus cocok persis; mencegah pencampuran id
+  // order lain untuk mengubah status di luar kepemilikan pemanggil.
+  if (invoice.order_id !== orderId) {
+    return { error: 'Data pembayaran tidak cocok dengan order.' }
+  }
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, store_id')
+    .eq('id', orderId)
+    .maybeSingle()
+
+  if (orderError || !order) {
+    return { error: 'Order tidak ditemukan.' }
+  }
+
+  // Hanya pemilik toko dari order inilah yang boleh mengonfirmasi.
+  const { data: ownedStore, error: storeError } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('id', order.store_id)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !ownedStore) {
+    return { error: 'Kamu tidak berhak mengonfirmasi pembayaran order ini.' }
   }
 
   if (!invoice.payment_proof_url) {
@@ -49,6 +89,7 @@ export async function confirmPayment(formData: FormData) {
       status: 'PROCESSING',
     })
     .eq('id', orderId)
+    .eq('store_id', ownedStore.id)
 
   if (orderUpdateError) {
     return { error: 'Invoice berhasil diubah, tapi status order gagal diperbarui.' }

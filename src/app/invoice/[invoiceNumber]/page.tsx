@@ -1,11 +1,24 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import {
+  createPublicInvoiceClient,
+  getInvoiceAccessToken,
+  isInvoiceTokenValid,
+  tokenQuery,
+} from '@/lib/invoice-access'
+import {
+  maskCustomerName,
+  maskPhoneNumber,
+  publicAddressLine,
+} from '@/lib/utils/privacy'
 import UploadPaymentProofForm from '@/components/invoice/UploadPaymentProofForm'
 
 type InvoicePageProps = {
   params: Promise<{
     invoiceNumber: string
+  }>
+  searchParams: Promise<{
+    t?: string
   }>
 }
 
@@ -56,9 +69,10 @@ function getOrderStatusLabel(status: string) {
   }
 }
 
-export default async function InvoicePage({ params }: InvoicePageProps) {
+export default async function InvoicePage({ params, searchParams }: InvoicePageProps) {
   const { invoiceNumber } = await params
-  const supabase = await createClient()
+  const { t } = await searchParams
+  const supabase = await createPublicInvoiceClient()
 
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
@@ -76,6 +90,12 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
     .maybeSingle()
 
   if (invoiceError || !invoice) {
+    notFound()
+  }
+
+  // Gerbang token: nomor invoice saja tidak cukup membuka halaman ini.
+  const storedToken = await getInvoiceAccessToken(supabase, invoice.id)
+  if (!isInvoiceTokenValid(storedToken, t)) {
     notFound()
   }
 
@@ -188,7 +208,7 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
                     Nama
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-900">
-                    {order.customer_name}
+                    {maskCustomerName(order.customer_name)}
                   </p>
                 </div>
 
@@ -197,7 +217,7 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
                     WhatsApp
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-900">
-                    {order.customer_phone}
+                    {maskPhoneNumber(order.customer_phone)}
                   </p>
                 </div>
 
@@ -206,10 +226,10 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
                     Alamat
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-900">
-                    {order.address}
+                    {publicAddressLine(order)}
                   </p>
                   <p className="mt-2 text-sm text-neutral-600">
-                    {order.city}, {order.province} {order.postal_code}
+                    Alamat lengkap hanya tampil di dashboard seller demi keamanan data customer.
                   </p>
                 </div>
 
@@ -218,7 +238,7 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
                     Catatan
                   </p>
                   <p className="mt-1 text-sm text-neutral-900">
-                    {order.notes || '-'}
+                    {order.notes ? 'Ada catatan untuk seller' : '-'}
                   </p>
                 </div>
               </div>
@@ -298,7 +318,7 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
                 </div>
 
                 <Link
-                  href={`/track/${invoice.invoice_number}`}
+                  href={`/track/${invoice.invoice_number}${tokenQuery(storedToken)}`}
                   className="block w-full rounded-2xl bg-indigo-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700"
                 >
                   Lacak pesanan
@@ -325,6 +345,7 @@ export default async function InvoicePage({ params }: InvoicePageProps) {
                   invoiceId={invoice.id}
                   invoiceNumber={invoice.invoice_number}
                   paymentProofUrl={invoice.payment_proof_url}
+                  accessToken={storedToken || ''}
                 />
               </div>
             </section>

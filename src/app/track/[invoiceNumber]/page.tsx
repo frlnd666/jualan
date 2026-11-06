@@ -25,6 +25,8 @@ function getPaymentStatusLabel(status: string) {
   switch (status) {
     case 'PENDING_PAYMENT':
       return 'Menunggu pembayaran'
+    case 'WAITING_VERIFICATION':
+      return 'Menunggu verifikasi'
     case 'PAID':
       return 'Sudah dibayar'
     case 'FAILED':

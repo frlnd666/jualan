@@ -22,7 +22,7 @@ function formatRupiah(value: number | string | null | undefined) {
 }
 
 function sanitizeNumberInput(value: string) {
-  return value.replace(/D/g, '')
+  return value.replace(/\D/g, '')
 }
 
 function parseNumberInput(value: string) {

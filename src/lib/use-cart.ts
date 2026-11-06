@@ -5,7 +5,8 @@ import type { CartItem, Product } from '@/lib/types'
 interface CartStore {
   items: CartItem[]
   storeSlug: string | null
-  addItem: (product: Product, storeSlug: string) => void
+  storeId: string | null
+  addItem: (product: Product, storeSlug: string, qty?: number) => void
   removeItem: (productId: string) => void
   updateQty: (productId: string, qty: number) => void
   clearCart: () => void
@@ -17,12 +18,26 @@ export const useCart = create<CartStore>()(
     (set, get) => ({
       items: [],
       storeSlug: null,
+      storeId: null,
 
-      addItem: (product, storeSlug) => {
-        const { items, storeSlug: current } = get()
+      addItem: (product, storeSlug, qty = 1) => {
+        const safeQty = Math.max(1, Math.floor(Number(qty) || 1))
+        const productStoreId = product.store_id ?? null
+        const { items, storeSlug: currentSlug, storeId: currentStoreId } = get()
 
-        if (current && current !== storeSlug) {
-          set({ items: [{ product, qty: 1 }], storeSlug })
+        // Cart hanya boleh berisi produk dari SATU toko. Pindah toko =
+        // cart lama diganti, dan identitas toko (slug + id) disimpan
+        // eksplisit supaya checkout tidak perlu menebak store dari produk.
+        const switchingStore =
+          (currentSlug && currentSlug !== storeSlug) ||
+          (currentStoreId && productStoreId && currentStoreId !== productStoreId)
+
+        if (switchingStore) {
+          set({
+            items: [{ product, qty: safeQty }],
+            storeSlug,
+            storeId: productStoreId,
+          })
           return
         }
 
@@ -31,11 +46,16 @@ export const useCart = create<CartStore>()(
         if (existing) {
           set({
             items: items.map((i) =>
-              i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i
+              i.product.id === product.id ? { ...i, qty: i.qty + safeQty } : i
             ),
+            storeId: currentStoreId ?? productStoreId,
           })
         } else {
-          set({ items: [...items, { product, qty: 1 }], storeSlug })
+          set({
+            items: [...items, { product, qty: safeQty }],
+            storeSlug,
+            storeId: productStoreId,
+          })
         }
       },
 
@@ -45,14 +65,14 @@ export const useCart = create<CartStore>()(
       updateQty: (productId, qty) =>
         set({
           items:
-            qty === 0
+            qty <= 0
               ? get().items.filter((i) => i.product.id !== productId)
               : get().items.map((i) =>
                   i.product.id === productId ? { ...i, qty } : i
                 ),
         }),
 
-      clearCart: () => set({ items: [], storeSlug: null }),
+      clearCart: () => set({ items: [], storeSlug: null, storeId: null }),
 
       subtotal: () =>
         get().items.reduce((sum, i) => sum + i.product.price * i.qty, 0),

@@ -10,12 +10,31 @@ type DashboardPaymentDetailPageProps = {
   }>
 }
 
+/** Bentuk order hasil join `orders (...)` di query invoice halaman ini. */
+interface EmbeddedOrder {
+  id: string
+  store_id: string
+  customer_name: string
+  customer_phone: string
+  address: string
+  province: string
+  city: string
+  postal_code: string
+  notes: string | null
+  subtotal: number
+  shipping_cost: number
+  total: number
+  status: string
+  shipping_method_name: string | null
+  created_at: string | null
+}
+
 function formatRupiah(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0)
 
   if (Number.isNaN(numberValue)) return '0'
 
-  return numberValue.toString().replace(/B(?=(d{3})+(?!d))/g, '.')
+  return numberValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
 function formatDate(dateValue: string | null | undefined) {
@@ -168,7 +187,19 @@ export default async function DashboardPaymentDetailPage({
     .eq('invoice_number', invoiceNumber)
     .maybeSingle()
 
-  if (invoiceError || !invoice || invoice.orders?.store_id !== store.id) {
+  if (invoiceError || !invoice) {
+    notFound()
+  }
+
+  // Join many-to-one `orders (...)` terbaca TypeScript sebagai array, padahal
+  // runtime Supabase mengembalikan objek tunggal. Normalisasi sekali di sini
+  // agar seluruh pemakaian di bawah bertipe EmbeddedOrder yang jelas.
+  const embeddedOrder: unknown = invoice.orders
+  const order: EmbeddedOrder | null = Array.isArray(embeddedOrder)
+    ? ((embeddedOrder[0] as EmbeddedOrder | undefined) ?? null)
+    : ((embeddedOrder as EmbeddedOrder | null) ?? null)
+
+  if (!order || order.store_id !== store.id) {
     notFound()
   }
 
@@ -190,8 +221,6 @@ export default async function DashboardPaymentDetailPage({
   if (itemsError) {
     notFound()
   }
-
-  const order = invoice.orders
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -325,7 +354,7 @@ export default async function DashboardPaymentDetailPage({
             <h2 className="text-lg font-bold text-gray-900">Item pesanan</h2>
 
             <div className="mt-4 space-y-3">
-              {(orderItems || []).map((item: any) => (
+              {(orderItems || []).map((item) => (
                 <div
                   key={item.id}
                   className="flex items-start justify-between gap-4 rounded-2xl bg-gray-50 px-4 py-4"

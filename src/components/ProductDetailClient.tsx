@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useCart } from '@/lib/use-cart'
 
 type Product = {
   id: string
   name: string
   slug: string
   price: number | string
+  store_id?: string | null
   description?: string | null
   images?: string[] | null
   badge?: string | null
@@ -69,6 +71,28 @@ export default function ProductDetailClient({
 
   const isDisabled =
     product.available === false || Number(product.stock ?? 0) <= 0
+
+  const addItem = useCart((state) => state.addItem)
+  const maxQty = Math.max(1, Number(product.stock ?? 1))
+  const [qty, setQty] = useState(1)
+  const [added, setAdded] = useState(false)
+
+  function handleAddToCart() {
+    addItem(
+      {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: Number(product.price),
+        store_id: product.store_id ?? null,
+        images: product.images ?? null,
+        badge: product.badge ?? null,
+      },
+      storeSlug,
+      qty
+    )
+    setAdded(true)
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f1ea] pb-32 text-[#241b17]">
@@ -179,6 +203,41 @@ export default function ProductDetailClient({
                 </div>
               </div>
 
+              {!isDisabled ? (
+                <div className="mt-4 flex items-center justify-between gap-4 rounded-[28px] border border-[#eadfd4] bg-white px-4 py-3">
+                  <p className="text-sm font-semibold text-[#241b17]">Jumlah</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label="Kurangi jumlah"
+                      onClick={() => {
+                        setQty((q) => Math.max(1, q - 1))
+                        setAdded(false)
+                      }}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-base font-bold text-[#241b17] transition hover:bg-[#faf6f1] disabled:opacity-40"
+                      disabled={qty <= 1}
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center text-sm font-bold text-[#241b17]">
+                      {qty}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Tambah jumlah"
+                      onClick={() => {
+                        setQty((q) => Math.min(maxQty, q + 1))
+                        setAdded(false)
+                      }}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-base font-bold text-[#241b17] transition hover:bg-[#faf6f1] disabled:opacity-40"
+                      disabled={qty >= maxQty}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl bg-[#fcfaf7] px-4 py-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8d7f73]">
@@ -251,13 +310,23 @@ export default function ProductDetailClient({
             Lihat menu lain
           </Link>
 
-          <button
-            type="button"
-            disabled={isDisabled}
-            className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#5b3df5] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(91,61,245,0.24)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
-          >
-            {isDisabled ? 'Belum tersedia' : 'Pesan sekarang'}
-          </button>
+          {added && !isDisabled ? (
+            <Link
+              href="/cart"
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(5,150,105,0.24)] transition hover:opacity-95"
+            >
+              Ditambahkan ✓ Lihat keranjang
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled={isDisabled}
+              onClick={handleAddToCart}
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#5b3df5] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(91,61,245,0.24)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+            >
+              {isDisabled ? 'Belum tersedia' : 'Pesan sekarang'}
+            </button>
+          )}
         </div>
       </div>
     </div>

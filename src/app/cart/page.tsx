@@ -4,12 +4,19 @@ import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
 
 export default function CartPage() {
-  const { items, updateQty, removeItem, subtotal, clearCart } = useCart()
+  const { items, updateQty, removeItem, subtotal, clearCart, storeSlug } = useCart()
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-xl mx-auto bg-white rounded-2xl p-4 space-y-4">
-        <h1 className="text-xl font-bold text-gray-900">Cart</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-bold text-gray-900">Cart</h1>
+          {storeSlug ? (
+            <Link href={`/${storeSlug}`} className="text-sm font-semibold text-indigo-600">
+              ← Kembali ke toko
+            </Link>
+          ) : null}
+        </div>
 
         {items.length === 0 ? (
           <p className="text-sm text-gray-500">Cart masih kosong.</p>
@@ -27,7 +34,7 @@ export default function CartPage() {
                 <div className="flex items-center gap-2 mt-3">
                   <button onClick={() => updateQty(item.product.id, item.qty - 1)} className="w-8 h-8 rounded-lg border">-</button>
                   <span className="w-8 text-center">{item.qty}</span>
-                  <button onClick={() => updateQty(item.product.id, item.qty + 1)} className="w-8 h-8 rounded-lg border">+</button>
+                  <button onClick={() => updateQty(item.product.id, Math.min(item.qty + 1, Number(item.product.stock ?? item.qty + 1)))} className="w-8 h-8 rounded-lg border">+</button>
                 </div>
               </div>
             ))}

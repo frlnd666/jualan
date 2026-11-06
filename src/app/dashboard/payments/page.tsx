@@ -257,6 +257,8 @@ export default async function DashboardPaymentsPage({
     )
   }
 
+  // Filter kepemilikan dilakukan DI SERVER (join !inner + eq store_id),
+  // bukan lagi mengambil semua invoice semua toko lalu menyaring di memori.
   const { data: invoices, error: invoicesError } = await supabase
     .from('invoices')
     .select(`
@@ -268,7 +270,7 @@ export default async function DashboardPaymentsPage({
       total,
       payment_method,
       created_at,
-      orders (
+      orders!inner (
         id,
         store_id,
         customer_name,
@@ -278,7 +280,9 @@ export default async function DashboardPaymentsPage({
         created_at
       )
     `)
+    .eq('orders.store_id', store.id)
     .order('created_at', { ascending: false })
+    .limit(200)
 
   if (invoicesError) {
     return (

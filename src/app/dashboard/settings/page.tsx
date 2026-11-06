@@ -74,7 +74,8 @@ export default function SettingsPage() {
     }
 
     if (storeId) {
-      await supabase.from('stores').update(payload).eq('id', storeId)
+      // Batasi ke toko milik user yang login, bukan sekadar id dari state.
+      await supabase.from('stores').update(payload).eq('id', storeId).eq('owner_id', user.id)
     } else {
       const { data } = await supabase.from('stores').insert(payload).select().single()
       if (data) setStoreId(data.id)

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 
 /**
  * Balasan seller dari dashboard. Memakai client user biasa — RLS
- * (chat_messages_owner_insert) memastikan sesi ini milik toko seller
+ * (chat_session_messages_owner_insert) memastikan sesi ini milik toko seller
  * dan memaksa sender = 'seller'.
  */
 export async function sendSellerMessage(
@@ -26,7 +26,7 @@ export async function sendSellerMessage(
 
   if (!user) return { success: false, error: 'Sesi login tidak ditemukan.' }
 
-  const { error } = await supabase.from('chat_messages').insert({
+  const { error } = await supabase.from('chat_session_messages').insert({
     session_id: sessionId,
     sender: 'seller',
     body: text,

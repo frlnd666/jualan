@@ -1,7 +1,18 @@
--- Migrasi P2 (2026-11-07): fitur chat toko + kolom profil toko tambahan.
+-- Migrasi P2 (2026-11-07, DIREVISI terhadap skema live): fitur chat toko +
+-- kolom profil toko tambahan + kolom shipped_at untuk shipments.
 --
 -- Jalankan SETELAH migrasi P0 (20261107_p0_security.sql).
 -- Aman dijalankan berulang (idempotent).
+--
+-- CATATAN REKONSILIASI SKEMA (dari dump skema live 2026-11-07):
+-- - Database SUDAH memiliki tabel `chats` + `chat_messages` versi lama
+--   (model chat berbasis order: chat_id, sender_type, message). Tabel itu
+--   TIDAK disentuh migrasi ini. Chat widget baru memakai tabel baru
+--   `chat_sessions` + `chat_session_messages` agar tidak bertabrakan.
+-- - Nama tabel kategori yang benar adalah `product_categories`
+--   (bukan `categories`).
+-- - Tabel `shipments` belum punya kolom `shipped_at` yang ditulis aksi
+--   seller — ditambahkan di bagian 4.
 --
 -- Model akses chat:
 -- - Pembeli (tamu, tanpa akun) TIDAK menyentuh tabel ini langsung. Semua
@@ -22,7 +33,7 @@ create table if not exists public.chat_sessions (
   last_message_at timestamptz not null default now()
 );
 
-create table if not exists public.chat_messages (
+create table if not exists public.chat_session_messages (
   id bigint generated always as identity primary key,
   session_id uuid not null references public.chat_sessions (id) on delete cascade,
   sender text not null check (sender in ('buyer', 'seller')),
@@ -32,11 +43,11 @@ create table if not exists public.chat_messages (
 
 create index if not exists chat_sessions_store_idx
   on public.chat_sessions (store_id, last_message_at desc);
-create index if not exists chat_messages_session_idx
-  on public.chat_messages (session_id, created_at);
+create index if not exists chat_session_messages_session_idx
+  on public.chat_session_messages (session_id, created_at);
 
 alter table public.chat_sessions enable row level security;
-alter table public.chat_messages enable row level security;
+alter table public.chat_session_messages enable row level security;
 
 drop policy if exists chat_sessions_owner_select on public.chat_sessions;
 create policy chat_sessions_owner_select on public.chat_sessions
@@ -58,24 +69,24 @@ create policy chat_sessions_owner_update on public.chat_sessions
     where s.id = chat_sessions.store_id and s.owner_id = auth.uid()
   ));
 
-drop policy if exists chat_messages_owner_select on public.chat_messages;
-create policy chat_messages_owner_select on public.chat_messages
+drop policy if exists chat_session_messages_owner_select on public.chat_session_messages;
+create policy chat_session_messages_owner_select on public.chat_session_messages
   for select to authenticated
   using (exists (
     select 1 from public.chat_sessions cs
     join public.stores s on s.id = cs.store_id
-    where cs.id = chat_messages.session_id and s.owner_id = auth.uid()
+    where cs.id = chat_session_messages.session_id and s.owner_id = auth.uid()
   ));
 
-drop policy if exists chat_messages_owner_insert on public.chat_messages;
-create policy chat_messages_owner_insert on public.chat_messages
+drop policy if exists chat_session_messages_owner_insert on public.chat_session_messages;
+create policy chat_session_messages_owner_insert on public.chat_session_messages
   for insert to authenticated
   with check (
     sender = 'seller'
     and exists (
       select 1 from public.chat_sessions cs
       join public.stores s on s.id = cs.store_id
-      where cs.id = chat_messages.session_id and s.owner_id = auth.uid()
+      where cs.id = chat_session_messages.session_id and s.owner_id = auth.uid()
     )
   );
 
@@ -87,7 +98,12 @@ alter table public.stores add column if not exists instagram text;
 
 -- 3. Kategori bisa dibaca publik (nama kategori tampil di storefront) -----------
 
-drop policy if exists categories_public_read on public.categories;
-create policy categories_public_read on public.categories
+drop policy if exists product_categories_public_read on public.product_categories;
+create policy product_categories_public_read on public.product_categories
   for select to anon, authenticated
   using (true);
+
+-- 4. shipments.shipped_at (ditulis aksi input resi seller) -----------------------
+
+alter table public.shipments
+  add column if not exists shipped_at timestamptz;

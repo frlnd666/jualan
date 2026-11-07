@@ -15,15 +15,12 @@ function formatRupiah(value: number | string | null | undefined) {
   return numeric.toLocaleString('id-ID')
 }
 
-function getCategoryName(product: { categories?: unknown }): string | null {
-  const raw = product.categories as
-    | { name?: string | null }
-    | { name?: string | null }[]
-    | null
-    | undefined
-  if (!raw) return null
-  const single = Array.isArray(raw) ? raw[0] : raw
-  return single?.name ?? null
+function getCategoryName(
+  product: { category_id?: string | null },
+  categoryNames: Map<string, string>
+): string | null {
+  if (!product.category_id) return null
+  return categoryNames.get(product.category_id) ?? null
 }
 
 function getInitials(name: string) {
@@ -51,10 +48,31 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
 
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, slug, price, images, badge, description, categories ( name )')
+    .select('id, name, slug, price, images, badge, description, category_id')
     .eq('store_id', store.id)
     .eq('available', true)
     .order('created_at', { ascending: false })
+
+  // Nama kategori diambil dari tabel product_categories (nama tabel asli
+  // di database) dengan query terpisah — bukan embed relasi — agar tahan
+  // terhadap perbedaan nama relasi PostgREST.
+  const categoryIds = Array.from(
+    new Set((products ?? []).map((p) => p.category_id).filter(Boolean))
+  ) as string[]
+
+  const categoryNames = new Map<string, string>()
+  if (categoryIds.length > 0) {
+    const { data: categories } = await supabase
+      .from('product_categories')
+      .select('id, name')
+      .in('id', categoryIds)
+
+    for (const category of categories ?? []) {
+      if (category?.id && category?.name) {
+        categoryNames.set(category.id, category.name)
+      }
+    }
+  }
 
   const productList = products ?? []
   const totalProducts = productList.length
@@ -292,9 +310,9 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                     </div>
 
                     <div className="p-3.5">
-                      {getCategoryName(product) ? (
+                      {getCategoryName(product, categoryNames) ? (
                         <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8d7f73]">
-                          {getCategoryName(product)}
+                          {getCategoryName(product, categoryNames)}
                         </p>
                       ) : null}
                       <p className="line-clamp-2 min-h-[2.75rem] text-sm font-bold leading-5 text-[#241b17]">

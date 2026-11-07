@@ -1,74 +1,121 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
+import { ArrowRight, Check } from "lucide-react";
+
+import { LANDING_PHOTOS } from "@/lib/landing-photos";
+
+const bullets = [
+  "Dashboard dirancang untuk layar HP: antrean pesanan, verifikasi, dan resi selesai dalam beberapa ketuk.",
+  "Bisa ditambahkan ke home screen (PWA) — terasa seperti aplikasi, tanpa perlu download dari Play Store.",
+  "Halaman toko dan invoice ringan dibuka dari jaringan seluler, termasuk dari link chat.",
+];
 
 export function MobileExperience() {
   return (
-    <section className="bg-[var(--surface-soft)] px-4 py-20 sm:px-6 lg:px-8">
-      <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+    <section className="px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.35 }}
         >
-          <p className="text-sm font-medium text-[var(--primary)]">
-            Mobile Experience
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+            Mobile-first
           </p>
-
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-[var(--text)] sm:text-4xl">
-            Tampil seperti aplikasi mobile modern, bukan sekadar web biasa
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+            Tokomu tinggal di HP yang sama dengan chat pelangganmu
           </h2>
-
-          <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-muted)]">
-            Pengalaman mobile jadi fokus utama: storefront rapi, checkout nyaman
-            dari HP, dan bisa ditambahkan ke home screen.
+          <p className="mt-4 max-w-xl text-base leading-7 text-[var(--text-muted)]">
+            Mayoritas UMKM mengelola pesanan dari satu HP Android. Jualan
+            dibuat untuk itu: tidak ada panel rumit, tidak ada menu
+            berlapis — yang perlu dikerjakan selalu tampil duluan.
           </p>
 
-          <div className="mt-8 space-y-3 text-sm text-[var(--text-muted)]">
-            <div className="rounded-[22px] border border-[var(--line)] bg-[var(--surface)] px-5 py-4 shadow-[var(--shadow-sm)]">
-              Preview produk dan checkout lebih nyaman di layar kecil.
-            </div>
-            <div className="rounded-[22px] border border-[var(--line)] bg-[var(--surface)] px-5 py-4 shadow-[var(--shadow-sm)]">
-              Seller bisa kelola toko langsung dari smartphone.
-            </div>
-            <div className="rounded-[22px] border border-[var(--line)] bg-[var(--surface)] px-5 py-4 shadow-[var(--shadow-sm)]">
-              Add to home screen bikin platform terasa seperti app.
-            </div>
-          </div>
+          <ul className="mt-7 space-y-3.5">
+            {bullets.map((bullet) => (
+              <li key={bullet} className="flex gap-3 text-sm leading-6 text-[var(--text-muted)]">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
+                  <Check className="h-3.5 w-3.5" />
+                </span>
+                {bullet}
+              </li>
+            ))}
+          </ul>
+
+          <Link
+            href="/register"
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--primary)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+          >
+            Coba buat toko dari HP-mu
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ delay: 0.05, duration: 0.35 }}
-          className="flex justify-center lg:justify-end"
+          className="flex justify-center"
         >
-          <div className="rounded-[36px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-md)]">
-            <div className="w-[280px] rounded-[32px] border border-[var(--line)] bg-[var(--bg)] p-3 shadow-[var(--shadow-sm)]">
-              <div className="rounded-[28px] bg-[var(--surface)] p-3">
-                <div className="h-36 rounded-[24px] border border-[var(--line)] bg-[var(--surface-soft)]" />
-
-                <h3 className="mt-4 text-lg font-semibold text-[var(--text)]">
-                  Kopi Sore
-                </h3>
-
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Cold brew, beans, dan pastry favorit pelanggan.
-                </p>
-
-                <div className="mt-4 grid gap-2">
-                  <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text)]">
-                    Checkout WhatsApp
-                  </div>
-                  <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text)]">
-                    Add to home screen
-                  </div>
+          <div className="w-[290px] rounded-[36px] border border-[var(--line)] bg-[var(--text)] p-2.5 shadow-[var(--shadow-md)]">
+            <div className="overflow-hidden rounded-[28px] bg-[var(--surface)]">
+              <div className="relative h-40">
+                <Image
+                  src={LANDING_PHOTOS.coffee}
+                  alt="Foto kedai Kopi Sore"
+                  fill
+                  sizes="290px"
+                  className="object-cover"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent p-3.5 pt-8">
+                  <p className="text-base font-bold text-white">Kopi Sore</p>
+                  <p className="text-[11px] text-white/85">Serang, Banten</p>
                 </div>
-
-                <div className="mt-4 rounded-full bg-[var(--primary)] px-4 py-2.5 text-center text-xs font-medium text-white">
-                  Buka Toko di HP
+              </div>
+              <div className="space-y-2.5 p-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg">
+                    <Image
+                      src={LANDING_PHOTOS.coffee}
+                      alt="Foto produk kopi"
+                      fill
+                      sizes="36px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium capitalize text-[var(--text)]">kopi</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Rp15.000</p>
+                  </div>
+                  <span className="rounded-full bg-[var(--primary)] px-2.5 py-1 text-[11px] font-medium text-white">
+                    + Keranjang
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg">
+                    <Image
+                      src={LANDING_PHOTOS.nasiGoreng}
+                      alt="Foto produk nasgor"
+                      fill
+                      sizes="36px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium capitalize text-[var(--text)]">nasgor</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Rp15.000</p>
+                  </div>
+                  <span className="rounded-full bg-[var(--primary)] px-2.5 py-1 text-[11px] font-medium text-white">
+                    + Keranjang
+                  </span>
+                </div>
+                <div className="rounded-full bg-[var(--text)] px-4 py-2.5 text-center text-xs font-semibold text-white">
+                  Checkout · 3 langkah
                 </div>
               </div>
             </div>

@@ -7,7 +7,6 @@ import {
   MobileExperience,
   Navbar,
   PricingSection,
-  SocialProof,
   StepsSection,
   TrustSection,
 } from "@/components/storefront/home";
@@ -17,12 +16,11 @@ export default function HomePage() {
     <main className="overflow-x-hidden">
       <Navbar />
       <HeroSection />
-      <DemoGrid />
       <TrustSection />
+      <DemoGrid />
       <StepsSection />
       <FeatureGrid />
       <MobileExperience />
-      <SocialProof />
       <PricingSection />
       <FaqSection />
       <FinalCta />

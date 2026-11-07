@@ -56,6 +56,13 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        // Foto stok bebas pakai untuk landing page (Pexels).
+        protocol: "https",
+        hostname: "images.pexels.com",
+        port: "",
+        pathname: "/photos/**",
+      },
     ],
   },
   async headers() {

@@ -1,62 +1,81 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 
 const faqs = [
   {
-    question: "Apakah harus bisa coding?",
-    answer: "Tidak. Seller bisa membuat toko, upload produk, dan mulai jualan tanpa setup teknis yang rumit.",
+    q: "Bagaimana pembeli membayar?",
+    a: "Saat checkout, pembeli memilih metode yang kamu sediakan (misalnya transfer bank atau QRIS). Setelah pesanan dibuat, halaman invoice menampilkan panduan pembayaran dan formulir upload bukti transfer. Kamu memeriksa bukti itu dari dashboard, lalu mengonfirmasi — status di halaman pembeli berubah seketika.",
   },
   {
-    question: "Apakah bisa dipakai di HP?",
-    answer: "Bisa. Semua tampilan dirancang mobile-first supaya seller dan pembeli nyaman mengakses dari smartphone.",
+    q: "Apakah Jualan memotong hasil penjualan saya?",
+    a: "Tidak. Jualan tidak memegang uang pembeli sama sekali. Pembayaran masuk langsung ke rekening atau QRIS kamu, dan saat ini platformnya gratis tanpa komisi per transaksi.",
   },
   {
-    question: "Apakah bisa pakai domain sendiri?",
-    answer: "Bisa di plan Pro, sehingga toko terlihat lebih profesional dan lebih mudah dipercaya pelanggan.",
+    q: "Saya tidak bisa coding. Bisakah saya memakainya?",
+    a: "Bisa — memang untuk itu Jualan dibuat. Kamu cukup mendaftar, mengisi profil toko, dan menambah produk lewat formulir biasa. Tidak ada yang perlu di-install dan tidak ada pengaturan teknis.",
   },
   {
-    question: "Apakah bisa checkout WhatsApp?",
-    answer: "Bisa. WhatsApp checkout jadi salah satu alur utama agar pelanggan lebih cepat menghubungi seller dan menyelesaikan order.",
+    q: "Bagaimana ongkos kirim ditentukan?",
+    a: "Kamu mengatur sendiri metode pengiriman dan tarifnya dari dashboard (misalnya kurir lokal, ekspedisi, atau ambil di tempat). Tarif yang kamu atur itulah yang muncul saat pembeli checkout, dan setelah paket dikirim kamu tinggal memasukkan nomor resinya.",
+  },
+  {
+    q: "Bisakah semua ini dikelola dari HP?",
+    a: "Ya. Dashboard dan halaman toko dirancang mobile-first dan Jualan adalah PWA — bisa ditambahkan ke home screen HP dan dibuka seperti aplikasi, tanpa download dari Play Store.",
+  },
+  {
+    q: "Apakah data pembeli saya aman?",
+    a: "Halaman invoice setiap pesanan dilindungi token acak dan data pribadi pembeli (nomor WhatsApp, alamat) ditampilkan termasking ke publik. Bukti transfer tersimpan di penyimpanan privat — hanya kamu dan pembeli yang bersangkutan yang bisa melihatnya.",
   },
 ];
 
 export function FaqSection() {
-  const [open, setOpen] = useState<number | null>(0);
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="px-4 py-20 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-medium text-[var(--primary)]">FAQ</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-neutral-950 sm:text-4xl">
-            Pertanyaan yang paling sering ditanyakan UMKM
+    <section id="faq" className="scroll-mt-20 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <div className="mx-auto max-w-3xl">
+        <div className="text-center">
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+            FAQ
+          </p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+            Yang sering ditanyakan
           </h2>
         </div>
-        <div className="mt-10 space-y-4">
+
+        <div className="mt-10 divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-6 shadow-[var(--shadow-sm)]">
           {faqs.map((faq, index) => {
-            const active = open === index;
+            const open = openIndex === index;
             return (
-              <div key={faq.question} className="rounded-[28px] border border-black/5 bg-white shadow-[var(--shadow-sm)]">
+              <div key={faq.q}>
                 <button
                   type="button"
-                  onClick={() => setOpen(active ? null : index)}
-                  className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+                  onClick={() => setOpenIndex(open ? null : index)}
+                  aria-expanded={open}
+                  className="flex w-full items-center justify-between gap-4 py-5 text-left"
                 >
-                  <span className="text-base font-medium text-neutral-950">{faq.question}</span>
-                  <span className="text-xl text-[var(--text-muted)]">{active ? "−" : "+"}</span>
+                  <span className="text-base font-semibold text-[var(--text)]">
+                    {faq.q}
+                  </span>
+                  <ChevronDown
+                    className={`h-5 w-5 shrink-0 text-[var(--text-muted)] transition-transform ${open ? "rotate-180" : ""}`}
+                  />
                 </button>
                 <AnimatePresence initial={false}>
-                  {active ? (
+                  {open ? (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.22 }}
                       className="overflow-hidden"
                     >
-                      <p className="px-6 pb-6 text-sm leading-7 text-[var(--text-muted)]">{faq.answer}</p>
+                      <p className="pb-5 text-sm leading-7 text-[var(--text-muted)]">
+                        {faq.a}
+                      </p>
                     </motion.div>
                   ) : null}
                 </AnimatePresence>

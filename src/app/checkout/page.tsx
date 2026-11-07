@@ -7,9 +7,42 @@ import { createOrderAction } from '@/lib/actions/checkout'
 import type { PaymentMethod, ShippingMethod } from '@/lib/types/order'
 import { createClient } from '@/lib/supabase/client'
 
+const CHECKOUT_STEPS = [
+  { key: 1, label: 'Data & alamat' },
+  { key: 2, label: 'Pengiriman' },
+  { key: 3, label: 'Pembayaran' },
+] as const
+
+const PAYMENT_OPTIONS: {
+  value: PaymentMethod
+  label: string
+  hint: string
+}[] = [
+  {
+    value: 'BANK_TRANSFER',
+    label: 'Transfer bank',
+    hint: 'Detail rekening tujuan kamu terima dari penjual setelah pesanan dibuat; bukti transfer diupload di halaman invoice.',
+  },
+  {
+    value: 'QRIS',
+    label: 'QRIS',
+    hint: 'Kode QR tujuan kamu terima dari penjual setelah pesanan dibuat; bukti pembayaran diupload di halaman invoice.',
+  },
+  {
+    value: 'COD',
+    label: 'COD (bayar di tempat)',
+    hint: 'Bayar tunai ke kurir saat barang diterima. Tidak perlu upload bukti.',
+  },
+]
+
+const inputClassName =
+  'w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400'
+
 export default function CheckoutPage() {
   const router = useRouter()
   const { items, subtotal, clearCart, storeId: cartStoreId } = useCart()
+
+  const [step, setStep] = useState(1)
 
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -77,6 +110,42 @@ export default function CheckoutPage() {
     fetchShippingMethods()
   }, [storeId])
 
+  // Validasi per langkah — cerminan persis validasi server action, supaya
+  // pembeli tidak menabrak error server di akhir alur.
+  function validateStep(target: number): string {
+    if (target === 1) {
+      if (!customerName.trim()) return 'Nama lengkap wajib diisi.'
+      if (!customerPhone.trim()) return 'Nomor WhatsApp wajib diisi.'
+      if (!address.trim()) return 'Alamat lengkap wajib diisi.'
+      if (!province.trim()) return 'Provinsi wajib diisi.'
+      if (!city.trim()) return 'Kota wajib diisi.'
+      if (!postalCode.trim()) return 'Kode pos wajib diisi.'
+    }
+    if (target === 2) {
+      if (loadingShipping) return 'Metode pengiriman masih dimuat.'
+      if (!shippingMethodId) return 'Pilih metode pengiriman terlebih dahulu.'
+    }
+    return ''
+  }
+
+  function goToStep(next: number) {
+    if (next > step) {
+      for (let s = step; s < next; s++) {
+        const problem = validateStep(s)
+        if (problem) {
+          setErrorMessage(problem)
+          setStep(s)
+          return
+        }
+      }
+    }
+    setErrorMessage('')
+    setStep(next)
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
   async function handleSubmit() {
     if (!items.length) {
       setErrorMessage('Cart masih kosong.')
@@ -88,9 +157,13 @@ export default function CheckoutPage() {
       return
     }
 
-    if (!shippingMethodId) {
-      setErrorMessage('Pilih metode pengiriman terlebih dahulu.')
-      return
+    for (let s = 1; s <= 2; s++) {
+      const problem = validateStep(s)
+      if (problem) {
+        setErrorMessage(problem)
+        setStep(s)
+        return
+      }
     }
 
     setErrorMessage('')
@@ -152,9 +225,49 @@ export default function CheckoutPage() {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-neutral-900">Checkout</h1>
             <p className="mt-1 text-sm text-neutral-600">
-              Lengkapi data pembeli, pilih pengiriman, lalu buat pesanan.
+              Tiga langkah singkat: data &amp; alamat, pengiriman, lalu pembayaran.
             </p>
           </div>
+
+          {/* Indikator langkah — langkah selesai bisa diklik untuk kembali. */}
+          <ol className="mb-6 flex items-center gap-2">
+            {CHECKOUT_STEPS.map((s, index) => {
+              const isActive = step === s.key
+              const isDone = step > s.key
+              return (
+                <li key={s.key} className="flex flex-1 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!isDone}
+                    onClick={() => isDone && goToStep(s.key)}
+                    className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      isActive
+                        ? 'bg-neutral-900 text-white'
+                        : isDone
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-neutral-100 text-neutral-500'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
+                        isActive
+                          ? 'bg-white text-neutral-900'
+                          : isDone
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-neutral-300 text-white'
+                      }`}
+                    >
+                      {isDone ? '✓' : s.key}
+                    </span>
+                    <span className="hidden sm:inline">{s.label}</span>
+                  </button>
+                  {index < CHECKOUT_STEPS.length - 1 ? (
+                    <span aria-hidden className="h-px flex-1 bg-neutral-200" />
+                  ) : null}
+                </li>
+              )
+            })}
+          </ol>
 
           {errorMessage ? (
             <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -162,9 +275,11 @@ export default function CheckoutPage() {
             </div>
           ) : null}
 
-          <div className="space-y-6">
+          {step === 1 ? (
             <section className="space-y-4">
-              <h2 className="text-base font-semibold text-neutral-900">Info customer</h2>
+              <h2 className="text-base font-semibold text-neutral-900">
+                Langkah 1 — Data &amp; alamat pengiriman
+              </h2>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
@@ -174,7 +289,7 @@ export default function CheckoutPage() {
                   <input
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400"
+                    className={inputClassName}
                     placeholder="Nama lengkap"
                   />
                 </label>
@@ -186,7 +301,7 @@ export default function CheckoutPage() {
                   <input
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400"
+                    className={inputClassName}
                     placeholder="08xxxxxxxxxx"
                   />
                 </label>
@@ -200,7 +315,7 @@ export default function CheckoutPage() {
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   rows={4}
-                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400"
+                  className={inputClassName}
                   placeholder="Nama jalan, nomor rumah, RT/RW, kecamatan, kelurahan"
                 />
               </label>
@@ -213,7 +328,7 @@ export default function CheckoutPage() {
                   <input
                     value={province}
                     onChange={(e) => setProvince(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400"
+                    className={inputClassName}
                     placeholder="DKI Jakarta"
                   />
                 </label>
@@ -225,7 +340,7 @@ export default function CheckoutPage() {
                   <input
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400"
+                    className={inputClassName}
                     placeholder="Jakarta Selatan"
                   />
                 </label>
@@ -237,7 +352,7 @@ export default function CheckoutPage() {
                   <input
                     value={postalCode}
                     onChange={(e) => setPostalCode(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400"
+                    className={inputClassName}
                     placeholder="12345"
                   />
                 </label>
@@ -245,20 +360,32 @@ export default function CheckoutPage() {
 
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-neutral-700">
-                  Catatan
+                  Catatan (opsional)
                 </span>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
-                  className="w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400"
+                  className={inputClassName}
                   placeholder="Contoh: rumah pagar hitam, titip satpam, atau request khusus"
                 />
               </label>
-            </section>
 
-            <section className="space-y-4 border-t border-neutral-200 pt-6">
-              <h2 className="text-base font-semibold text-neutral-900">Metode pengiriman</h2>
+              <button
+                type="button"
+                onClick={() => goToStep(2)}
+                className="w-full rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800"
+              >
+                Lanjut ke pengiriman
+              </button>
+            </section>
+          ) : null}
+
+          {step === 2 ? (
+            <section className="space-y-4">
+              <h2 className="text-base font-semibold text-neutral-900">
+                Langkah 2 — Metode pengiriman
+              </h2>
 
               {loadingShipping ? (
                 <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
@@ -306,20 +433,38 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               )}
-            </section>
 
-            <section className="space-y-4 border-t border-neutral-200 pt-6">
-              <h2 className="text-base font-semibold text-neutral-900">Metode pembayaran</h2>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => goToStep(1)}
+                  className="rounded-2xl border border-neutral-200 bg-white px-5 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
+                >
+                  Kembali
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToStep(3)}
+                  disabled={loadingShipping || !shippingMethodId}
+                  className="flex-1 rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Lanjut ke pembayaran
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {step === 3 ? (
+            <section className="space-y-4">
+              <h2 className="text-base font-semibold text-neutral-900">
+                Langkah 3 — Metode pembayaran
+              </h2>
 
               <div className="space-y-3">
-                {[
-                  { value: 'BANK_TRANSFER', label: 'Transfer bank' },
-                  { value: 'QRIS', label: 'QRIS' },
-                  { value: 'COD', label: 'COD' },
-                ].map((option) => (
+                {PAYMENT_OPTIONS.map((option) => (
                   <label
                     key={option.value}
-                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-4 transition ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${
                       paymentMethod === option.value
                         ? 'border-neutral-900 bg-neutral-50'
                         : 'border-neutral-200 bg-white'
@@ -330,16 +475,48 @@ export default function CheckoutPage() {
                       name="paymentMethod"
                       value={option.value}
                       checked={paymentMethod === option.value}
-                      onChange={() => setPaymentMethod(option.value as PaymentMethod)}
+                      onChange={() => setPaymentMethod(option.value)}
+                      className="mt-1"
                     />
-                    <span className="text-sm font-medium text-neutral-800">
-                      {option.label}
+                    <span>
+                      <span className="block text-sm font-semibold text-neutral-900">
+                        {option.label}
+                      </span>
+                      <span className="mt-0.5 block text-xs leading-5 text-neutral-500">
+                        {option.hint}
+                      </span>
                     </span>
                   </label>
                 ))}
               </div>
+
+              <div className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-600">
+                Setelah pesanan dibuat, kamu langsung masuk ke halaman invoice:
+                di sana ada ringkasan pesanan, status, dan tempat upload bukti
+                pembayaran. Simpan link halaman itu — itu kunci pesananmu.
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="rounded-2xl border border-neutral-200 bg-white px-5 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
+                >
+                  Kembali
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isPending}
+                  className="flex-1 rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPending
+                    ? 'Memproses pesanan...'
+                    : `Buat pesanan • Rp ${total.toLocaleString('id-ID')}`}
+                </button>
+              </div>
             </section>
-          </div>
+          ) : null}
         </div>
 
         <aside className="h-fit rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6 lg:sticky lg:top-6">
@@ -374,11 +551,14 @@ export default function CheckoutPage() {
               </div>
 
               <div className="flex items-center justify-between text-neutral-600">
-                <span>Ongkir</span>
+                <span>
+                  Ongkir
+                  {selectedShipping ? ` (${selectedShipping.name})` : ''}
+                </span>
                 <span>
                   {selectedShipping
                     ? `Rp ${shippingCost.toLocaleString('id-ID')}`
-                    : '-'}
+                    : 'Pilih di langkah 2'}
                 </span>
               </div>
 
@@ -388,17 +568,9 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <button
-              onClick={handleSubmit}
-              disabled={isPending || loadingShipping || !shippingMethodId}
-              className="w-full rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPending ? 'Memproses pesanan...' : 'Buat pesanan'}
-            </button>
-
             <p className="text-xs leading-5 text-neutral-500">
-              Setelah pesanan dibuat, customer akan diarahkan ke halaman invoice
-              untuk melihat detail order dan instruksi pembayaran.
+              Langkah {step} dari 3 — {CHECKOUT_STEPS[step - 1].label}. Harga
+              final selalu dihitung ulang oleh server dari database.
             </p>
           </div>
         </aside>

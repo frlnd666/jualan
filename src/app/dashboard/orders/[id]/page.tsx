@@ -2,7 +2,16 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import OrderFulfillment from '@/components/dashboard/OrderFulfillment'
+import ConfirmPaymentButton from '@/components/dashboard/ConfirmPaymentButton'
 import { resolvePaymentProofUrl } from '@/lib/payment-proof'
+import { getInvoiceAccessToken, tokenQuery } from '@/lib/invoice-access'
+import {
+  getOrderStatusLabel,
+  getOrderStatusStyle,
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  getPaymentStatusStyle,
+} from '@/lib/order-status'
 
 type DashboardOrderDetailPageProps = {
   params: Promise<{
@@ -37,95 +46,6 @@ function formatDate(dateValue: string | null | undefined) {
     month: 'long',
     year: 'numeric',
   }).format(date)
-}
-
-function getOrderStatusLabel(status: string) {
-  switch (status) {
-    case 'PENDING_PAYMENT':
-      return 'Menunggu pembayaran'
-    case 'WAITING_VERIFICATION':
-      return 'Menunggu verifikasi'
-    case 'PAID':
-      return 'Sudah dibayar'
-    case 'PROCESSING':
-      return 'Sedang diproses'
-    case 'SHIPPED':
-      return 'Sedang dikirim'
-    case 'COMPLETED':
-      return 'Selesai'
-    case 'CANCELLED':
-      return 'Dibatalkan'
-    default:
-      return status || '-'
-  }
-}
-
-function getOrderStatusStyle(status: string) {
-  switch (status) {
-    case 'PENDING_PAYMENT':
-      return 'bg-amber-50 text-amber-700 border-amber-200'
-    case 'WAITING_VERIFICATION':
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
-    case 'PAID':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    case 'PROCESSING':
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
-    case 'SHIPPED':
-      return 'bg-sky-50 text-sky-700 border-sky-200'
-    case 'COMPLETED':
-      return 'bg-neutral-100 text-neutral-700 border-neutral-200'
-    case 'CANCELLED':
-      return 'bg-rose-50 text-rose-700 border-rose-200'
-    default:
-      return 'bg-neutral-100 text-neutral-700 border-neutral-200'
-  }
-}
-
-function getPaymentStatusLabel(status: string | null) {
-  switch (status) {
-    case 'PENDING':
-      return 'Menunggu pembayaran'
-    case 'WAITING_VERIFICATION':
-      return 'Menunggu verifikasi'
-    case 'VERIFIED':
-      return 'Sudah diverifikasi'
-    case 'REJECTED':
-      return 'Ditolak'
-    case 'EXPIRED':
-      return 'Kadaluarsa'
-    default:
-      return status || '-'
-  }
-}
-
-function getPaymentStatusStyle(status: string | null) {
-  switch (status) {
-    case 'PENDING':
-      return 'bg-amber-50 text-amber-700 border-amber-200'
-    case 'WAITING_VERIFICATION':
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
-    case 'VERIFIED':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    case 'REJECTED':
-      return 'bg-rose-50 text-rose-700 border-rose-200'
-    case 'EXPIRED':
-      return 'bg-neutral-100 text-neutral-600 border-neutral-200'
-    default:
-      return 'bg-neutral-100 text-neutral-600 border-neutral-200'
-  }
-}
-
-function getPaymentMethodLabel(method: string | null) {
-  switch (method) {
-    case 'BANK_TRANSFER':
-      return 'Transfer bank'
-    case 'QRIS':
-      return 'QRIS'
-    case 'COD':
-      return 'COD'
-    default:
-      return method || '-'
-  }
 }
 
 export default async function DashboardOrderDetailPage({
@@ -218,6 +138,12 @@ export default async function DashboardOrderDetailPage({
 
   const proofUrl = await resolvePaymentProofUrl(invoice?.payment_proof_url)
 
+  // Token invoice untuk link "Lihat halaman pembeli" — tanpa token, halaman
+  // publiknya menolak (gerbang P0), jadi link pratinjau lama selalu 404.
+  const invoiceToken = invoice
+    ? await getInvoiceAccessToken(supabase, invoice.id)
+    : null
+
   const hasItems = (orderItems ?? []).length > 0
 
   return (
@@ -298,17 +224,16 @@ export default async function DashboardOrderDetailPage({
                 Bukti transfer sudah diupload
               </h2>
               <p className="mt-1 text-sm text-emerald-800">
-                Customer sudah mengupload bukti pembayaran. Silakan verifikasi di halaman detail pembayaran.
+                Periksa gambarnya di bagian Info invoice, lalu konfirmasi
+                langsung dari bagian Aksi seller di halaman ini.
               </p>
             </div>
-            {invoice?.invoice_number ? (
-              <Link
-                href={`/dashboard/payments/${invoice.invoice_number}`}
-                className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
-              >
-                Verifikasi pembayaran
-              </Link>
-            ) : null}
+            <a
+              href="#aksi-seller"
+              className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
+            >
+              Verifikasi sekarang ↓
+            </a>
           </div>
         </section>
       ) : null}
@@ -436,14 +361,6 @@ export default async function DashboardOrderDetailPage({
                   Order ini belum memiliki data item, atau data item belum tersimpan saat proses checkout.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {invoice?.invoice_number ? (
-                    <Link
-                      href={`/dashboard/payments/${invoice.invoice_number}`}
-                      className="inline-flex items-center justify-center rounded-2xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100"
-                    >
-                      Cek pembayaran terkait
-                    </Link>
-                  ) : null}
                   <Link
                     href="/dashboard/orders"
                     className="inline-flex items-center justify-center rounded-2xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100"
@@ -512,11 +429,51 @@ export default async function DashboardOrderDetailPage({
             </div>
           </section>
 
-          {/* Aksi seller */}
-          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+          {/* Aksi seller — pembayaran + pengiriman dalam satu tempat */}
+          <section
+            id="aksi-seller"
+            className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6"
+          >
             <h2 className="text-lg font-bold text-gray-900">Aksi seller</h2>
 
-            <div className="mt-4">
+            {invoice ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm font-semibold text-gray-900">
+                  1. Pembayaran —{' '}
+                  {getPaymentStatusLabel(invoice.payment_status)}
+                </p>
+                {invoice.payment_status === 'PAID' ? (
+                  <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                    Pembayaran sudah dikonfirmasi ✓
+                  </p>
+                ) : (
+                  <>
+                    <ConfirmPaymentButton
+                      invoiceId={invoice.id}
+                      orderId={order.id}
+                      invoiceNumber={invoice.invoice_number}
+                      disabled={!invoice.payment_proof_url}
+                    />
+                    {!invoice.payment_proof_url ? (
+                      <p className="text-xs leading-5 text-gray-500">
+                        Tombol aktif setelah customer mengupload bukti
+                        transfer. Gambar bukti tampil di bagian Info invoice
+                        di bawah.
+                      </p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-500">
+                Invoice untuk order ini belum tersedia.
+              </div>
+            )}
+
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <p className="mb-3 text-sm font-semibold text-gray-900">
+                2. Pengiriman &amp; status order
+              </p>
               <OrderFulfillment
                 orderId={order.id}
                 currentStatus={order.status}
@@ -525,36 +482,22 @@ export default async function DashboardOrderDetailPage({
               />
             </div>
 
-            <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
-              {invoice ? (
-                <>
-                  <Link
-                    href={`/dashboard/payments/${invoice.invoice_number}`}
-                    className="block w-full rounded-2xl bg-indigo-600 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-indigo-700"
-                  >
-                    Detail pembayaran
-                  </Link>
-
-                  <Link
-                    href={`/invoice/${invoice.invoice_number}`}
-                    className="block w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 text-center text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                  >
-                    Preview invoice pembeli
-                  </Link>
-
-                  <Link
-                    href={`/track/${invoice.invoice_number}`}
-                    className="block w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 text-center text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                  >
-                    Preview tracking pembeli
-                  </Link>
-                </>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-500">
-                  Invoice untuk order ini belum tersedia.
-                </div>
-              )}
-            </div>
+            {invoice ? (
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <Link
+                  href={`/invoice/${invoice.invoice_number}${tokenQuery(invoiceToken)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 text-center text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                >
+                  Lihat halaman pembeli ↗
+                </Link>
+                <p className="mt-2 text-xs leading-5 text-gray-500">
+                  Halaman yang sama dengan yang diterima customer (invoice,
+                  status, dan resi dalam satu halaman).
+                </p>
+              </div>
+            ) : null}
           </section>
 
           {/* Info invoice */}

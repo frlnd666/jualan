@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
+import DesktopNav from '@/components/dashboard/DesktopNav'
 import LogoutButton from '@/components/dashboard/LogoutButton'
 
 export default async function DashboardLayout({
@@ -48,6 +49,7 @@ export default async function DashboardLayout({
             <LogoutButton />
           </div>
         </div>
+        <DesktopNav />
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-[calc(88px+env(safe-area-inset-bottom))] pt-4 md:pb-6">

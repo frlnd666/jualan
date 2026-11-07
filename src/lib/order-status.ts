@@ -73,6 +73,44 @@ export function getShipmentStatusLabel(status: string | null): string {
   }
 }
 
+/** Kelas badge status pesanan (varian dashboard: ada border). */
+export function getOrderStatusStyle(status: string): string {
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'PAID':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    case 'PROCESSING':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+    case 'SHIPPED':
+      return 'bg-sky-50 text-sky-700 border-sky-200'
+    case 'COMPLETED':
+      return 'bg-neutral-100 text-neutral-700 border-neutral-200'
+    case 'CANCELLED':
+      return 'bg-rose-50 text-rose-700 border-rose-200'
+    default:
+      return 'bg-neutral-100 text-neutral-700 border-neutral-200'
+  }
+}
+
+/** Kelas badge status pembayaran invoice (varian dashboard: ada border). */
+export function getPaymentStatusStyle(status: string | null): string {
+  switch (status) {
+    case 'PENDING_PAYMENT':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'WAITING_VERIFICATION':
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+    case 'PAID':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    case 'FAILED':
+      return 'bg-rose-50 text-rose-700 border-rose-200'
+    case 'REFUNDED':
+      return 'bg-neutral-100 text-neutral-600 border-neutral-200'
+    default:
+      return 'bg-neutral-100 text-neutral-600 border-neutral-200'
+  }
+}
+
 export type OrderStep = {
   key: string
   title: string

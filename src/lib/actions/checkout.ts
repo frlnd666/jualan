@@ -293,9 +293,11 @@ export async function createOrderAction(input: CheckoutFormInput) {
     throw new Error('Gagal membuat invoice unik. Silakan coba lagi.')
   }
 
+  // &baru=1 membuat halaman invoice menampilkan sambutan "pesanan berhasil
+  // dibuat" + langkah pembayaran bernomor (mode sukses setelah checkout).
   redirect(
     tokenStored
-      ? `/invoice/${invoiceNumber}?t=${encodeURIComponent(accessToken)}`
-      : `/invoice/${invoiceNumber}`
+      ? `/invoice/${invoiceNumber}?t=${encodeURIComponent(accessToken)}&baru=1`
+      : `/invoice/${invoiceNumber}?baru=1`
   )
 }

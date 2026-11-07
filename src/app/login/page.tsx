@@ -4,12 +4,21 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import AuthShell, {
+  AuthOrDivider,
+  GoogleAuthButton,
+  authErrorClass,
+  authInputClass,
+  authLabelClass,
+  authSubmitClass,
+} from '@/components/auth/AuthShell'
 
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -37,69 +46,69 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Masuk</h1>
-        <p className="text-sm text-gray-500 mb-6">Kelola toko UMKM kamu</p>
+    <AuthShell
+      title="Selamat datang kembali"
+      subtitle="Masuk untuk mengelola toko UMKM kamu"
+      footer={
+        <p className="text-center text-sm text-neutral-500">
+          Belum punya akun?{' '}
+          <Link href="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
+            Daftar gratis
+          </Link>
+        </p>
+      }
+    >
+      <GoogleAuthButton label="Masuk dengan Google" onClick={handleGoogle} />
+      <AuthOrDivider />
 
-        <button
-          onClick={handleGoogle}
-          className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition mb-4"
-        >
-          <span>Masuk dengan Google</span>
-        </button>
-
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400">atau</span>
-          <div className="flex-1 h-px bg-gray-200" />
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div>
+          <label className={authLabelClass}>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className={authInputClass}
+            placeholder="email@kamu.com"
+          />
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="email@kamu.com"
-            />
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-sm font-medium text-neutral-700">Password</label>
+            <Link href="/forgot-password" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+              Lupa password?
+            </Link>
           </div>
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">Password</label>
-              <Link href="/forgot-password" className="text-xs font-medium text-indigo-600">
-                Lupa password?
-              </Link>
-            </div>
+          <div className="relative">
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              autoComplete="current-password"
+              className={`${authInputClass} pr-11`}
+              placeholder="••••••••"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-neutral-400 hover:text-neutral-600"
+            >
+              {showPassword ? 'Tutup' : 'Lihat'}
+            </button>
           </div>
+        </div>
 
-          {error && <p className="text-red-500 text-xs">{error}</p>}
+        {error ? <p className={authErrorClass}>{error}</p> : null}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
-          >
-            {loading ? 'Memproses...' : 'Masuk'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Belum punya akun?{' '}
-          <Link href="/register" className="text-indigo-600 font-medium">Daftar</Link>
-        </p>
-      </div>
-    </div>
+        <button type="submit" disabled={loading} className={authSubmitClass}>
+          {loading ? 'Memproses...' : 'Masuk'}
+        </button>
+      </form>
+    </AuthShell>
   )
 }

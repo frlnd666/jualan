@@ -4,12 +4,21 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import AuthShell, {
+  AuthOrDivider,
+  GoogleAuthButton,
+  authErrorClass,
+  authInputClass,
+  authLabelClass,
+  authSubmitClass,
+} from '@/components/auth/AuthShell'
 
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -54,68 +63,68 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Daftar</h1>
-        <p className="text-sm text-gray-500 mb-6">Buat toko UMKM kamu sekarang</p>
+    <AuthShell
+      title="Buat akun penjual"
+      subtitle="Buat toko UMKM kamu sekarang — gratis"
+      footer={
+        <p className="text-center text-sm text-neutral-500">
+          Sudah punya akun?{' '}
+          <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
+            Masuk
+          </Link>
+        </p>
+      }
+    >
+      <GoogleAuthButton label="Daftar dengan Google" onClick={handleGoogle} />
+      <AuthOrDivider />
 
-        <button
-          onClick={handleGoogle}
-          className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition mb-4"
-        >
-          <span>Daftar dengan Google</span>
-        </button>
-
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400">atau</span>
-          <div className="flex-1 h-px bg-gray-200" />
+      <form onSubmit={handleRegister} className="space-y-4">
+        <div>
+          <label className={authLabelClass}>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className={authInputClass}
+            placeholder="email@kamu.com"
+          />
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+        <div>
+          <label className={authLabelClass}>Password</label>
+          <div className="relative">
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="email@kamu.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="min. 6 karakter"
+              autoComplete="new-password"
+              className={`${authInputClass} pr-11`}
+              placeholder="Minimal 6 karakter"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-neutral-400 hover:text-neutral-600"
+            >
+              {showPassword ? 'Tutup' : 'Lihat'}
+            </button>
           </div>
+        </div>
 
-          {error && <p className="text-red-500 text-xs">{error}</p>}
-          {info && (
-            <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{info}</p>
-          )}
+        {error ? <p className={authErrorClass}>{error}</p> : null}
+        {info ? (
+          <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{info}</p>
+        ) : null}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
-          >
-            {loading ? 'Memproses...' : 'Daftar Sekarang'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Sudah punya akun?{' '}
-          <Link href="/login" className="text-indigo-600 font-medium">Masuk</Link>
-        </p>
-      </div>
-    </div>
+        <button type="submit" disabled={loading} className={authSubmitClass}>
+          {loading ? 'Memproses...' : 'Daftar sekarang'}
+        </button>
+      </form>
+    </AuthShell>
   )
 }

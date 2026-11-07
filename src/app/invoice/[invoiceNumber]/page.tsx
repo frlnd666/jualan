@@ -12,6 +12,8 @@ import {
   publicAddressLine,
 } from '@/lib/utils/privacy'
 import UploadPaymentProofForm from '@/components/invoice/UploadPaymentProofForm'
+import PublicConfigNotice from '@/components/PublicConfigNotice'
+import { isAdminClientConfigured } from '@/lib/supabase/admin'
 
 type InvoicePageProps = {
   params: Promise<{
@@ -92,6 +94,12 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
     .maybeSingle()
 
   if (invoiceError || !invoice) {
+    // Bedakan "invoice memang tidak ada" dari "server belum bisa membaca
+    // invoice karena kunci service-role belum terpasang" — yang kedua
+    // jangan menyamar sebagai 404.
+    if (!isAdminClientConfigured()) {
+      return <PublicConfigNotice />
+    }
     notFound()
   }
 

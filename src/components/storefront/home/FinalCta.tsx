@@ -55,10 +55,6 @@ export function FinalCta() {
             </Link>
           </nav>
         </div>
-        <p className="mx-auto mt-6 max-w-6xl text-xs text-[var(--text-muted)]">
-          Foto pada halaman ini menggunakan stok bebas pakai dari Pexels.
-          Kopi Sore adalah toko sungguhan yang beroperasi di platform ini.
-        </p>
       </footer>
     </>
   );

@@ -1,46 +1,88 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import {
+  getOrderStatusLabel,
+  getOrderStatusStyle,
+  getPaymentStatusLabel,
+  getPaymentStatusStyle,
+} from '@/lib/order-status'
 
-function getOrderStatusLabel(status: string) {
-  switch (status) {
-    case 'PENDING_PAYMENT':
-      return 'Menunggu pembayaran'
-    case 'PAID':
-      return 'Sudah dibayar'
-    case 'PROCESSING':
-      return 'Sedang diproses'
-    case 'SHIPPED':
-      return 'Sedang dikirim'
-    case 'COMPLETED':
-      return 'Selesai'
-    case 'CANCELLED':
-      return 'Dibatalkan'
+type OrdersPageProps = {
+  searchParams: Promise<{
+    tab?: string
+  }>
+}
+
+type OrderRow = {
+  id: string
+  customer_name: string
+  customer_phone: string | null
+  total: number | string
+  status: string
+  created_at: string
+}
+
+type InvoiceLite = {
+  order_id: string
+  invoice_number: string
+  payment_status: string
+  payment_proof_url: string | null
+}
+
+/**
+ * Tab antrean kerja penjual. Satu pesanan masuk tepat satu tab utama
+ * berdasarkan gabungan status order + status pembayaran invoice-nya —
+ * menggantikan pemisahan lama Pesanan vs Pembayaran.
+ */
+const TABS = [
+  { key: 'semua', label: 'Semua' },
+  { key: 'perlu-verifikasi', label: 'Perlu verifikasi' },
+  { key: 'belum-bayar', label: 'Belum bayar' },
+  { key: 'perlu-dikirim', label: 'Perlu dikirim' },
+  { key: 'dikirim', label: 'Dikirim' },
+  { key: 'selesai', label: 'Selesai' },
+  { key: 'batal', label: 'Batal' },
+] as const
+
+type TabKey = (typeof TABS)[number]['key']
+
+function tabOf(order: OrderRow, invoice?: InvoiceLite): TabKey {
+  if (order.status === 'CANCELLED') return 'batal'
+  if (order.status === 'COMPLETED') return 'selesai'
+  if (order.status === 'SHIPPED') return 'dikirim'
+  if (invoice?.payment_status === 'WAITING_VERIFICATION') {
+    return 'perlu-verifikasi'
+  }
+  if (order.status === 'PAID' || order.status === 'PROCESSING') {
+    return 'perlu-dikirim'
+  }
+  return 'belum-bayar'
+}
+
+function actionHint(order: OrderRow, invoice?: InvoiceLite): string | null {
+  const tab = tabOf(order, invoice)
+  switch (tab) {
+    case 'perlu-verifikasi':
+      return invoice?.payment_proof_url
+        ? 'Bukti transfer masuk — periksa & konfirmasi'
+        : 'Pembayaran menunggu verifikasimu'
+    case 'perlu-dikirim':
+      return order.status === 'PROCESSING'
+        ? 'Sedang disiapkan — input resi setelah dikirim'
+        : 'Sudah lunas — siapkan & kirim pesanan ini'
+    case 'belum-bayar':
+      return 'Menunggu pembayaran customer'
     default:
-      return status || '-'
+      return null
   }
 }
 
-function getOrderStatusStyle(status: string) {
-  switch (status) {
-    case 'PENDING_PAYMENT':
-      return 'bg-amber-50 text-amber-700 border-amber-200'
-    case 'PAID':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    case 'PROCESSING':
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
-    case 'SHIPPED':
-      return 'bg-sky-50 text-sky-700 border-sky-200'
-    case 'COMPLETED':
-      return 'bg-neutral-100 text-neutral-700 border-neutral-200'
-    case 'CANCELLED':
-      return 'bg-rose-50 text-rose-700 border-rose-200'
-    default:
-      return 'bg-neutral-100 text-neutral-700 border-neutral-200'
-  }
-}
+export default async function OrdersPage({ searchParams }: OrdersPageProps) {
+  const { tab: rawTab } = await searchParams
+  const activeTab: TabKey =
+    TABS.find((t) => t.key === rawTab)?.key ?? 'semua'
 
-export default async function OrdersPage() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -56,116 +98,167 @@ export default async function OrdersPage() {
 
   if (!store) redirect('/dashboard/settings')
 
-  const { data: orders } = await supabase
+  const { data: ordersData } = await supabase
     .from('orders')
-    .select('id, customer_name, total, status, created_at')
+    .select('id, customer_name, customer_phone, total, status, created_at')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 
-  const totalOrders = orders?.length ?? 0
-  const pendingOrders =
-    orders?.filter((order) => order.status === 'PENDING_PAYMENT').length ?? 0
-  const paidOrders =
-    orders?.filter((order) => order.status === 'PAID').length ?? 0
+  const orders = (ordersData ?? []) as OrderRow[]
+
+  const { data: invoicesData } = orders.length
+    ? await supabase
+        .from('invoices')
+        .select('order_id, invoice_number, payment_status, payment_proof_url')
+        .in(
+          'order_id',
+          orders.map((o) => o.id)
+        )
+    : { data: [] }
+
+  const invoiceByOrder = new Map<string, InvoiceLite>()
+  for (const inv of (invoicesData ?? []) as InvoiceLite[]) {
+    invoiceByOrder.set(inv.order_id, inv)
+  }
+
+  const counts = new Map<TabKey, number>()
+  for (const t of TABS) counts.set(t.key, 0)
+  for (const order of orders) {
+    const tab = tabOf(order, invoiceByOrder.get(order.id))
+    counts.set(tab, (counts.get(tab) ?? 0) + 1)
+    counts.set('semua', (counts.get('semua') ?? 0) + 1)
+  }
+
+  const visibleOrders =
+    activeTab === 'semua'
+      ? orders
+      : orders.filter(
+          (order) => tabOf(order, invoiceByOrder.get(order.id)) === activeTab
+        )
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Pesanan</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Kelola order yang masuk dan langsung buka halaman pembayaran dari tiap pesanan.
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+          Pesanan
+        </h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Semua pekerjaanmu ada di sini: verifikasi pembayaran dan pengiriman
+          diatur dari satu halaman detail pesanan — tidak ada lagi menu
+          pembayaran terpisah.
         </p>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Total order
-          </p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{totalOrders}</p>
+      {/* Tab antrean */}
+      <div className="-mx-4 overflow-x-auto px-4 pb-1">
+        <div className="flex gap-2">
+          {TABS.map((t) => {
+            const isActive = activeTab === t.key
+            const count = counts.get(t.key) ?? 0
+            const needsAttention =
+              (t.key === 'perlu-verifikasi' || t.key === 'perlu-dikirim') &&
+              count > 0
+            return (
+              <Link
+                key={t.key}
+                href={
+                  t.key === 'semua'
+                    ? '/dashboard/orders'
+                    : `/dashboard/orders?tab=${t.key}`
+                }
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
+                  isActive
+                    ? 'border-gray-900 bg-gray-900 text-white'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {t.label}
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                    isActive
+                      ? 'bg-white text-gray-900'
+                      : needsAttention
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              </Link>
+            )
+          })}
         </div>
-
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Menunggu bayar
-          </p>
-          <p className="mt-2 text-2xl font-bold text-amber-600">{pendingOrders}</p>
-        </div>
-
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Sudah dibayar
-          </p>
-          <p className="mt-2 text-2xl font-bold text-emerald-600">{paidOrders}</p>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4 md:p-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-amber-900 md:text-base">
-              Verifikasi pembayaran
-            </h2>
-            <p className="mt-1 text-sm text-amber-800">
-              Klik tombol di tiap order untuk melihat pembayaran yang paling relevan.
-            </p>
-          </div>
-        </div>
-      </section>
+      </div>
 
       <div className="space-y-3">
-        {(orders ?? []).length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-gray-200 bg-white p-6 text-sm text-gray-500">
-            Belum ada pesanan masuk.
+        {visibleOrders.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-gray-200 bg-white p-8 text-center">
+            <p className="text-sm font-semibold text-gray-900">
+              {activeTab === 'semua'
+                ? 'Belum ada pesanan masuk.'
+                : 'Tidak ada pesanan di antrean ini.'}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              {activeTab === 'perlu-verifikasi' || activeTab === 'perlu-dikirim'
+                ? 'Kerja bagus — antrean tindakanmu kosong.'
+                : 'Pesanan baru akan muncul di sini begitu customer checkout.'}
+            </p>
           </div>
         ) : (
-          (orders ?? []).map((order) => {
-            const statusStyle = getOrderStatusStyle(order.status)
-
+          visibleOrders.map((order) => {
+            const invoice = invoiceByOrder.get(order.id)
+            const hint = actionHint(order, invoice)
             return (
-              <div
+              <Link
                 key={order.id}
-                className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm"
+                href={`/dashboard/orders/${order.id}`}
+                className="block rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-gray-200 hover:shadow"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-base font-semibold text-gray-900">
                       {order.customer_name}
                     </p>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Rp {Number(order.total).toLocaleString('id-ID')}
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {invoice?.invoice_number ?? 'Tanpa invoice'} •{' '}
+                      {new Date(order.created_at).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
                     </p>
-                    <div className="mt-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold">
-                      <span className={statusStyle}>
-                        {getOrderStatusLabel(order.status)}
-                      </span>
-                    </div>
                   </div>
-
-                  <span className="shrink-0 text-xs text-gray-400">
-                    {new Date(order.created_at).toLocaleDateString('id-ID')}
-                  </span>
+                  <p className="shrink-0 text-base font-bold text-gray-900">
+                    Rp {Number(order.total).toLocaleString('id-ID')}
+                  </p>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-  <Link
-    href={`/dashboard/orders/${order.id}`}
-    className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-  >
-    Detail pesanan
-  </Link>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getOrderStatusStyle(order.status)}`}
+                  >
+                    {getOrderStatusLabel(order.status)}
+                  </span>
+                  {invoice ? (
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getPaymentStatusStyle(invoice.payment_status)}`}
+                    >
+                      Bayar: {getPaymentStatusLabel(invoice.payment_status)}
+                    </span>
+                  ) : null}
+                  {invoice?.payment_proof_url ? (
+                    <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      Bukti masuk ✓
+                    </span>
+                  ) : null}
+                </div>
 
-  <Link
-    href={{
-      pathname: '/dashboard/payments',
-      query: { orderId: order.id },
-    }}
-    className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
-  >
-    Buka pembayaran
-  </Link>
-</div>
-              </div>
+                {hint ? (
+                  <p className="mt-3 rounded-2xl bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
+                    {hint} →
+                  </p>
+                ) : null}
+              </Link>
             )
           })
         )}

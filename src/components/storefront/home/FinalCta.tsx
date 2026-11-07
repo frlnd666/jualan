@@ -1,66 +1,64 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 
 export function FinalCta() {
   return (
     <>
-      <section className="px-4 pb-16 pt-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.4 }}
-          transition={{ duration: 0.35 }}
-          className="mx-auto max-w-7xl overflow-hidden rounded-[36px] border border-[var(--line)] bg-[var(--surface)] px-6 py-12 shadow-[var(--shadow-md)] sm:px-10 lg:px-14"
-        >
-          <div className="max-w-3xl">
-            <p className="text-sm text-[var(--text-muted)]">Mulai sekarang</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-[var(--text)] sm:text-4xl">
-              Mulai Jualan Online dengan Tampilan Profesional
-            </h2>
-            <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--text-muted)]">
-              Bikin toko online yang mudah dibagikan, nyaman dipakai dari HP,
-              dan terlihat lebih meyakinkan untuk pelanggan baru.
-            </p>
+      <section className="px-4 pb-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl rounded-3xl bg-[var(--text)] px-6 py-14 text-center sm:px-12 lg:py-16">
+          <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            Tokomu berikutnya cuma sejauh satu link
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/70">
+            Daftar, tambah produk pertamamu, dan bagikan linknya. Lima menit
+            dari sekarang, pelangganmu bisa checkout sendiri tanpa menunggu
+            kamu membalas chat.
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link
-              href="/login"
-              className="mt-8 inline-flex rounded-full bg-[var(--primary)] px-6 py-3.5 text-sm font-medium text-white transition hover:bg-[var(--primary-hover)]"
+              href="/register"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
             >
-              Buat Toko Gratis
+              Buat toko gratis
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/kopisore"
+              className="inline-flex items-center justify-center rounded-full border border-white/25 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Lihat toko yang sudah live
             </Link>
           </div>
-        </motion.div>
+        </div>
       </section>
 
-      <footer className="border-t border-[var(--line)] px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.14em] text-[var(--text)]">
-              UMKM Storefront
-            </p>
-            <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Platform SaaS multi-tenant untuk UMKM Indonesia.
-            </p>
+      <footer className="border-t border-[var(--line)] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-[var(--text-muted)] sm:flex-row">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--primary)] text-xs font-bold text-white">
+              J
+            </span>
+            <span className="font-semibold text-[var(--text)]">Jualan</span>
+            <span>· Platform toko online untuk UMKM Indonesia</span>
           </div>
-
-          <div className="flex flex-wrap gap-5 text-sm text-[var(--text-muted)]">
-            <Link href="#features">Features</Link>
-            <Link href="#demo">Demo</Link>
-            <Link href="#pricing">Pricing</Link>
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Instagram
-            </a>
-          </div>
-
-          <p className="text-sm text-[var(--text-muted)]">
-            © 2026 UMKM Storefront. All rights reserved.
-          </p>
+          <nav className="flex items-center gap-5">
+            <Link href="/kopisore" className="transition hover:text-[var(--text)]">
+              Toko contoh
+            </Link>
+            <Link href="/login" className="transition hover:text-[var(--text)]">
+              Masuk
+            </Link>
+            <Link href="/register" className="transition hover:text-[var(--text)]">
+              Daftar
+            </Link>
+          </nav>
         </div>
+        <p className="mx-auto mt-6 max-w-6xl text-xs text-[var(--text-muted)]">
+          Foto pada halaman ini menggunakan stok bebas pakai dari Pexels.
+          Kopi Sore adalah toko sungguhan yang beroperasi di platform ini.
+        </p>
       </footer>
     </>
   );

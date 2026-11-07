@@ -32,6 +32,16 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // Default Next.js hanya 1MB — foto bukti transfer dari kamera HP
+      // (umumnya 2–6MB) selalu ditolak sebelum server action berjalan,
+      // dan browser berakhir di "This page couldn't load". Batas aplikasi
+      // sendiri 3MB (validasi di uploadPaymentProof); 4mb memberi ruang
+      // untuk overhead multipart dan tetap di bawah cap platform 4.5MB.
+      bodySizeLimit: "4mb",
+    },
+  },
   images: {
     remotePatterns: [
       {

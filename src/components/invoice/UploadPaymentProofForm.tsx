@@ -3,6 +3,42 @@
 import { useState, useTransition } from 'react'
 import { uploadPaymentProof } from '@/lib/actions/upload-payment-proof'
 
+/**
+ * Kecilkan foto bukti di browser sebelum dikirim: foto kamera HP umumnya
+ * 2–6MB, lambat diunggah lewat server action dan rawan gagal di jaringan
+ * seluler. Bukti transfer cukup terbaca jelas di sisi panjang maks 1600px
+ * JPEG — hasilnya biasanya < 400KB. Bila kompresi gagal/tidak didukung,
+ * file asli yang dikirim (server tetap memvalidasi maks 3MB).
+ */
+async function compressImageIfNeeded(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || file.size <= 900 * 1024) return file
+
+  try {
+    const bitmap = await createImageBitmap(file, {
+      imageOrientation: 'from-image',
+    } as ImageBitmapOptions)
+    const maxSide = 1600
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.85)
+    )
+    if (!blob || blob.size >= file.size) return file
+
+    const name = file.name.replace(/\.[^.]+$/, '') + '.jpg'
+    return new File([blob], name, { type: 'image/jpeg' })
+  } catch {
+    return file
+  }
+}
+
 type Props = {
   invoiceId: string
   invoiceNumber: string
@@ -26,14 +62,9 @@ export default function UploadPaymentProofForm({
           <p className="text-sm font-semibold text-green-800">
             Bukti transfer sudah diupload
           </p>
-          <a
-            href={paymentProofUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 inline-block text-sm font-medium text-green-700 underline"
-          >
-            Lihat bukti transfer
-          </a>
+          <p className="mt-1 text-sm text-green-700">
+            Seller akan memverifikasi pembayaranmu dari bukti tersebut.
+          </p>
         </div>
       ) : null}
 
@@ -41,6 +72,10 @@ export default function UploadPaymentProofForm({
         action={(formData) => {
           setMessage(null)
           startTransition(async () => {
+            const rawFile = formData.get('file')
+            if (rawFile instanceof File && rawFile.size > 0) {
+              formData.set('file', await compressImageIfNeeded(rawFile))
+            }
             const result = await uploadPaymentProof(formData)
             setMessage(result.error || result.success || null)
           })

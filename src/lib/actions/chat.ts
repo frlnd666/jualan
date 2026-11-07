@@ -97,7 +97,7 @@ export async function getChatMessages(
   if (!session) return { success: false, error: 'Sesi chat tidak ditemukan.' }
 
   const { data: messages } = await supabase
-    .from('chat_messages')
+    .from('chat_session_messages')
     .select('id, sender, body, created_at')
     .eq('session_id', session.id)
     .order('created_at', { ascending: true })
@@ -128,7 +128,7 @@ export async function sendChatMessage(
   const { supabase, session } = await getOwnedSession(sessionId, accessToken)
   if (!session) return { success: false, error: 'Sesi chat tidak ditemukan.' }
 
-  const { error } = await supabase.from('chat_messages').insert({
+  const { error } = await supabase.from('chat_session_messages').insert({
     session_id: session.id,
     sender: 'buyer',
     body: text,

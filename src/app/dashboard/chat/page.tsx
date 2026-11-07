@@ -52,7 +52,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
 
   const { data: messages } = activeSession
     ? await supabase
-        .from('chat_messages')
+        .from('chat_session_messages')
         .select('id, sender, body, created_at')
         .eq('session_id', activeSession.id)
         .order('created_at', { ascending: true })

@@ -11,6 +11,8 @@ import {
   maskPhoneNumber,
   publicAddressLine,
 } from '@/lib/utils/privacy'
+import PublicConfigNotice from '@/components/PublicConfigNotice'
+import { isAdminClientConfigured } from '@/lib/supabase/admin'
 
 type TrackPageProps = {
   params: Promise<{
@@ -157,6 +159,9 @@ export default async function TrackOrderPage({ params, searchParams }: TrackPage
     .maybeSingle()
 
   if (invoiceError || !invoice) {
+    if (!isAdminClientConfigured()) {
+      return <PublicConfigNotice />
+    }
     notFound()
   }
 

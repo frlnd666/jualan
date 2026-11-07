@@ -265,11 +265,16 @@ export default function EditProductPage({ params }: EditProductPageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-4">
-      <div className="mb-6 flex items-start justify-between gap-3">
+    <div className="mx-auto max-w-2xl space-y-6 px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900">Edit Produk</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="text-sm font-medium text-[var(--text-muted)]">
+            Edit produk
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text)]">
+            {name || 'Produk'}
+          </h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
             Perbarui informasi produk, stok, status, dan foto utama.
           </p>
         </div>
@@ -277,117 +282,152 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         <button
           type="button"
           onClick={() => router.push('/dashboard/products')}
-          className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700"
+          className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
         >
           Kembali
         </button>
       </div>
 
       {errorMessage ? (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {errorMessage}
         </div>
       ) : null}
 
       {successMessage ? (
-        <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {successMessage}
         </div>
       ) : null}
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-neutral-800">
-            Nama produk
-          </label>
-          <input
-            value={name}
-            onChange={(e) => {
-              const nextName = e.target.value
-              setName(nextName)
-              if (!slug.trim()) setSlug(toSlug(nextName))
-            }}
-            className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-indigo-500"
-            placeholder="Nama produk"
-            disabled={loadingPage}
-          />
-        </div>
+      <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] md:p-6">
+        <h2 className="text-base font-bold text-[var(--text)]">
+          Informasi produk
+        </h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Data ini tampil di halaman produk dan daftar katalog toko.
+        </p>
 
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-neutral-800">
-            Slug produk
-          </label>
-          <input
-            value={slug}
-            onChange={(e) => setSlug(toSlug(e.target.value))}
-            className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-indigo-500"
-            placeholder="slug-produk"
-            disabled={loadingPage}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-neutral-800">
-              Harga
-            </label>
+        <div className="mt-5 space-y-4">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+              Nama produk
+            </span>
             <input
-              value={price}
-              onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ''))}
-              className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-indigo-500"
-              placeholder="Harga"
-              inputMode="numeric"
+              value={name}
+              onChange={(e) => {
+                const nextName = e.target.value
+                setName(nextName)
+                if (!slug.trim()) setSlug(toSlug(nextName))
+              }}
+              className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+              placeholder="Nama produk"
               disabled={loadingPage}
             />
-          </div>
+          </label>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-neutral-800">
-              Stok
-            </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+              Slug produk
+            </span>
             <input
-              value={stock}
-              onChange={(e) => setStock(e.target.value.replace(/[^\d]/g, ''))}
-              className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-indigo-500"
-              placeholder="Stok"
-              inputMode="numeric"
+              value={slug}
+              onChange={(e) => setSlug(toSlug(e.target.value))}
+              className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+              placeholder="slug-produk"
               disabled={loadingPage}
             />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-neutral-800">
-            Deskripsi
+            <span className="mt-2 block text-xs text-[var(--text-muted)]">
+              Dipakai untuk URL produk. Gunakan huruf kecil dan tanda hubung.
+            </span>
           </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-indigo-500"
-            rows={5}
-            placeholder="Deskripsi"
-            disabled={loadingPage}
-          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+                Harga
+              </span>
+              <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 focus-within:border-[var(--primary)]">
+                <div className="flex items-center">
+                  <span className="mr-3 text-sm font-semibold text-[var(--text-muted)]">
+                    Rp
+                  </span>
+                  <input
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ''))}
+                    className="w-full bg-transparent text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)]"
+                    placeholder="15000"
+                    inputMode="numeric"
+                    disabled={loadingPage}
+                  />
+                </div>
+              </div>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+                Stok
+              </span>
+              <input
+                value={stock}
+                onChange={(e) => setStock(e.target.value.replace(/[^\d]/g, ''))}
+                className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+                placeholder="0"
+                inputMode="numeric"
+                disabled={loadingPage}
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+              Deskripsi
+            </span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+              rows={5}
+              placeholder="Deskripsi"
+              disabled={loadingPage}
+            />
+          </label>
+
+          <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-[var(--surface-soft)] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={available}
+              onChange={(e) => setAvailable(e.target.checked)}
+              disabled={loadingPage}
+              className="h-4 w-4"
+            />
+            <span className="text-sm font-medium text-[var(--text)]">
+              Produk aktif dan tampil di toko
+            </span>
+          </label>
         </div>
+      </section>
 
-        <label className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3">
-          <input
-            type="checkbox"
-            checked={available}
-            onChange={(e) => setAvailable(e.target.checked)}
-            disabled={loadingPage}
-          />
-          <span className="text-sm font-medium text-neutral-800">
-            Produk aktif dan tampil di toko
-          </span>
-        </label>
+      <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] md:p-6">
+        <h2 className="text-base font-bold text-[var(--text)]">Foto produk</h2>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
+          Upload foto baru jika ingin mengganti gambar utama produk.
+        </p>
 
-        <div className="space-y-2">
+        <div className="mt-5 space-y-4">
           <label
             htmlFor="product-image"
-            className="block text-sm font-semibold text-neutral-800"
+            className="flex cursor-pointer flex-col items-center justify-center rounded-[28px] border border-dashed border-[var(--line)] bg-[var(--surface-soft)] px-5 py-8 text-center transition hover:border-[var(--primary)]"
           >
-            Foto produk
+            <span className="text-sm font-semibold text-[var(--text)]">
+              {uploadingImage ? 'Mengupload gambar...' : 'Pilih foto produk'}
+            </span>
+            <span className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+              Format JPG, PNG, WEBP.
+            </span>
+            <span className="mt-4 inline-flex rounded-2xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white">
+              Pilih file
+            </span>
           </label>
 
           <input
@@ -396,41 +436,43 @@ export default function EditProductPage({ params }: EditProductPageProps) {
             type="file"
             accept="image/png,image/jpeg,image/webp"
             onChange={(e) => handleImageChange(e.target.files?.[0] || null)}
-            className="block w-full cursor-pointer rounded-2xl border border-neutral-200 bg-neutral-50 text-sm text-neutral-600 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700 focus:outline-none"
+            className="hidden"
             disabled={loadingPage}
           />
 
-          <p className="text-xs text-neutral-500">
+          <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--text-muted)]">
             {imageFile
               ? `File dipilih: ${imageFile.name}`
-              : 'Upload foto baru jika ingin mengganti gambar utama produk.'}
-          </p>
-        </div>
-
-        {imagePreview ? (
-          <div className="space-y-2">
-            <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-              <img
-                src={imagePreview}
-                alt="Preview foto produk"
-                className="h-52 w-full object-cover"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleRemoveImage}
-              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
-            >
-              Hapus foto
-            </button>
+              : 'Belum ada file baru yang dipilih.'}
           </div>
-        ) : null}
 
-        <div className="grid grid-cols-2 gap-3">
+          {imagePreview ? (
+            <div className="space-y-2">
+              <div className="overflow-hidden rounded-[28px] border border-[var(--line)] bg-white">
+                <img
+                  src={imagePreview}
+                  alt="Preview foto produk"
+                  className="h-56 w-full object-cover"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+              >
+                Hapus foto
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <div className="sticky bottom-20 z-10 rounded-[28px] border border-[var(--line)] bg-[var(--surface)]/95 p-4 shadow-[var(--shadow-md)] backdrop-blur">
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={() => router.push('/dashboard/products')}
-            className="w-full rounded-xl border border-neutral-200 bg-white py-3 font-semibold text-neutral-700"
+            className="inline-flex items-center justify-center rounded-2xl border border-[var(--line)] bg-white px-5 py-3 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
             disabled={submitting}
           >
             Batal
@@ -440,7 +482,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
             type="button"
             onClick={handleSubmit}
             disabled={loadingPage || uploadingImage || submitting}
-            className="w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex flex-1 items-center justify-center rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[var(--shadow-sm)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loadingPage
               ? 'Memuat produk...'

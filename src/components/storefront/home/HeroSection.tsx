@@ -8,9 +8,9 @@ import { ArrowRight, BadgeCheck, Check, ClipboardCheck, PackageCheck } from "luc
 import { LANDING_PHOTOS } from "@/lib/landing-photos";
 
 const trustPoints = [
-  "Gratis dipakai",
   "Tanpa potongan per transaksi",
   "Pembayaran langsung ke rekeningmu",
+  "Mulai gratis, upgrade kapan saja",
 ];
 
 const heroProducts = [
@@ -47,14 +47,14 @@ export function HeroSection() {
               href="/register"
               className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
             >
-              Buat toko gratis
+              Coba Silver gratis 14 hari
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/kopisore"
+              href="/register"
               className="inline-flex items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] px-6 py-3.5 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
             >
-              Kunjungi toko contoh
+              Buat toko gratis
             </Link>
           </div>
 

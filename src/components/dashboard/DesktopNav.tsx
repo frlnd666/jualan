@@ -9,6 +9,7 @@ const items = [
   { href: '/dashboard/orders', label: 'Pesanan' },
   { href: '/dashboard/chat', label: 'Chat' },
   { href: '/dashboard/shipping', label: 'Pengiriman' },
+  { href: '/dashboard/subscription', label: 'Langganan' },
   { href: '/dashboard/settings', label: 'Pengaturan' },
 ]
 

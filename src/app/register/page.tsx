@@ -31,6 +31,15 @@ function readPlanFromUrl(): RegisterPlan {
   return 'free'
 }
 
+// Fase 2: ?type=buyer mendaftarkan akun pembeli (belanja + lacak
+// pesanan), bukan penjual. Tanpa parameter → penjual seperti semula.
+function readTypeFromUrl(): 'seller' | 'buyer' {
+  if (typeof window === 'undefined') return 'seller'
+  return new URLSearchParams(window.location.search).get('type') === 'buyer'
+    ? 'buyer'
+    : 'seller'
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -41,10 +50,14 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [plan] = useState<RegisterPlan>(() => readPlanFromUrl())
+  const [accountType] = useState<'seller' | 'buyer'>(() => readTypeFromUrl())
+  const isBuyer = accountType === 'buyer'
 
   // Simpan pilihan paket sekali saat halaman dibuka, sebelum user
-  // sempat mendaftar lewat email maupun Google.
+  // sempat mendaftar lewat email maupun Google. Pembeli tidak punya
+  // paket — jangan simpan cuan_plan untuk mereka.
   useEffect(() => {
+    if (isBuyer) return
     try {
       window.localStorage.setItem(REGISTER_PLAN_KEY, plan)
     } catch {}
@@ -57,10 +70,14 @@ export default function RegisterPage() {
     setError('')
     setInfo('')
 
+    // Pembeli: setelah verifikasi email, kembali ke akun pembeli.
+    const emailRedirectTo = isBuyer
+      ? `${location.origin}/auth/callback?next=/akun`
+      : `${location.origin}/auth/callback`
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${location.origin}/auth/callback` },
+      options: { emailRedirectTo },
     })
 
     if (error) {
@@ -80,10 +97,27 @@ export default function RegisterPage() {
       return
     }
 
+    if (isBuyer) {
+      // Cookie pengarah untuk middleware: pembeli baru belum punya baris
+      // profiles, jadi peran belum bisa dibaca dari database.
+      document.cookie = 'cuan_account_type=buyer; path=/; max-age=86400'
+      router.push('/akun')
+      return
+    }
     router.push('/dashboard')
   }
 
   async function handleGoogle() {
+    if (isBuyer) {
+      document.cookie = 'cuan_account_type=buyer; path=/; max-age=86400'
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${location.origin}/auth/callback?next=/akun`,
+        },
+      })
+      return
+    }
     try {
       window.localStorage.setItem(REGISTER_PLAN_KEY, plan)
     } catch {}
@@ -95,23 +129,44 @@ export default function RegisterPage() {
 
   return (
     <AuthShell
-      title="Buat akun penjual"
-      subtitle="Buat toko UMKM kamu sekarang — gratis"
+      title={isBuyer ? 'Buat akun pembeli' : 'Buat akun penjual'}
+      subtitle={
+        isBuyer
+          ? 'Belanja di toko UMKM dan lacak pesananmu dari satu akun'
+          : 'Buat toko UMKM kamu sekarang — gratis'
+      }
       footer={
         <p className="text-center text-sm text-neutral-500">
           Sudah punya akun?{' '}
           <Link href="/login" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
             Masuk
           </Link>
+          {' · '}
+          {isBuyer ? (
+            <Link href="/register" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
+              Daftar sebagai penjual
+            </Link>
+          ) : (
+            <Link href="/register?type=buyer" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
+              Daftar sebagai pembeli
+            </Link>
+          )}
         </p>
       }
     >
       <GoogleAuthButton label="Daftar dengan Google" onClick={handleGoogle} />
       <AuthOrDivider />
 
-      <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-        Paket yang kamu pilih: <strong>{PLAN_COPY[plan]}</strong>
-      </p>
+      {isBuyer ? (
+        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Akun pembeli — keranjang tersimpan di akun, buku alamat, dan
+          riwayat pesanan. Gratis, tanpa paket.
+        </p>
+      ) : (
+        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Paket yang kamu pilih: <strong>{PLAN_COPY[plan]}</strong>
+        </p>
+      )}
 
       <form onSubmit={handleRegister} className="space-y-4">
         <div>

@@ -10,6 +10,13 @@ interface CartStore {
   removeItem: (productId: string) => void
   updateQty: (productId: string, qty: number) => void
   clearCart: () => void
+  /** Ganti seluruh isi keranjang (dipakai BuyerCartSync saat memuat
+   *  keranjang tersimpan dari akun). */
+  loadItems: (
+    items: CartItem[],
+    storeSlug: string | null,
+    storeId: string | null
+  ) => void
   subtotal: () => number
 }
 
@@ -73,6 +80,9 @@ export const useCart = create<CartStore>()(
         }),
 
       clearCart: () => set({ items: [], storeSlug: null, storeId: null }),
+
+      loadItems: (items, storeSlug, storeId) =>
+        set({ items, storeSlug, storeId }),
 
       subtotal: () =>
         get().items.reduce((sum, i) => sum + i.product.price * i.qty, 0),

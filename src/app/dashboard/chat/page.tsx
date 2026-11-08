@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 import { redirect } from 'next/navigation'
 import ChatReplyBox from '@/components/dashboard/ChatReplyBox'
 
@@ -29,6 +30,16 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // Fase 2: chat hanya untuk pemilik toko — staff tidak boleh masuk.
+  const { data: chatProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  if ((chatProfile as { role?: string } | null)?.role === 'staff') {
+    return <StaffDeniedCard title="Chat" />
+  }
 
   const { data: store } = await supabase
     .from('stores')

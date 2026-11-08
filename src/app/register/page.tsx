@@ -69,7 +69,7 @@ export default function RegisterPage() {
       footer={
         <p className="text-center text-sm text-neutral-500">
           Sudah punya akun?{' '}
-          <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
+          <Link href="/login" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
             Masuk
           </Link>
         </p>

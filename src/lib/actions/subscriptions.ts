@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
+import { getDashboardAccess } from '@/lib/dashboard-access'
 import {
   getStoreSubscription,
   periodEndFor,
@@ -172,7 +173,11 @@ export async function createProductAction(input: {
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Kamu harus login untuk menambahkan produk.' }
 
-  const storeId = await getOwnedStoreId(user.id)
+  // Fase 2: staff toko boleh menambah produk (hak terbatas), pemilik
+  // tetap lewat jalur yang sama. Aksi langganan lain di file ini tetap
+  // owner-only lewat getOwnedStoreId.
+  const access = await getDashboardAccess(supabase, user.id)
+  const storeId = access?.store.id
   if (!storeId) return { error: 'Toko tidak ditemukan untuk akun ini.' }
 
   const name = input.name.trim()

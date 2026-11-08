@@ -4,7 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { createProductAction } from '@/lib/actions/subscriptions'
 import { removeProductImageObject } from '@/lib/product-image'
+import {
+  FREE_SUBSCRIPTION,
+  type SubscriptionRow,
+} from '@/lib/subscriptions'
+import { effectiveTier, limitsFor } from '@/lib/subscription-tiers'
 
 function sanitizeNumberInput(value: string) {
   return value.replace(/\D/g, '')
@@ -49,6 +55,10 @@ export default function NewProductPage() {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  // Kuota paket (Fase 1): dibaca dari subscriptions toko sendiri.
+  const [productLimit, setProductLimit] = useState<number | null>(null)
+  const [productUsed, setProductUsed] = useState<number | null>(null)
+  const [tierLabel, setTierLabel] = useState('Free')
 
   useEffect(() => {
     async function loadStore() {
@@ -78,6 +88,25 @@ export default function NewProductPage() {
       }
 
       setStoreId(store.id)
+
+      // Batas paket dibaca di sini hanya untuk tampilan; penegakan yang
+      // mengikat ada di server action createProductAction.
+      const { data: subscriptionRow } = await supabase
+        .from('subscriptions')
+        .select('tier, status, current_period_end')
+        .eq('store_id', store.id)
+        .maybeSingle()
+      const subscription: SubscriptionRow =
+        (subscriptionRow as SubscriptionRow | null) ?? FREE_SUBSCRIPTION
+      const { tier } = effectiveTier(subscription)
+      setTierLabel(tier === 'free' ? 'Free' : tier === 'silver' ? 'Silver' : 'Gold')
+      setProductLimit(limitsFor(subscription).maxProducts)
+      const { count } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('store_id', store.id)
+      setProductUsed(count ?? 0)
+
       setLoadingStore(false)
     }
 
@@ -217,23 +246,20 @@ export default function NewProductPage() {
     try {
       setSubmitting(true)
 
-      const { error } = await supabase.from('products').insert({
-        store_id: storeId,
+      // Penegakan batas tier DI SERVER (bukan insert langsung dari
+      // browser): server action memeriksa jumlah produk + jumlah foto
+      // terhadap batas paket aktif sebelum menyimpan.
+      const result = await createProductAction({
         name: name.trim(),
         slug: slug.trim(),
         price: parseNumberInput(price),
         stock: parseNumberInput(stock),
         description: description.trim(),
         images: imageUrl ? [imageUrl] : [],
-        available: true,
       })
 
-      if (error) {
-        if (error.message?.toLowerCase().includes('duplicate')) {
-          throw new Error('Slug produk sudah dipakai. Gunakan slug lain.')
-        }
-
-        throw error
+      if (result.error) {
+        throw new Error(result.error)
       }
 
       router.push('/dashboard/products')
@@ -270,6 +296,15 @@ export default function NewProductPage() {
             Lengkapi informasi utama produk, upload foto, lalu simpan agar produk
             tampil di toko.
           </p>
+          {productLimit !== null && productUsed !== null ? (
+            <p className="mt-2 text-xs font-semibold text-[var(--text-muted)]">
+              Paket {tierLabel}: {productUsed} dari {productLimit} produk
+              terpakai.
+              {productUsed >= productLimit
+                ? ' Batas tercapai — upgrade paket untuk menambah produk.'
+                : ''}
+            </p>
+          ) : null}
         </div>
 
         <Link

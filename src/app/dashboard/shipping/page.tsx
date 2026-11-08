@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 
 type ShippingMethodRow = {
   id: string
@@ -64,6 +65,7 @@ export default function ShippingPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const [loadingPage, setLoadingPage] = useState(true)
+  const [denied, setDenied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -98,6 +100,19 @@ export default function ShippingPage() {
 
       if (!user) {
         router.push('/login')
+        return
+      }
+
+      // Fase 2: pengiriman hanya untuk pemilik toko — staff ditolak di
+      // sini (dan di RLS: tidak ada policy staff di shipping_methods).
+      const { data: shippingProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      if ((shippingProfile as { role?: string } | null)?.role === 'staff') {
+        setDenied(true)
+        setLoadingPage(false)
         return
       }
 
@@ -267,6 +282,8 @@ export default function ShippingPage() {
   const totalMethods = methods.length
   const activeMethods = methods.filter((method) => method.is_active).length
   const inactiveMethods = methods.filter((method) => !method.is_active).length
+
+  if (denied) return <StaffDeniedCard title="Metode Ekspedisi" />
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-4">

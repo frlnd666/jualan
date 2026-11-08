@@ -13,17 +13,36 @@ const items = [
   { href: '/dashboard/settings', label: 'Pengaturan' },
 ]
 
+// Staff (Fase 2) hanya boleh Beranda, Produk, dan Pesanan — menu lain
+// disembunyikan DAN halamannya dijaga di server (bukan hanya di nav).
+const STAFF_ITEMS = [
+  { href: '/dashboard', label: 'Beranda' },
+  { href: '/dashboard/products', label: 'Produk' },
+  { href: '/dashboard/orders', label: 'Pesanan' },
+]
+
 /**
  * Navigasi desktop — sebelumnya dashboard tidak punya menu sama sekali di
  * layar besar (bottom nav hanya tampil di mobile), sehingga halaman seperti
  * Pengiriman hanya bisa dicapai dari tautan berserakan.
  */
-export default function DesktopNav() {
+export default function DesktopNav({
+  isStaff = false,
+  isAdmin = false,
+}: {
+  isStaff?: boolean
+  isAdmin?: boolean
+}) {
   const pathname = usePathname()
+  const visibleItems = isStaff
+    ? STAFF_ITEMS
+    : isAdmin
+      ? [...items, { href: '/dashboard/admin', label: 'Admin' }]
+      : items
 
   return (
     <nav className="mx-auto hidden max-w-6xl items-center gap-1 px-4 pb-3 md:flex">
-      {items.map((item) => {
+      {visibleItems.map((item) => {
         const active =
           pathname === item.href ||
           (item.href !== '/dashboard' && pathname.startsWith(item.href))

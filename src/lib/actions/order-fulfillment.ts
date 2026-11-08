@@ -76,21 +76,18 @@ async function restoreStock(supabase: SupabaseServerClient, orderId: string) {
 
   for (const item of items ?? []) {
     if (!item.product_id) continue
+    const qty = Number(item.qty ?? 0)
+    if (qty < 1) continue
 
-    const { data: product } = await supabase
-      .from('products')
-      .select('id, stock')
-      .eq('id', item.product_id)
-      .maybeSingle()
-
-    if (!product) continue
-
-    const currentStock = Number(product.stock ?? 0)
-    await supabase
-      .from('products')
-      .update({ stock: currentStock + Number(item.qty ?? 0) })
-      .eq('id', product.id)
-      .eq('stock', product.stock)
+    // RPC atomik (tambah qty); kepemilikan toko dicek di dalam fungsi
+    // untuk pemanggil ber-JWT, jadi seller hanya bisa mengembalikan stok
+    // produk tokonya sendiri. Sebelumnya baca-ubah-tulis dari kode
+    // (update stock = nilai_baca + qty) bisa menimpa perubahan bersamaan.
+    // Kegagalan di sini best-effort: order sudah terlanjur CANCELLED.
+    await supabase.rpc('increment_stock', {
+      p_product_id: item.product_id,
+      p_qty: qty,
+    })
   }
 }
 

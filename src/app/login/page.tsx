@@ -52,7 +52,7 @@ export default function LoginPage() {
       footer={
         <p className="text-center text-sm text-neutral-500">
           Belum punya akun?{' '}
-          <Link href="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
+          <Link href="/register" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
             Daftar gratis
           </Link>
         </p>
@@ -78,7 +78,7 @@ export default function LoginPage() {
         <div>
           <div className="mb-1 flex items-center justify-between">
             <label className="text-sm font-medium text-neutral-700">Password</label>
-            <Link href="/forgot-password" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+            <Link href="/forgot-password" className="text-xs font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
               Lupa password?
             </Link>
           </div>

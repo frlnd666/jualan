@@ -5,12 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { createProductAction } from '@/lib/actions/subscriptions'
+import { getProductQuotaAction } from '@/lib/actions/dashboard-store'
 import { removeProductImageObject } from '@/lib/product-image'
-import {
-  FREE_SUBSCRIPTION,
-  type SubscriptionRow,
-} from '@/lib/subscriptions'
-import { effectiveTier, limitsFor } from '@/lib/subscription-tiers'
 
 function sanitizeNumberInput(value: string) {
   return value.replace(/\D/g, '')
@@ -75,37 +71,21 @@ export default function NewProductPage() {
         return
       }
 
-      const { data: store, error } = await supabase
-        .from('stores')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (error || !store) {
-        setErrorMessage('Toko tidak ditemukan untuk akun ini.')
+      // Fase 2: toko + kuota dibaca lewat server action (staff tidak
+      // bisa membaca tabel stores langsung — ada rekening bank di sana).
+      // Batas paket di sini hanya untuk tampilan; penegakan yang
+      // mengikat ada di server action createProductAction.
+      const quota = await getProductQuotaAction()
+      if ('error' in quota) {
+        setErrorMessage(quota.error)
         setLoadingStore(false)
         return
       }
 
-      setStoreId(store.id)
-
-      // Batas paket dibaca di sini hanya untuk tampilan; penegakan yang
-      // mengikat ada di server action createProductAction.
-      const { data: subscriptionRow } = await supabase
-        .from('subscriptions')
-        .select('tier, status, current_period_end')
-        .eq('store_id', store.id)
-        .maybeSingle()
-      const subscription: SubscriptionRow =
-        (subscriptionRow as SubscriptionRow | null) ?? FREE_SUBSCRIPTION
-      const { tier } = effectiveTier(subscription)
-      setTierLabel(tier === 'free' ? 'Free' : tier === 'silver' ? 'Silver' : 'Gold')
-      setProductLimit(limitsFor(subscription).maxProducts)
-      const { count } = await supabase
-        .from('products')
-        .select('id', { count: 'exact', head: true })
-        .eq('store_id', store.id)
-      setProductUsed(count ?? 0)
+      setStoreId(quota.storeId)
+      setTierLabel(quota.tierLabel)
+      setProductLimit(quota.productLimit)
+      setProductUsed(quota.productUsed)
 
       setLoadingStore(false)
     }

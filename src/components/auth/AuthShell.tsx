@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
+import Image from 'next/image'
 
 /**
  * Kerangka visual bersama untuk halaman auth (login, register,
- * lupa/reset password): latar gradasi brand, kartu putih terpusat,
- * dan logo Jualan. Logika tiap halaman tetap di halamannya sendiri.
+ * lupa/reset password): latar kertas, kartu putih terpusat,
+ * dan logo CUAN. Logika tiap halaman tetap di halamannya sendiri.
  */
 export default function AuthShell({
   title,
@@ -17,24 +18,18 @@ export default function AuthShell({
   footer?: ReactNode
 }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-700 via-indigo-800 to-violet-900 px-4 py-10">
-      {/* Aksen dekoratif lembut di latar */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-32 -right-16 h-80 w-80 rounded-full bg-fuchsia-400/20 blur-3xl"
-      />
-
+    <div className="relative flex min-h-screen items-center justify-center bg-[var(--bg)] px-4 py-10">
       <div className="relative w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-black text-indigo-700 shadow-lg">
-            J
-          </div>
-          <p className="mt-3 text-xl font-bold tracking-tight text-white">Jualan</p>
-          <p className="text-sm text-indigo-200">Storefront untuk UMKM Indonesia</p>
+          <Image
+            src="/logo-cuan.svg"
+            alt="Logo CUAN"
+            width={56}
+            height={56}
+            className="h-14 w-14"
+          />
+          <p className="mt-3 text-xl font-bold tracking-tight text-[var(--text)]">CUAN</p>
+          <p className="text-sm text-[var(--text-muted)]">Toko online untuk UMKM Indonesia</p>
         </div>
 
         <div className="rounded-3xl bg-white p-7 shadow-2xl md:p-8">
@@ -46,7 +41,7 @@ export default function AuthShell({
           {footer ? <div className="mt-6">{footer}</div> : null}
         </div>
 
-        <p className="mt-5 text-center text-xs text-indigo-200/80">
+        <p className="mt-5 text-center text-xs text-[var(--text-muted)]">
           Aman &amp; terenkripsi — data tokomu hanya milikmu.
         </p>
       </div>
@@ -103,7 +98,7 @@ export function AuthOrDivider() {
 }
 
 export const authInputClass =
-  'w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30'
+  'w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[#0b6b4a] focus:outline-none focus:ring-2 focus:ring-[#0b6b4a]/30'
 
 export const authLabelClass = 'mb-1 block text-sm font-medium text-neutral-700'
 
@@ -111,4 +106,4 @@ export const authErrorClass =
   'rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700'
 
 export const authSubmitClass =
-  'w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50'
+  'w-full rounded-xl bg-[var(--text)] py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50'

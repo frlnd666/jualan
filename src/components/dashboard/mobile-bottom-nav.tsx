@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, Package, ShoppingBag, MessageCircle, Store } from 'lucide-react'
+import { LayoutGrid, Package, ShoppingBag, MessageCircle, Store, Crown } from 'lucide-react'
 
 const items = [
   { href: '/dashboard', label: 'Home', icon: LayoutGrid },
   { href: '/dashboard/products', label: 'Produk', icon: Package },
   { href: '/dashboard/orders', label: 'Pesanan', icon: ShoppingBag },
   { href: '/dashboard/chat', label: 'Chat', icon: MessageCircle },
+  { href: '/dashboard/subscription', label: 'Paket', icon: Crown },
   { href: '/dashboard/settings', label: 'Toko', icon: Store },
 ]
 
@@ -17,7 +18,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[color:var(--surface)/0.92] px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden">
-      <div className="mx-auto grid max-w-6xl grid-cols-5 gap-1">
+      <div className="mx-auto grid max-w-6xl grid-cols-6 gap-1">
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (

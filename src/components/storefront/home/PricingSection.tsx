@@ -12,6 +12,8 @@ type Tier = {
   desc: string;
   cta: string;
   ctaNote: string;
+  // Paket yang diteruskan ke /register (?plan=) — Fase 1.
+  plan: 'free' | 'silver-trial' | 'gold';
   popular: boolean;
   features: TierFeature[];
 };
@@ -24,6 +26,7 @@ const tiers: Tier[] = [
     desc: "Buat coba jualan dan merasakan tokonya dulu.",
     cta: "Buat toko gratis",
     ctaNote: "Tanpa kartu kredit.",
+    plan: "free",
     popular: false,
     features: [
       { text: "4 produk", included: true },
@@ -45,6 +48,7 @@ const tiers: Tier[] = [
     desc: "Paket utama untuk toko yang sudah serius jualan.",
     cta: "Coba Silver gratis 14 hari",
     ctaNote: "Trial 14 hari, tanpa kartu kredit.",
+    plan: "silver-trial",
     popular: true,
     features: [
       { text: "30 produk", included: true },
@@ -66,6 +70,7 @@ const tiers: Tier[] = [
     desc: "Untuk toko besar yang butuh kapasitas dan domain sendiri.",
     cta: "Pilih Gold",
     ctaNote: "Setara Rp16.667 / bulan.",
+    plan: "gold",
     popular: false,
     features: [
       { text: "175 produk", included: true },
@@ -148,7 +153,7 @@ export function PricingSection() {
               </ul>
 
               <Link
-                href="/register"
+                href={`/register?plan=${tier.plan}`}
                 className="btn btn-primary mt-7 flex w-full px-6 py-3.5 text-sm"
               >
                 {tier.cta}

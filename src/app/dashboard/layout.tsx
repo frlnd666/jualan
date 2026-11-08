@@ -18,6 +18,20 @@ export default async function DashboardLayout({
 
   if (!user) redirect('/login')
 
+  // Fase 1: pastikan user punya baris profiles (role awal 'buyer').
+  // RLS mengizinkan user menyisipkan barisnya sendiri sebagai buyer.
+  // Gagal di sini tidak boleh mematikan dashboard — dicoba diam-diam.
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (!profile) {
+      await supabase.from('profiles').insert({ id: user.id, role: 'buyer' })
+    }
+  } catch {}
+
   const { data: store } = await supabase
     .from('stores')
     .select('id, name, slug')

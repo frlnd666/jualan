@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import StoreChatWidget from '@/components/storefront/StoreChatWidget'
+import { getPublicStoreSubscription } from '@/lib/subscriptions-server'
+import { limitsFor } from '@/lib/subscription-tiers'
 
 type StorefrontPageProps = {
   params: Promise<{
@@ -53,11 +55,29 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
     .eq('available', true)
     .order('created_at', { ascending: false })
 
+  // Fase 1 (Bab 5): downgrade menyembunyikan, bukan menghapus.
+  // - Toko SUSPENDED hilang dari publik.
+  // - Produk di atas batas paket tidak ditampilkan (diurutkan terbaru
+  //   dulu, jadi yang tampil adalah produk terbaru sampai batas).
+  // - Foto ke-2+ tidak ditampilkan untuk Free (max 1 foto).
+  // TODO Fase 4: watermark foto + iklan affiliate di banner toko Free.
+  const subscription = await getPublicStoreSubscription(store.id)
+  if (subscription.status === 'SUSPENDED') {
+    notFound()
+  }
+  const tierLimits = limitsFor(subscription)
+  const visibleProducts = (products ?? [])
+    .slice(0, tierLimits.maxProducts)
+    .map((p) => ({
+      ...p,
+      images: (p.images ?? []).slice(0, tierLimits.maxPhotosPerProduct),
+    }))
+
   // Nama kategori diambil dari tabel product_categories (nama tabel asli
   // di database) dengan query terpisah — bukan embed relasi — agar tahan
   // terhadap perbedaan nama relasi PostgREST.
   const categoryIds = Array.from(
-    new Set((products ?? []).map((p) => p.category_id).filter(Boolean))
+    new Set(visibleProducts.map((p) => p.category_id).filter(Boolean))
   ) as string[]
 
   const categoryNames = new Map<string, string>()
@@ -74,7 +94,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
     }
   }
 
-  const productList = products ?? []
+  const productList = visibleProducts
   const totalProducts = productList.length
   const featuredProducts = productList.slice(0, 2)
 

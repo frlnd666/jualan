@@ -2,14 +2,14 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'UMKM Storefront',
-    short_name: 'Jualan',
+    name: 'CUAN',
+    short_name: 'CUAN',
     description: 'Platform toko online untuk UMKM Indonesia',
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#6366F1',
+    background_color: '#f6f3ee',
+    theme_color: '#0b6b4a',
     icons: [
       {
         src: '/icons/192',

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { getDashboardAccess } from '@/lib/dashboard-access'
 
 function StatCard({
   label,
@@ -50,13 +51,22 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login')
 
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id, name, slug')
-    .eq('owner_id', user.id)
-    .single()
+  // Fase 2: pembeli yang tersesat ke /dashboard (mis. tautan lama atau
+  // login Google tanpa ?next=) diarahkan ke akun pembeli. Admin platform
+  // tidak punya toko — arahkan ke panel admin, bukan ke wizard toko.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (profile?.role === 'buyer') redirect('/akun')
+  if (profile?.role === 'admin') redirect('/dashboard/admin')
 
-  if (!store) redirect('/dashboard/settings')
+  // Fase 2: staff masuk dashboard tokonya lewat profiles.store_id.
+  const access = await getDashboardAccess(supabase, user.id)
+  if (!access) redirect('/dashboard/onboarding')
+  const store = access.store
+  const isStaff = access.role === 'staff'
 
   const { count: productCount } = await supabase
     .from('products')
@@ -162,6 +172,26 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {!isStaff &&
+      (store.onboarding_step ?? 5) > 0 &&
+      (store.onboarding_step ?? 5) < 5 ? (
+        <section className="rounded-[32px] border border-amber-200 bg-amber-50 p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-sm font-bold text-amber-900">
+            Setup tokomu belum selesai
+          </p>
+          <p className="mt-1 text-sm leading-6 text-amber-800">
+            Lanjutkan wizard setup — tinggal beberapa langkah lagi sampai
+            tokomu siap dibagikan.
+          </p>
+          <Link
+            href="/dashboard/onboarding"
+            className="mt-3 inline-flex items-center justify-center rounded-2xl bg-amber-700 px-4 py-3 text-sm font-semibold text-white"
+          >
+            Lanjutkan setup
+          </Link>
+        </section>
+      ) : null}
+
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -248,33 +278,37 @@ export default async function DashboardPage() {
             Buat produk baru dan atur harga, foto, serta deskripsi.
           </p>
         </Link>
-        <Link
-          href="/dashboard/shipping"
-          className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
-        >
-          <p className="text-sm font-bold">Metode pengiriman</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-            Atur kurir dan ongkos kirim yang ditawarkan ke customer.
-          </p>
-        </Link>
-        <Link
-          href="/dashboard/subscription"
-          className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
-        >
-          <p className="text-sm font-bold">Langganan</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-            Paket, batas produk, upgrade, dan perpanjangan.
-          </p>
-        </Link>
-        <Link
-          href="/dashboard/settings"
-          className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
-        >
-          <p className="text-sm font-bold">Pengaturan toko</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-            Nama, alamat, WhatsApp, logo, dan tampilan tokomu.
-          </p>
-        </Link>
+        {isStaff ? null : (
+          <>
+            <Link
+              href="/dashboard/shipping"
+              className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
+            >
+              <p className="text-sm font-bold">Metode pengiriman</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Atur kurir dan ongkos kirim yang ditawarkan ke customer.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/subscription"
+              className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
+            >
+              <p className="text-sm font-bold">Langganan</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Paket, batas produk, upgrade, dan perpanjangan.
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/settings"
+              className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
+            >
+              <p className="text-sm font-bold">Pengaturan toko</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Nama, alamat, WhatsApp, logo, dan tampilan tokomu.
+              </p>
+            </Link>
+          </>
+        )}
       </section>
     </div>
   )

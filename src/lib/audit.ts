@@ -11,6 +11,10 @@ export type AuditAction =
   | 'subscription_verified'
   | 'subscription_rejected'
   | 'subscription_cancelled'
+  | 'subscription_trial_ended'
+  | 'subscription_past_due'
+  | 'subscription_expired'
+  | 'subscription_ended'
   | 'store_suspended'
   | 'store_unsuspended'
   | 'staff_added'
@@ -25,6 +29,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   subscription_verified: 'Langganan diverifikasi',
   subscription_rejected: 'Pembayaran langganan ditolak',
   subscription_cancelled: 'Langganan dibatalkan',
+  subscription_trial_ended: 'Trial berakhir (cron)',
+  subscription_past_due: 'Masuk masa tenggang (cron)',
+  subscription_expired: 'Langganan berakhir (cron)',
+  subscription_ended: 'Periode batal berakhir (cron)',
   store_suspended: 'Toko dibekukan',
   store_unsuspended: 'Pembekuan toko dibuka',
   staff_added: 'Staff ditambahkan',

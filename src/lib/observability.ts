@@ -11,6 +11,7 @@ export type LogEventName =
   | 'qris_webhook_received'
   | 'qris_webhook_paid'
   | 'qris_webhook_rejected'
+  | 'subscription_transitions_run'
 
 export interface LogEventRecord {
   ts: string

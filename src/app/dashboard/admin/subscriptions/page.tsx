@@ -6,7 +6,10 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolvePaymentProofUrl } from '@/lib/payment-proof'
 import { TIER_LABELS } from '@/lib/subscriptions'
-import { VerifyPaymentButtons } from '@/components/dashboard/SubscriptionActions'
+import {
+  RunTransitionsButton,
+  VerifyPaymentButtons,
+} from '@/components/dashboard/SubscriptionActions'
 
 type PaymentRow = {
   id: string
@@ -88,6 +91,23 @@ export default async function AdminSubscriptionsPage() {
           tidak berubah.
         </p>
       </div>
+
+      <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] md:p-6">
+        <h2 className="text-base font-bold text-[var(--text)]">
+          Transisi langganan (cron harian)
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+          Cron berjalan otomatis tiap hari 07:00 WIB: trial yang habis turun
+          ke Free, periode berbayar yang habis masuk masa tenggang 7 hari,
+          tenggang yang habis turun ke Free, dan pengingat H-3/H-1 ke pemilik
+          toko. Tombol ini menjalankan logika yang sama secara manual —
+          aman diulang (transisi idempotent, pengingat tidak dikirim dua
+          kali di hari yang sama).
+        </p>
+        <div className="mt-4">
+          <RunTransitionsButton />
+        </div>
+      </section>
 
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] md:p-6">
         <h2 className="text-base font-bold text-[var(--text)]">

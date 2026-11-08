@@ -295,3 +295,84 @@ description, canonical, OG, dan JSON-LD (cek View Source).
 auto-debit, notifikasi email/WhatsApp, verifikasi DNS dari sisi server
 selain lewat Vercel API (cek DNS langsung dari aplikasi tidak dibuat —
 Vercel yang menjadi sumber kebenaran status domain).
+
+## Cron transisi status langganan (2026-11-09)
+
+Jadwal harian yang mengubah status langganan di database — sebelumnya
+status hanya dihitung di read-time (`effectiveTier`), jadi toko tetap
+jalan benar meski cron belum jalan; cron membuat status DI DATABASE
+ikut bergerak (tampilan halaman Langganan, audit log, dan notifikasi
+pemilik toko jadi benar).
+
+**Cara kerja:** Vercel Cron (lihat `vercel.json`, jadwal `0 0 * * *` =
+07:00 WIB setiap hari; timing Hobby hanya dijamin dalam sejam, satu run
+bisa telat ~1 jam) memanggil `GET /api/cron/subscription-transitions`.
+Route memakai service_role dan memanggil
+`runSubscriptionTransitions()` di `src/lib/subscription-transitions.ts`:
+
+- TRIALING yang `trial_ends_at`-nya lewat → tier Free, status ACTIVE
+  (trial selesai, toko jadi Free).
+- ACTIVE berbayar yang `current_period_end`-nya lewat → PAST_DUE +
+  `grace_ends_at` = akhir periode + 7 hari (toko tetap jualan, fitur
+  premium baru terkunci — penegakan di `effectiveTier`).
+- PAST_DUE yang masa tenggangnya habis → EXPIRED + tier Free (produk
+  di atas batas disembunyikan di read-time, bukan dihapus).
+- CANCELLED yang `current_period_end`-nya lewat → tier Free, status
+  ACTIVE.
+- SUSPENDED dan EXPIRED tidak disentuh cron (SUSPENDED hanya admin).
+- Setiap transisi dicatat ke `audit_log` (actor `system`) + notifikasi
+  in-app ke pemilik toko (link `/dashboard/subscription`).
+- Pengingat H-3 dan H-1 (hari kalender WIB) sebelum trial berakhir dan
+  sebelum periode berbayar berakhir — di-dedup per toko + jenis + hari
+  (dicek ke tabel `notifications` sebelum mengirim, jadi tidak spam).
+
+**Idempotent & aman diulang:** sesudah status berubah, baris itu tidak
+lagi cocok dengan kondisi pemicu; update baris memakai syarat status
+lama (`.eq('status', ...)`), jadi dua run bersamaan tidak menggandakan
+efek. Satu baris gagal tidak menghentikan baris lain (dicatat di
+`summary.errors`).
+
+**Env yang wajib diisi (Vercel Production + `.env.local`):**
+- `CRON_SECRET` — secret acak (mis. `openssl rand -base64 32`). Vercel
+  Cron mengirim header `Authorization: Bearer <CRON_SECRET>` OTOMATIS
+  bila env ini diset; JANGAN tulis secret di URL/vercel.json. Tanpa env
+  ini route mengembalikan 401. Tombol manual admin tidak memakai secret
+  ini (pakai sesi admin).
+- `SUPABASE_SERVICE_ROLE_KEY` — sudah wajib sejak Fase 0.
+
+**Tidak ada migrasi baru untuk cron ini.** `audit_log.action` bebas
+teks, `notifications.type` bebas teks, dan dedup pengingat memakai
+query ke tabel `notifications` yang sudah ada (Fase 3).
+
+**Cara test manual:**
+1. Sebagai admin, buka `/dashboard/admin/subscriptions` → seksi
+   "Transisi langganan (cron harian)" → "Jalankan transisi sekarang".
+   Hasilnya tampil sebagai ringkasan (diproses, transisi per jenis,
+   pengingat dikirim, yang dilewati karena duplikat).
+2. Simulasi tanggal lewat SQL (Supabase SQL Editor) — ubah satu toko
+   trial agar berakhir kemarin, lalu jalankan tombol di atas:
+   `update public.subscriptions set trial_ends_at = now() - interval '1 day', current_period_end = now() - interval '1 day' where store_id = '<id-toko>';`
+   Harusnya: status jadi Free/ACTIVE + audit log
+   `subscription_trial_ended` + notifikasi ke pemilik toko. Kembalikan
+   bila perlu: set `trial_ends_at`/`current_period_end` ke tanggal
+   depan dan status/tier semula (atau buat trial baru lewat register).
+   Simulasi PAST_DUE→EXPIRED: set `status = 'PAST_DUE',
+   grace_ends_at = now() - interval '1 day'` pada toko berbayar.
+   Simulasi pengingat H-3: set `trial_ends_at` ke 3 hari lagi (WIB)
+   lalu jalankan tombol — notifikasi `TRIAL_ENDING_SOON` terkirim
+   sekali; jalankan tombol kedua kalinya di hari yang sama — pengingat
+   dilewati (duplikat).
+3. Cek route cron langsung (butuh CRON_SECRET):
+   `curl -H "Authorization: Bearer <CRON_SECRET>" https://jualin-delta.vercel.app/api/cron/subscription-transitions`
+   Tanpa header → 401.
+
+**Perilaku bila cron belum jalan:** tidak ada yang rusak — status
+efektif tetap dihitung benar di read-time (`effectiveTier`), toko tetap
+jualan. Yang tertinggal hanya status di database (mis. trial yang sudah
+habis masih tertulis TRIALING) sampai cron berikutnya jalan atau admin
+menekan tombol manual.
+
+**Yang TIDAK dibangun di cron ini:** auto-debit/perpanjangan otomatis
+(pembayaran langganan tetap manual + verifikasi admin), pengingat
+email/WhatsApp (hanya in-app), dan pengingat sebelum masa tenggang
+habis (pemilik sudah diberi tahu saat masuk PAST_DUE).

@@ -9,6 +9,63 @@ import {
   ensureStoreSubscription,
   verifySubscriptionPayment,
 } from '@/lib/actions/subscriptions'
+import { runSubscriptionTransitionsAction } from '@/lib/actions/subscription-transitions'
+
+/**
+ * Tombol admin untuk menjalankan transisi langganan secara manual —
+ * logika yang sama dengan cron harian (lihat
+ * src/lib/subscription-transitions.ts). Dipakai untuk testing dan
+ * mengejar ketertinggalan bila cron sempat tidak jalan. Aman diulang:
+ * transisi idempotent, pengingat di-dedup per hari.
+ */
+export function RunTransitionsButton() {
+  const router = useRouter()
+  const [message, setMessage] = useState('')
+  const [isPending, startTransition] = useTransition()
+
+  function run() {
+    setMessage('')
+    startTransition(async () => {
+      const result = await runSubscriptionTransitionsAction()
+      if ('error' in result) {
+        setMessage(result.error)
+        return
+      }
+      const s = result.summary
+      const changed =
+        s.transitions['trial-ended'] +
+        s.transitions['past-due'] +
+        s.transitions.expired +
+        s.transitions['cancelled-ended']
+      const reminded = s.reminders.trial + s.reminders.period
+      setMessage(
+        `Selesai: ${s.processed} langganan diproses, ${changed} transisi ` +
+          `(trial berakhir ${s.transitions['trial-ended']}, telat bayar ${s.transitions['past-due']}, ` +
+          `berakhir ${s.transitions.expired}, batal berakhir ${s.transitions['cancelled-ended']}), ` +
+          `${reminded} pengingat dikirim` +
+          (s.remindersSkippedDuplicate > 0
+            ? `, ${s.remindersSkippedDuplicate} pengingat dilewati (sudah dikirim hari ini)`
+            : '') +
+          (s.errors.length > 0 ? `. ${s.errors.length} error — cek log server.` : '.')
+      )
+      router.refresh()
+    })
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={run}
+        disabled={isPending}
+        className="rounded-xl bg-[var(--text)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+      >
+        {isPending ? 'Menjalankan…' : 'Jalankan transisi sekarang'}
+      </button>
+      {message ? <p className="text-xs leading-5 text-[var(--text-muted)]">{message}</p> : null}
+    </div>
+  )
+}
 
 export function VerifyPaymentButtons({ paymentId }: { paymentId: string }) {
   const router = useRouter()

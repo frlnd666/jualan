@@ -18,6 +18,13 @@ export type NotificationType =
   | 'ORDER_SHIPPED'
   | 'ORDER_COMPLETED'
   | 'ORDER_CANCELLED'
+  // Cron langganan (transisi status + pengingat H-3/H-1).
+  | 'TRIAL_ENDING_SOON'
+  | 'TRIAL_ENDED'
+  | 'SUBSCRIPTION_ENDING_SOON'
+  | 'SUBSCRIPTION_PAST_DUE'
+  | 'SUBSCRIPTION_EXPIRED'
+  | 'SUBSCRIPTION_ENDED'
 
 export interface NotifyInput {
   userId: string

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, Package, ShoppingBag, MessageCircle, Store, Crown } from 'lucide-react'
+import { LayoutGrid, Package, ShoppingBag, MessageCircle, Store, Crown, Shield } from 'lucide-react'
 
 const items = [
   { href: '/dashboard', label: 'Home', icon: LayoutGrid },
@@ -13,13 +13,35 @@ const items = [
   { href: '/dashboard/settings', label: 'Toko', icon: Store },
 ]
 
-export default function MobileBottomNav() {
+// Staff (Fase 2) hanya Home, Produk, Pesanan.
+const STAFF_ITEMS = [
+  { href: '/dashboard', label: 'Home', icon: LayoutGrid },
+  { href: '/dashboard/products', label: 'Produk', icon: Package },
+  { href: '/dashboard/orders', label: 'Pesanan', icon: ShoppingBag },
+]
+
+export default function MobileBottomNav({
+  isStaff = false,
+  isAdmin = false,
+}: {
+  isStaff?: boolean
+  isAdmin?: boolean
+}) {
   const pathname = usePathname()
+  const visibleItems = isStaff
+    ? STAFF_ITEMS
+    : isAdmin
+      ? [
+          ...items,
+          { href: '/dashboard/admin', label: 'Admin', icon: Shield },
+        ]
+      : items
+  const cols = isStaff ? 'grid-cols-3' : isAdmin ? 'grid-cols-7' : 'grid-cols-6'
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[color:var(--surface)/0.92] px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden">
-      <div className="mx-auto grid max-w-6xl grid-cols-6 gap-1">
-        {items.map(({ href, label, icon: Icon }) => {
+      <div className={`mx-auto grid max-w-6xl gap-1 ${cols}`}>
+        {visibleItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link

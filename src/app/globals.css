@@ -11,9 +11,12 @@
 
   --line: #e7ded2;
 
-  --primary: #c46e3b;
-  --primary-hover: #a9552b;
-  --primary-soft: #f2e3d8;
+  --primary: #0b6b4a;
+  --primary-hover: #084d3c;
+  --primary-soft: #dcebe3;
+  /* Hijau zamrud gelap khusus untuk TEKS/ikon di atas latar terang.
+     --primary (#0b6b4a) 5,9:1 terhadap latar — lolos 4,5:1. */
+  --primary-deep: #0b6b4a;
 
   --olive: #7a846b;
   --stone: #c8b8a6;
@@ -45,3 +48,46 @@ a { color: inherit; text-decoration: none; }
 img, svg { display: block; max-width: 100%; }
 button, input, textarea, select { font: inherit; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Satu pola tombol untuk seluruh landing — jangan bikin varian baru
+   di komponen. Kontras terukur (teks putih di #1f1a17 = 17,2:1,
+   teks gelap di #fffdf9 = 17,0:1; keduanya jauh di atas 7:1).
+   .btn-primary  : tombol utama di latar terang.
+   .btn-secondary: tombol kedua di latar terang.
+   .btn-light    : tombol utama di atas panel gelap.
+   .btn-outline-light: tombol kedua di atas panel gelap. */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    line-height: 1.25;
+    transition: background-color 0.15s ease, color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .btn-primary {
+    background-color: var(--text);
+    color: #fff;
+  }
+  .btn-primary:hover { background-color: #000; }
+  .btn-secondary {
+    background-color: var(--surface);
+    color: var(--text);
+    border: 1.5px solid var(--text);
+  }
+  .btn-secondary:hover { background-color: var(--surface-soft); }
+  .btn-light {
+    background-color: #fff;
+    color: var(--text);
+  }
+  .btn-light:hover { background-color: var(--surface-soft); }
+  .btn-outline-light {
+    background-color: transparent;
+    color: #fff;
+    border: 1.5px solid rgb(255 255 255 / 0.7);
+  }
+  .btn-outline-light:hover { background-color: rgb(255 255 255 / 0.12); }
+}

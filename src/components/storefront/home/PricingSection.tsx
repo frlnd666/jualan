@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { ArrowRight, Check, X } from "lucide-react";
 
 type TierFeature = { text: string; included: boolean };
@@ -88,10 +87,10 @@ export function PricingSection() {
     <section id="harga" className="scroll-mt-20 border-y border-[var(--line)] bg-[var(--surface)] px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-6xl">
         <div className="text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary-deep)]">
             Harga
           </p>
-          <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+          <h2 className="mx-auto mt-3 max-w-2xl text-balance text-2xl font-bold leading-tight tracking-tight text-[var(--text)] sm:text-3xl">
             Mulai gratis. Upgrade kapan saja.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-[var(--text-muted)]">
@@ -103,13 +102,9 @@ export function PricingSection() {
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
-          {tiers.map((tier, index) => (
-            <motion.div
+          {tiers.map((tier) => (
+            <div
               key={tier.name}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.3, delay: index * 0.08 }}
               className={`relative rounded-2xl border bg-[var(--bg)] p-7 shadow-[var(--shadow-sm)] ${
                 tier.popular
                   ? "border-[var(--primary)] ring-2 ring-[var(--primary)]"
@@ -117,7 +112,7 @@ export function PricingSection() {
               }`}
             >
               {tier.popular ? (
-                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[var(--primary)] px-3.5 py-1 text-xs font-semibold text-white">
+                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[var(--text)] px-3.5 py-1 text-xs font-bold text-white">
                   Paling populer
                 </span>
               ) : null}
@@ -145,22 +140,16 @@ export function PricingSection() {
                     {feature.included ? (
                       <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--success)]" />
                     ) : (
-                      <X className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)] opacity-50" />
+                      <X className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
                     )}
-                    <span className={feature.included ? "" : "opacity-60"}>
-                      {feature.text}
-                    </span>
+                    <span>{feature.text}</span>
                   </li>
                 ))}
               </ul>
 
               <Link
                 href="/register"
-                className={`mt-7 flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white transition ${
-                  tier.popular
-                    ? "bg-[var(--primary)] hover:bg-[var(--primary-hover)]"
-                    : "bg-[var(--text)] hover:opacity-90"
-                }`}
+                className="btn btn-primary mt-7 flex w-full px-6 py-3.5 text-sm"
               >
                 {tier.cta}
                 <ArrowRight className="h-4 w-4" />
@@ -168,7 +157,7 @@ export function PricingSection() {
               <p className="mt-3 text-center text-xs text-[var(--text-muted)]">
                 {tier.ctaNote}
               </p>
-            </motion.div>
+            </div>
           ))}
         </div>
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getDashboardAccess } from '@/lib/dashboard-access'
 import type { OrderStatus } from '@/lib/types/order'
 
 export interface ActionResult {
@@ -33,7 +34,8 @@ const ORDER_STATUSES: OrderStatus[] = [
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
-/** Verifikasi: user login, punya toko, dan order ini milik tokonya. */
+/** Verifikasi: user login, punya akses ke toko (pemilik ATAU staff —
+// Fase 2), dan order ini milik toko itu. */
 async function getOwnedOrder(supabase: SupabaseServerClient, orderId: string) {
   const {
     data: { user },
@@ -43,15 +45,11 @@ async function getOwnedOrder(supabase: SupabaseServerClient, orderId: string) {
     return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' as const }
   }
 
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id')
-    .eq('owner_id', user.id)
-    .maybeSingle()
-
-  if (!store) {
+  const access = await getDashboardAccess(supabase, user.id)
+  if (!access) {
     return { error: 'Toko tidak ditemukan untuk akun ini.' as const }
   }
+  const store = access.store
 
   const { data: order } = await supabase
     .from('orders')

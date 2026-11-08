@@ -40,7 +40,14 @@ export function logEvent(
 }
 
 /** Cek env wajib — hanya boolean, nilainya TIDAK PERNAH dikembalikan. */
-export function requiredEnvStatus(): Record<string, boolean> {
+export type RequiredEnvStatus = {
+  supabaseUrl: boolean
+  supabaseServiceRole: boolean
+  shopeepayEncryptionKey: boolean
+  platformBank: boolean
+}
+
+export function requiredEnvStatus(): RequiredEnvStatus {
   return {
     supabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
     supabaseServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),

@@ -25,7 +25,7 @@ export async function GET() {
 
   const env = requiredEnvStatus()
   const envOk =
-    env.supabaseUrl && env.supabaseServiceRole && env.shopeePayEncryptionKey
+    env.supabaseUrl && env.supabaseServiceRole && env.shopeepayEncryptionKey
   const status = database === 'ok' && envOk ? 'ok' : 'degraded'
 
   return NextResponse.json({

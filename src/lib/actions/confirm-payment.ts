@@ -44,7 +44,7 @@ export async function confirmPayment(formData: FormData) {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, store_id')
+    .select('id, store_id, payment_method')
     .eq('id', orderId)
     .maybeSingle()
 
@@ -64,7 +64,12 @@ export async function confirmPayment(formData: FormData) {
     return { error: 'Kamu tidak berhak mengonfirmasi pembayaran order ini.' }
   }
 
-  if (!invoice.payment_proof_url) {
+  // Fase 1 (Bab 5 rencana SaaS): COD tidak punya bukti transfer — penjual
+  // menandai pembayaran COD sebagai diterima tanpa unggahan bukti. Syarat
+  // bukti HANYA berlaku untuk BANK_TRANSFER / QRIS, yang memang dibayar
+  // lewat transfer dan dibuktikan dengan foto.
+  const isCod = order.payment_method === 'COD'
+  if (!isCod && !invoice.payment_proof_url) {
     return { error: 'Bukti transfer belum diupload customer.' }
   }
 

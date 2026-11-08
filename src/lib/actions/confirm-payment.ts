@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getDashboardAccess } from '@/lib/dashboard-access'
 
 export async function confirmPayment(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId') || '')
@@ -52,17 +53,13 @@ export async function confirmPayment(formData: FormData) {
     return { error: 'Order tidak ditemukan.' }
   }
 
-  // Hanya pemilik toko dari order inilah yang boleh mengonfirmasi.
-  const { data: ownedStore, error: storeError } = await supabase
-    .from('stores')
-    .select('id')
-    .eq('id', order.store_id)
-    .eq('owner_id', user.id)
-    .maybeSingle()
-
-  if (storeError || !ownedStore) {
+  // Hanya pemilik toko dari order ini — atau staff toko itu (Fase 2) —
+  // yang boleh mengonfirmasi.
+  const access = await getDashboardAccess(supabase, user.id)
+  if (!access || access.store.id !== order.store_id) {
     return { error: 'Kamu tidak berhak mengonfirmasi pembayaran order ini.' }
   }
+  const ownedStore = access.store
 
   // Fase 1 (Bab 5 rencana SaaS): COD tidak punya bukti transfer — penjual
   // menandai pembayaran COD sebagai diterima tanpa unggahan bukti. Syarat

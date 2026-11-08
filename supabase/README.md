@@ -72,6 +72,60 @@ boleh dianggap selesai.
 trial Silver 14 hari, upgrade manual + verifikasi admin, dan downgrade
 (produk di atas 4 disembunyikan dari storefront, bukan dihapus).
 
+## Fase 2 — Akun dan peran (2026-11-08)
+
+Urutan jalankan di Supabase SQL Editor, SETELAH seluruh migrasi Fase 1:
+
+1. **`migrations/20261108_f2_buyer_accounts.sql`** — akun pembeli +
+   staff + onboarding. Idempotent (`IF NOT EXISTS` / `CREATE OR
+   REPLACE` / `DROP POLICY IF EXISTS`); tidak mengubah data yang sudah
+   ada. Isinya:
+   - `orders.buyer_id` (nullable → `auth.users`) + policy select
+     pembeli atas ordernya sendiri + policy select invoice lewat
+     order miliknya;
+   - tabel `buyer_addresses` (buku alamat) dan `buyer_carts` +
+     `buyer_cart_items` (keranjang tersimpan per akun), RLS
+     owner-only;
+   - `stores.onboarding_step` (integer, default 0; 0 = belum mulai,
+     5 = selesai);
+   - helper `is_staff_of_store(uuid)` + policy staff (aditif) di
+     products / orders / order_items / shipments / invoices — staff
+     HANYA bisa produk + order tokonya, TIDAK bisa shipping_methods,
+     subscriptions, subscription_payments, atau chat;
+   - policy insert `stores` ditulis ulang supaya role staff tidak
+     bisa membuat toko (pengecualian: user yang belum punya baris
+     profiles, karena profiles dibuat malas);
+   - trigger `prevent_role_escalation` diperluas: selain role, perubahan
+     `store_id` oleh pemanggil ber-JWT yang bukan admin juga diblokir
+     (menutup celah staff memindahkan dirinya ke toko lain);
+   - RPC `decrement_stock` / `increment_stock` didefinisikan ulang
+     supaya staff toko juga boleh mengembalikan stok saat membatalkan
+     order (sebelumnya owner-only, jadi pembatalan staff gagal).
+2. **Tidak ada langkah SQL lain** — baris `buyer_carts` dibuat kode
+   aplikasi saat pembeli login pertama kali; `buyer_id` diisi checkout
+   saat ada sesi login.
+
+**Perilaku sebelum migrasi dijalankan:** checkout tetap jalan —
+`createOrderAction` mencoba menyimpan `buyer_id`, dan bila kolom belum
+ada, insert diulang tanpa kolom itu (pola yang sama dengan fallback
+`access_token` Fase 0). Keranjang tersimpan, buku alamat, dan riwayat
+pesanan pembeli baru aktif setelah migrasi dijalankan; sebelum itu
+pembeli login tetap bisa checkout sebagai tamu.
+
+**Yang perlu diverifikasi Ferlan setelah migrasi:** daftar sebagai
+pembeli (`/register?type=buyer`) → keranjang tersimpan antar perangkat
+→ checkout dengan alamat tersimpan → pesanan muncul di
+`/akun/pesanan`; tambah staff dari `/dashboard/staff` (batas tier:
+Free 0 / Silver 1 / Gold 3) → login staff hanya bisa produk +
+pesanan; wizard `/dashboard/onboarding` 5 langkah; admin membekukan
+toko dari `/dashboard/admin`.
+
+**Yang TIDAK dibangun di Fase 2:** notifikasi (Fase 3), voucher
+(Fase 3), watermark/iklan Free (Fase 4), cron transisi status
+langganan (TRIALING→Free, ACTIVE→PAST_DUE→EXPIRED), dan auto-debit
+(Fase 2 di rencana awal — ditunda, pembayaran langganan tetap
+manual).
+
 ## Perilaku sebelum migrasi dijalankan
 
 Kode dirancang tetap hidup di masa transisi:

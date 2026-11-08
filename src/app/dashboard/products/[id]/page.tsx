@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { removeProductImageObject } from '@/lib/product-image'
+import { getProductForEditAction } from '@/lib/actions/dashboard-store'
 
 type EditProductPageProps = {
   params: Promise<{
@@ -63,32 +64,18 @@ export default function EditProductPage({ params }: EditProductPageProps) {
           return
         }
 
-        const { data: store, error: storeError } = await supabase
-          .from('stores')
-          .select('id')
-          .eq('owner_id', user.id)
-          .single()
-
-        if (storeError || !store) {
-          setErrorMessage('Toko tidak ditemukan untuk akun ini.')
+        // Fase 2: produk dimuat lewat server action — staff tidak bisa
+        // membaca tabel stores langsung (ada rekening bank di sana),
+        // dan akses toko diverifikasi di server (pemilik ATAU staff).
+        const result = await getProductForEditAction(currentProductId)
+        if ('error' in result) {
+          setErrorMessage(result.error)
           setLoadingPage(false)
           return
         }
+        const product = result.product
 
-        setStoreId(store.id)
-
-        const { data: product, error: productError } = await supabase
-          .from('products')
-          .select('id, store_id, name, slug, price, stock, description, available, images')
-          .eq('id', currentProductId)
-          .eq('store_id', store.id)
-          .single()
-
-        if (productError || !product) {
-          setErrorMessage('Produk tidak ditemukan.')
-          setLoadingPage(false)
-          return
-        }
+        setStoreId(product.store_id)
 
         setName(product.name || '')
         setSlug(product.slug || '')

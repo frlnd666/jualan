@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getDashboardAccess } from '@/lib/dashboard-access'
 import { redirect } from 'next/navigation'
 import {
   getOrderStatusLabel,
@@ -90,13 +91,9 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
   if (!user) redirect('/login')
 
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id')
-    .eq('owner_id', user.id)
-    .single()
-
-  if (!store) redirect('/dashboard/settings')
+  const access = await getDashboardAccess(supabase, user.id)
+  if (!access) redirect('/dashboard/settings')
+  const store = access.store
 
   const { data: ordersData } = await supabase
     .from('orders')

@@ -258,6 +258,15 @@ export default async function DashboardPage() {
           </p>
         </Link>
         <Link
+          href="/dashboard/subscription"
+          className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
+        >
+          <p className="text-sm font-bold">Langganan</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+            Paket, batas produk, upgrade, dan perpanjangan.
+          </p>
+        </Link>
+        <Link
           href="/dashboard/settings"
           className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
         >

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Logo CUAN">
+  <!-- CUAN — mark only. C as a coin, rising arrow in the gap = profit.
+       Main emerald #0b6b4a, ink #1f1a17. Recommended background: paper cream #f7f0dd.
+       Transparent background; no gradients, no effects. -->
+  <!-- C: thick arc, open on the right -->
+  <path d="M 94 32 A 44 44 0 1 0 94 88" fill="none" stroke="#0b6b4a" stroke-width="16" stroke-linecap="butt"/>
+  <!-- Rising graph inside the C -->
+  <polyline points="40,78 58,60 70,70 84,52" fill="none" stroke="#1f1a17" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Arrowhead at the rising end -->
+  <polygon points="84,52 98,38 96,56" fill="#1f1a17"/>
+</svg>

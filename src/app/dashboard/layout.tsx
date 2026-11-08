@@ -5,6 +5,7 @@ import Link from 'next/link'
 import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
 import DesktopNav from '@/components/dashboard/DesktopNav'
 import LogoutButton from '@/components/dashboard/LogoutButton'
+import { getDashboardAccess } from '@/lib/dashboard-access'
 
 export default async function DashboardLayout({
   children,
@@ -32,11 +33,12 @@ export default async function DashboardLayout({
     }
   } catch {}
 
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id, name, slug')
-    .eq('owner_id', user.id)
-    .single()
+  // Fase 2: staff masuk dashboard toko tempatnya bekerja (bukan toko
+  // miliknya) — header menampilkan nama toko itu, nav difilter.
+  const access = await getDashboardAccess(supabase, user.id)
+  const store = access?.store ?? null
+  const isStaff = access?.role === 'staff'
+  const { data: isAdmin } = await supabase.rpc('is_admin')
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
@@ -63,14 +65,14 @@ export default async function DashboardLayout({
             <LogoutButton />
           </div>
         </div>
-        <DesktopNav />
+        <DesktopNav isStaff={isStaff} isAdmin={isAdmin === true} />
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-[calc(88px+env(safe-area-inset-bottom))] pt-4 md:pb-6">
         {children}
       </main>
 
-      <MobileBottomNav />
+      <MobileBottomNav isStaff={isStaff} isAdmin={isAdmin === true} />
     </div>
   )
 }

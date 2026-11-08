@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og'
 
 /**
  * Ikon PWA digenerate dari kode (tidak ada aset PNG biner di repo):
- * kotak indigo dengan huruf J putih. Ukuran yang didukung: 192 dan 512.
+ * kotak hijau zamrud dengan huruf C putih. Ukuran yang didukung: 192 dan 512.
  */
 export async function GET(
   _request: Request,
@@ -20,7 +20,7 @@ export async function GET(
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#6366F1',
+          background: '#0b6b4a',
           borderRadius: px * 0.22,
           color: '#ffffff',
           fontSize: px * 0.58,
@@ -28,7 +28,7 @@ export async function GET(
           fontFamily: 'sans-serif',
         }}
       >
-        J
+        C
       </div>
     ),
     { width: px, height: px }

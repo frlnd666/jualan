@@ -32,6 +32,8 @@ export default function EditProductPage({ params }: EditProductPageProps) {
   const [slug, setSlug] = useState('')
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('0')
+  // Fase 3: berat produk (gram) — dipakai hitung ongkir di checkout.
+  const [weightGram, setWeightGram] = useState('')
   const [description, setDescription] = useState('')
   const [available, setAvailable] = useState(true)
 
@@ -81,6 +83,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         setSlug(product.slug || '')
         setPrice(String(product.price ?? ''))
         setStock(String(product.stock ?? 0))
+        setWeightGram(product.weight_gram ? String(product.weight_gram) : '')
         setDescription(product.description || '')
         setAvailable(Boolean(product.available))
         setImageUrl(product.images?.[0] || '')
@@ -237,6 +240,8 @@ export default function EditProductPage({ params }: EditProductPageProps) {
           description: description.trim(),
           available,
           images: imageUrl ? [imageUrl] : [],
+          weight_gram:
+            Number(weightGram || 0) > 0 ? Number(weightGram) : null,
         })
         .eq('id', productId)
         .eq('store_id', storeId)
@@ -365,6 +370,23 @@ export default function EditProductPage({ params }: EditProductPageProps) {
               />
             </label>
           </div>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+              Berat produk (gram)
+            </span>
+            <input
+              value={weightGram}
+              onChange={(e) => setWeightGram(e.target.value.replace(/[^\d]/g, ''))}
+              className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+              placeholder="500"
+              inputMode="numeric"
+              disabled={loadingPage}
+            />
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              Dipakai menghitung ongkir berdasarkan berat. Kosong = 500 g.
+            </p>
+          </label>
 
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-[var(--text)]">

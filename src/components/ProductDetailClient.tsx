@@ -15,6 +15,8 @@ type Product = {
   badge?: string | null
   stock?: number | null
   available?: boolean | null
+  /** Berat per unit (gram, Fase 3) — dipakai hitung ongkir. */
+  weight_gram?: number | null
 }
 
 type ProductDetailClientProps = {
@@ -87,6 +89,9 @@ export default function ProductDetailClient({
         store_id: product.store_id ?? null,
         images: product.images ?? null,
         badge: product.badge ?? null,
+        // Fase 3: berat ikut ke keranjang supaya checkout bisa
+        // menampilkan ongkir berbasis berat sebelum submit.
+        weight_gram: product.weight_gram ?? null,
       },
       storeSlug,
       qty

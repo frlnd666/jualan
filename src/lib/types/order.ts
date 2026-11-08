@@ -23,6 +23,12 @@ export interface ShippingMethod {
   estimated_days: string | null
   is_active?: boolean
   created_at?: string | null
+  /** Kode kurir bebas (Fase 3), mis. JNE / JNT / TOKO. */
+  courier_code?: string | null
+  /** Ongkir tambahan per kg di atas berat dasar (Fase 3). */
+  per_kg_price?: number | null
+  /** Berat (gram) yang sudah termasuk di harga dasar (Fase 3). */
+  base_weight_gram?: number | null
 }
 
 export interface CartItemInput {
@@ -44,6 +50,8 @@ export interface CheckoutFormInput {
   notes?: string
   shippingMethodId: string
   paymentMethod: PaymentMethod
+  /** Kode voucher (opsional) — divalidasi ulang di server. */
+  voucherCode?: string
   items: CartItemInput[]
 }
 
@@ -63,6 +71,11 @@ export interface OrderRow {
   status: OrderStatus
   payment_method: PaymentMethod
   shipping_method_name: string | null
+  /** Kode voucher yang dipakai (Fase 3), null bila tanpa voucher. */
+  voucher_code?: string | null
+  discount_amount?: number | null
+  total_weight_gram?: number | null
+  seller_note?: string | null
   created_at: string | null
   updated_at?: string | null
 }

@@ -19,6 +19,8 @@ import {
   getShipmentStatusLabel,
 } from '@/lib/order-status'
 import UploadPaymentProofForm from '@/components/invoice/UploadPaymentProofForm'
+import DynamicQrisPanel from '@/components/invoice/DynamicQrisPanel'
+import { getQrisPaymentForInvoiceAction } from '@/lib/actions/qris'
 import PublicConfigNotice from '@/components/PublicConfigNotice'
 import OrderTimeline from '@/components/order/OrderTimeline'
 import InvoiceShareButtons from '@/components/order/InvoiceShareButtons'
@@ -121,6 +123,9 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
       status,
       payment_method,
       shipping_method_name,
+      discount_amount,
+      voucher_code,
+      total_weight_gram,
       created_at
     `)
     .eq('id', invoice.order_id)
@@ -182,6 +187,16 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
   const isCod = invoice.payment_method === 'COD'
   const timeline = buildOrderTimeline(order.status, invoice.payment_status)
   const invoicePath = `/invoice/${invoice.invoice_number}${tokenQuery(storedToken)}`
+
+  // Fase 3 — QRIS dinamis: bila invoice QRIS masih menunggu bayar, muat
+  // QR aktif (bila ada) untuk panel QR. Panel-nya sendiri yang akan
+  // generate QR bila belum ada; bila toko belum mengaktifkan QRIS
+  // dinamis, panel tidak tampil dan alur manual lama yang jalan.
+  const showDynamicQris =
+    invoice.payment_method === 'QRIS' && invoice.payment_status === 'PENDING_PAYMENT'
+  const existingQris = showDynamicQris
+    ? await getQrisPaymentForInvoiceAction(invoice.invoice_number, t ?? null)
+    : null
 
   return (
     <div className="min-h-screen bg-neutral-50 px-4 py-6 md:px-6">
@@ -258,6 +273,16 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                 <OrderTimeline steps={timeline} />
               </div>
             </section>
+
+            {showDynamicQris ? (
+              <DynamicQrisPanel
+                invoiceNumber={invoice.invoice_number}
+                token={t ?? null}
+                initialQrContent={existingQris?.qrContent ?? null}
+                initialExpiresAt={existingQris?.expiresAt ?? null}
+                amount={Number(invoice.total)}
+              />
+            ) : null}
 
             {invoice.payment_status === 'PENDING_PAYMENT' && !isCod ? (
               <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 md:p-6">
@@ -522,6 +547,25 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                   <span>Subtotal</span>
                   <span>{formatRupiah(order.subtotal)}</span>
                 </div>
+
+                {Number(
+                  (order as { discount_amount?: number | null }).discount_amount ?? 0
+                ) > 0 ? (
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span>
+                      Diskon voucher
+                      {(order as { voucher_code?: string | null }).voucher_code
+                        ? ` (${(order as { voucher_code?: string | null }).voucher_code})`
+                        : ''}
+                    </span>
+                    <span>
+                      −{' '}
+                      {formatRupiah(
+                        (order as { discount_amount?: number | null }).discount_amount ?? 0
+                      )}
+                    </span>
+                  </div>
+                ) : null}
 
                 <div className="flex items-center justify-between text-neutral-600">
                   <span>Ongkir</span>

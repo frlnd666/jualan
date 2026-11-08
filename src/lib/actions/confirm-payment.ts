@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
+import { notifyOrderStatusChange } from '@/lib/notifications'
 
 export async function confirmPayment(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId') || '')
@@ -45,7 +47,7 @@ export async function confirmPayment(formData: FormData) {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, store_id, payment_method')
+    .select('id, store_id, payment_method, customer_name, total, buyer_id')
     .eq('id', orderId)
     .maybeSingle()
 
@@ -96,6 +98,29 @@ export async function confirmPayment(formData: FormData) {
   if (orderUpdateError) {
     return { error: 'Invoice berhasil diubah, tapi status order gagal diperbarui.' }
   }
+
+  // Fase 3: beri tahu pembeli login bahwa pembayarannya terkonfirmasi.
+  // Best-effort — tidak boleh menggagalkan konfirmasi.
+  try {
+    const buyerId = (order as { buyer_id?: string | null }).buyer_id ?? null
+    if (buyerId) {
+      const notifyClient = await createPublicInvoiceClient()
+      await notifyOrderStatusChange(
+        notifyClient,
+        {
+          ownerId: ownedStore.owner_id,
+          buyerId,
+          storeId: ownedStore.id,
+          orderId,
+          invoiceNumber,
+          customerName: (order as { customer_name?: string }).customer_name ?? 'Customer',
+          total: Number((order as { total?: number }).total ?? 0),
+        },
+        'ORDER_PAID',
+        ownedStore.name
+      )
+    }
+  } catch {}
 
   revalidatePath('/dashboard/payments')
   revalidatePath('/dashboard/orders')

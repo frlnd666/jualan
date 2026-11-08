@@ -9,6 +9,8 @@ export interface Product {
   available?: boolean | null
   images?: string[] | null
   badge?: string | null
+  /** Berat per unit (gram, Fase 3) — dipakai hitung ongkir. */
+  weight_gram?: number | null
 }
 
 export interface CartItem {

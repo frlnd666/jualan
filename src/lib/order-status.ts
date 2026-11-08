@@ -176,3 +176,31 @@ export function buildOrderTimeline(
     },
   ]
 }
+
+export type OrderTabKey =
+  | 'semua'
+  | 'perlu-verifikasi'
+  | 'belum-bayar'
+  | 'perlu-dikirim'
+  | 'dikirim'
+  | 'selesai'
+  | 'batal'
+
+/**
+ * Tab antrean kerja penjual (Fase 3: dipindah ke sini dari
+ * dashboard/orders agar dipakai server (hitung tab) dan client
+ * (daftar + export CSV) dari satu sumber kebenaran). Satu pesanan
+ * masuk tepat satu tab utama berdasarkan gabungan status order +
+ * status pembayaran invoice-nya.
+ */
+export function getOrderTab(
+  orderStatus: string,
+  paymentStatus?: string | null
+): OrderTabKey {
+  if (orderStatus === 'CANCELLED') return 'batal'
+  if (orderStatus === 'COMPLETED') return 'selesai'
+  if (orderStatus === 'SHIPPED') return 'dikirim'
+  if (paymentStatus === 'WAITING_VERIFICATION') return 'perlu-verifikasi'
+  if (orderStatus === 'PAID' || orderStatus === 'PROCESSING') return 'perlu-dikirim'
+  return 'belum-bayar'
+}

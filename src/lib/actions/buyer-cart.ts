@@ -58,7 +58,7 @@ export async function getBuyerCartAction(): Promise<BuyerCart> {
 
   const { data: productsData } = await supabase
     .from('products')
-    .select('id, name, slug, price, store_id, description, stock, available, images, badge')
+    .select('id, name, slug, price, store_id, description, stock, available, images, badge, weight_gram')
     .in(
       'id',
       rows.map((r) => r.product_id)

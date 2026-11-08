@@ -63,6 +63,7 @@ export type ProductForEdit = {
   description: string | null
   available: boolean
   images: string[] | null
+  weight_gram?: number | null
 }
 
 export async function getProductForEditAction(
@@ -81,7 +82,7 @@ export async function getProductForEditAction(
   if (!admin) return { error: 'Konfigurasi server belum lengkap.' }
   const { data: product, error } = await admin
     .from('products')
-    .select('id, store_id, name, slug, price, stock, description, available, images')
+    .select('id, store_id, name, slug, price, stock, description, available, images, weight_gram')
     .eq('id', productId)
     .eq('store_id', access.store.id)
     .maybeSingle()

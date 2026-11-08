@@ -14,6 +14,10 @@ type ShippingMethodRow = {
   estimated_days: string | null
   is_active: boolean
   created_at: string
+  // Fase 3: tarif ongkir per kg + kode kurir.
+  courier_code?: string | null
+  per_kg_price?: number | string | null
+  base_weight_gram?: number | null
 }
 
 function formatRupiah(value: number | string | null | undefined) {
@@ -61,6 +65,10 @@ export default function ShippingPage() {
   const [price, setPrice] = useState('')
   const [estimatedDays, setEstimatedDays] = useState('')
   const [isActive, setIsActive] = useState(true)
+  // Fase 3: kode kurir + tarif per kg di atas berat dasar.
+  const [courierCode, setCourierCode] = useState('')
+  const [perKgPrice, setPerKgPrice] = useState('')
+  const [baseWeightGram, setBaseWeightGram] = useState('1000')
 
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -77,7 +85,7 @@ export default function ShippingPage() {
 
     const { data, error } = await supabase
       .from('shipping_methods')
-      .select('id, store_id, name, price, estimated_days, is_active, created_at')
+      .select('id, store_id, name, price, estimated_days, is_active, created_at, courier_code, per_kg_price, base_weight_gram')
       .eq('store_id', activeStoreId)
       .order('created_at', { ascending: false })
 
@@ -141,6 +149,9 @@ export default function ShippingPage() {
     setPrice('')
     setEstimatedDays('')
     setIsActive(true)
+    setCourierCode('')
+    setPerKgPrice('')
+    setBaseWeightGram('1000')
     setEditingId(null)
   }
 
@@ -150,6 +161,13 @@ export default function ShippingPage() {
     setPrice(String(method.price ?? ''))
     setEstimatedDays(method.estimated_days || '')
     setIsActive(method.is_active)
+    setCourierCode(method.courier_code || '')
+    setPerKgPrice(
+      method.per_kg_price !== null && method.per_kg_price !== undefined
+        ? String(method.per_kg_price)
+        : ''
+    )
+    setBaseWeightGram(String(method.base_weight_gram ?? 1000))
     setErrorMessage('')
     setSuccessMessage('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -174,6 +192,16 @@ export default function ShippingPage() {
       return
     }
 
+    if (parseNumberInput(perKgPrice) < 0) {
+      setErrorMessage('Tarif per kg tidak valid.')
+      return
+    }
+
+    if (parseNumberInput(baseWeightGram) < 1) {
+      setErrorMessage('Berat dasar harus minimal 1 gram.')
+      return
+    }
+
     try {
       setSaving(true)
 
@@ -183,6 +211,12 @@ export default function ShippingPage() {
         price: parseNumberInput(price),
         estimated_days: estimatedDays.trim() || null,
         is_active: isActive,
+        // Fase 3: kolom baru — bila migrasi f3 belum dijalankan, simpan
+        // gagal di sini dan error ditampilkan (bukan silent). Jalankan
+        // migrasi f3 dulu (lihat supabase/README.md).
+        courier_code: courierCode.trim().toUpperCase() || null,
+        per_kg_price: parseNumberInput(perKgPrice),
+        base_weight_gram: parseNumberInput(baseWeightGram),
       }
 
       if (editingId) {
@@ -428,6 +462,58 @@ export default function ShippingPage() {
             </label>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+                Kode kurir
+              </span>
+              <input
+                value={courierCode}
+                onChange={(e) => setCourierCode(e.target.value.toUpperCase())}
+                className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+                placeholder="JNE"
+                disabled={loadingPage || saving}
+              />
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Penanda di order, mis. JNE, JNT, TOKO.
+              </p>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+                Tarif per kg (Rp)
+              </span>
+              <input
+                value={perKgPrice}
+                onChange={(e) => setPerKgPrice(sanitizeNumberInput(e.target.value))}
+                className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+                placeholder="5000"
+                inputMode="numeric"
+                disabled={loadingPage || saving}
+              />
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Tambahan per kg di atas berat dasar. 0 = tarif flat.
+              </p>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+                Berat dasar (gram)
+              </span>
+              <input
+                value={baseWeightGram}
+                onChange={(e) => setBaseWeightGram(sanitizeNumberInput(e.target.value))}
+                className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+                placeholder="1000"
+                inputMode="numeric"
+                disabled={loadingPage || saving}
+              />
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Berat yang sudah termasuk di ongkir dasar.
+              </p>
+            </label>
+          </div>
+
           <label className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-[var(--text)]">
@@ -509,9 +595,16 @@ export default function ShippingPage() {
                     </p>
                     <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                       Rp {formatRupiah(method.price)}
+                      {Number(method.per_kg_price ?? 0) > 0
+                        ? ` + Rp ${formatRupiah(method.per_kg_price)}/kg`
+                        : ''}
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
                       Estimasi: {method.estimated_days || '-'}
+                      {method.courier_code ? ` • Kurir: ${method.courier_code}` : ''}
+                      {Number(method.per_kg_price ?? 0) > 0
+                        ? ` • Termasuk ${Number(method.base_weight_gram ?? 1000).toLocaleString('id-ID')} g pertama`
+                        : ''}
                     </p>
                   </div>
 

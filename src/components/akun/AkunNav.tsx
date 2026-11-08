@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 const items = [
   { href: '/akun/pesanan', label: 'Pesanan Saya' },
   { href: '/akun/alamat', label: 'Alamat Saya' },
+  { href: '/akun/notifikasi', label: 'Notifikasi' },
   { href: '/cart', label: 'Keranjang' },
 ]
 

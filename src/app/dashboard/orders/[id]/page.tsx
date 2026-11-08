@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import OrderFulfillment from '@/components/dashboard/OrderFulfillment'
 import ConfirmPaymentButton from '@/components/dashboard/ConfirmPaymentButton'
+import SellerNoteForm from '@/components/dashboard/SellerNoteForm'
 import { resolvePaymentProofUrl } from '@/lib/payment-proof'
 import { getInvoiceAccessToken, tokenQuery } from '@/lib/invoice-access'
 import {
@@ -85,6 +86,10 @@ export default async function DashboardOrderDetailPage({
       status,
       payment_method,
       shipping_method_name,
+      seller_note,
+      voucher_code,
+      discount_amount,
+      total_weight_gram,
       created_at
     `)
     .eq('id', id)
@@ -395,6 +400,20 @@ export default async function DashboardOrderDetailPage({
               </div>
             )}
           </section>
+
+          {/* Catatan internal seller (Fase 3) */}
+          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+            <h2 className="text-lg font-bold text-gray-900">Catatan seller</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Catatan internal untuk tim toko — tidak terlihat customer.
+            </p>
+            <div className="mt-4">
+              <SellerNoteForm
+                orderId={order.id}
+                initialNote={(order as { seller_note?: string | null }).seller_note ?? null}
+              />
+            </div>
+          </section>
         </div>
 
         {/* Kolom kanan */}
@@ -409,10 +428,41 @@ export default async function DashboardOrderDetailPage({
                 <span>Rp {formatRupiah(order.subtotal)}</span>
               </div>
 
+              {Number(
+                (order as { discount_amount?: number | null }).discount_amount ?? 0
+              ) > 0 ? (
+                <div className="flex items-center justify-between text-emerald-700">
+                  <span>
+                    Diskon voucher
+                    {(order as { voucher_code?: string | null }).voucher_code
+                      ? ` (${(order as { voucher_code?: string | null }).voucher_code})`
+                      : ''}
+                  </span>
+                  <span>
+                    − Rp{' '}
+                    {formatRupiah(
+                      (order as { discount_amount?: number | null }).discount_amount ?? 0
+                    )}
+                  </span>
+                </div>
+              ) : null}
+
               <div className="flex items-center justify-between text-gray-600">
                 <span>Ongkos kirim</span>
                 <span>Rp {formatRupiah(order.shipping_cost)}</span>
               </div>
+
+              {(order as { total_weight_gram?: number | null }).total_weight_gram ? (
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>Total berat</span>
+                  <span>
+                    {Number(
+                      (order as { total_weight_gram?: number | null }).total_weight_gram
+                    ).toLocaleString('id-ID')}{' '}
+                    g
+                  </span>
+                </div>
+              ) : null}
 
               <div className="flex items-center justify-between text-gray-600">
                 <span>Kurir</span>

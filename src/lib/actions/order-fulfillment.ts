@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
+import { notifyOrderStatusChange, type NotificationType } from '@/lib/notifications'
 import type { OrderStatus } from '@/lib/types/order'
 
 export interface ActionResult {
@@ -13,8 +15,10 @@ export interface ActionResult {
 /**
  * Transisi status order yang boleh dilakukan seller dari dashboard.
  * Status terminal (COMPLETED, CANCELLED) tidak punya transisi keluar.
+ * Diekspor untuk dipakai bulk update (order-management.ts) — satu sumber
+ * kebenaran, bukan duplikat aturan.
  */
-const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   PENDING_PAYMENT: ['CANCELLED'],
   PAID: ['PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'],
   PROCESSING: ['SHIPPED', 'COMPLETED', 'CANCELLED'],
@@ -53,7 +57,7 @@ async function getOwnedOrder(supabase: SupabaseServerClient, orderId: string) {
 
   const { data: order } = await supabase
     .from('orders')
-    .select('id, store_id, status')
+    .select('id, store_id, status, customer_name, total, buyer_id')
     .eq('id', orderId)
     .eq('store_id', store.id)
     .maybeSingle()
@@ -62,11 +66,12 @@ async function getOwnedOrder(supabase: SupabaseServerClient, orderId: string) {
     return { error: 'Pesanan tidak ditemukan.' as const }
   }
 
-  return { order }
+  return { order, store }
 }
 
-/** Kembalikan stok produk untuk semua item order (dipakai saat order dibatalkan). */
-async function restoreStock(supabase: SupabaseServerClient, orderId: string) {
+/** Kembalikan stok produk untuk semua item order (dipakai saat order dibatalkan).
+ *  Diekspor untuk dipakai bulk update (order-management.ts). */
+export async function restoreStock(supabase: SupabaseServerClient, orderId: string) {
   const { data: items } = await supabase
     .from('order_items')
     .select('product_id, qty')
@@ -87,6 +92,57 @@ async function restoreStock(supabase: SupabaseServerClient, orderId: string) {
       p_qty: qty,
     })
   }
+}
+
+function statusToNotificationType(status: OrderStatus): NotificationType | null {
+  switch (status) {
+    case 'PAID':
+    case 'PROCESSING':
+      return 'ORDER_PAID'
+    case 'SHIPPED':
+      return 'ORDER_SHIPPED'
+    case 'COMPLETED':
+      return 'ORDER_COMPLETED'
+    case 'CANCELLED':
+      return 'ORDER_CANCELLED'
+    default:
+      return null
+  }
+}
+
+/**
+ * Fase 3 — beri tahu pemilik toko + pembeli login saat status berubah.
+ * Best-effort: tidak boleh menggagalkan update status.
+ */
+async function notifyOrderChange(
+  order: {
+    id: string
+    customer_name: string
+    total: number
+    buyer_id: string | null
+  },
+  store: { id: string; name: string; owner_id: string },
+  nextStatus: OrderStatus
+): Promise<void> {
+  const type = statusToNotificationType(nextStatus)
+  if (!type) return
+  try {
+    const notifyClient = await createPublicInvoiceClient()
+    await notifyOrderStatusChange(
+      notifyClient,
+      {
+        ownerId: store.owner_id,
+        buyerId: order.buyer_id,
+        storeId: store.id,
+        orderId: order.id,
+        invoiceNumber: '',
+        customerName: order.customer_name,
+        total: Number(order.total),
+      },
+      type,
+      store.name
+    )
+  } catch {}
 }
 
 export async function updateOrderStatusAction(
@@ -132,6 +188,9 @@ export async function updateOrderStatusAction(
   if (nextStatus === 'CANCELLED') {
     await restoreStock(supabase, owned.order.id)
   }
+
+  // Fase 3: notifikasi in-app ke pemilik toko + pembeli login.
+  await notifyOrderChange(owned.order, owned.store, nextStatus)
 
   revalidatePath('/dashboard/orders')
   revalidatePath(`/dashboard/orders/${owned.order.id}`)
@@ -202,6 +261,9 @@ export async function saveShipmentAction(
       .eq('store_id', owned.order.store_id)
       .eq('status', currentStatus)
   }
+
+  // Fase 3: resi tersimpan = pesanan dikirim — beri tahu pembeli.
+  await notifyOrderChange(owned.order, owned.store, 'SHIPPED')
 
   revalidatePath('/dashboard/orders')
   revalidatePath(`/dashboard/orders/${owned.order.id}`)

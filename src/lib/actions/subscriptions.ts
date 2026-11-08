@@ -166,6 +166,8 @@ export async function createProductAction(input: {
   stock: number
   description: string
   images: string[]
+  /** Berat per unit (gram, Fase 3) — dipakai hitung ongkir di checkout. */
+  weightGram?: number | null
 }) {
   const supabase = await createClient()
   const {
@@ -223,6 +225,13 @@ export async function createProductAction(input: {
     stock: Math.max(0, Math.floor(input.stock) || 0),
     description: input.description.trim(),
     images: input.images.slice(0, limits.maxPhotosPerProduct),
+    // Fase 3: berat produk (gram). Kolom sudah ada sejak Fase 0/live;
+    // bila insert gagal karena kolom belum ada di instalasi lama,
+    // error-nya diteruskan apa adanya (bukan silent) supaya terlihat.
+    weight_gram:
+      input.weightGram && Number.isFinite(input.weightGram) && input.weightGram > 0
+        ? Math.floor(input.weightGram)
+        : null,
     available: true,
   })
 

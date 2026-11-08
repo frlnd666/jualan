@@ -39,6 +39,9 @@ export default function NewProductPage() {
   const [slug, setSlug] = useState('')
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('0')
+  // Fase 3: berat produk (gram) — dipakai hitung ongkir di checkout.
+  // Kosong = 500 g (default sistem).
+  const [weightGram, setWeightGram] = useState('')
   const [description, setDescription] = useState('')
 
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -236,6 +239,7 @@ export default function NewProductPage() {
         stock: parseNumberInput(stock),
         description: description.trim(),
         images: imageUrl ? [imageUrl] : [],
+        weightGram: parseNumberInput(weightGram) || null,
       })
 
       if (result.error) {
@@ -394,6 +398,23 @@ export default function NewProductPage() {
               />
             </label>
           </div>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">
+              Berat produk (gram)
+            </span>
+            <input
+              value={weightGram}
+              onChange={(e) => setWeightGram(sanitizeNumberInput(e.target.value))}
+              className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+              placeholder="500"
+              inputMode="numeric"
+              disabled={loadingStore || submitting}
+            />
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              Dipakai menghitung ongkir berdasarkan berat. Kosong = 500 g.
+            </p>
+          </label>
 
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-[var(--text)]">

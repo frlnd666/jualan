@@ -6,6 +6,12 @@ import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
 import { createOrderAction } from '@/lib/actions/checkout'
 import { getAllowedPaymentMethodsAction } from '@/lib/actions/subscriptions'
+import { validateVoucherCodeAction } from '@/lib/actions/vouchers'
+import {
+  calcShippingCost,
+  formatWeight,
+  totalWeightGrams,
+} from '@/lib/shipping'
 import {
   listBuyerAddressesAction,
   type BuyerAddress,
@@ -68,6 +74,15 @@ export default function CheckoutPage() {
   // Metode pembayaran yang diizinkan paket toko (Fase 1): Free hanya COD.
   // Diambil dari server; penegakan yang mengikat tetap di createOrderAction.
   const [allowedMethods, setAllowedMethods] = useState<PaymentMethod[] | null>(null)
+  // Voucher (Fase 3): kode divalidasi ke server; diskon tampil di
+  // ringkasan. Penegakan final tetap di createOrderAction.
+  const [voucherCode, setVoucherCode] = useState('')
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    code: string
+    discount: number
+  } | null>(null)
+  const [voucherMessage, setVoucherMessage] = useState('')
+  const [checkingVoucher, setCheckingVoucher] = useState(false)
 
   const visiblePaymentOptions = useMemo(() => {
     if (!allowedMethods) return PAYMENT_OPTIONS
@@ -87,8 +102,28 @@ export default function CheckoutPage() {
   }, [shippingMethods, shippingMethodId])
 
   const subtotalValue = subtotal()
-  const shippingCost = selectedShipping ? Number(selectedShipping.price) : 0
-  const total = subtotalValue + shippingCost
+  // Fase 3: total berat keranjang + ongkir berbasis berat (harga dasar +
+  // per kg di atas berat dasar). Harga yang mengikat tetap dihitung
+  // server dari database — ini hanya preview.
+  const totalWeightGram = useMemo(
+    () =>
+      totalWeightGrams(
+        items.map((item) => ({ weightGram: item.product.weight_gram, qty: item.qty }))
+      ),
+    [items]
+  )
+  const shippingCost = selectedShipping
+    ? calcShippingCost(
+        {
+          basePrice: Number(selectedShipping.price),
+          perKgPrice: Number(selectedShipping.per_kg_price ?? 0),
+          baseWeightGram: Number(selectedShipping.base_weight_gram ?? 1000),
+        },
+        totalWeightGram
+      )
+    : 0
+  const voucherDiscount = appliedVoucher?.discount ?? 0
+  const total = subtotalValue - voucherDiscount + shippingCost
 
   useEffect(() => {
     async function fetchShippingMethods() {
@@ -102,12 +137,27 @@ export default function CheckoutPage() {
 
       const supabase = createClient()
 
-      const { data, error } = await supabase
+      // Fase 3: kolom tarif per-kg dibaca bila ada; bila migrasi f3 belum
+      // dijalankan, ulangi dengan kolom lama (ongkir = harga dasar).
+      const full = await supabase
         .from('shipping_methods')
-        .select('id, store_id, name, price, estimated_days, is_active, created_at')
+        .select('id, store_id, name, price, estimated_days, is_active, created_at, courier_code, per_kg_price, base_weight_gram')
         .eq('store_id', storeId)
         .eq('is_active', true)
         .order('price', { ascending: true })
+
+      let data: ShippingMethod[] | null = full.data as ShippingMethod[] | null
+      let error = full.error
+      if (error && /per_kg_price|courier_code|base_weight_gram/.test(error.message || '')) {
+        const legacy = await supabase
+          .from('shipping_methods')
+          .select('id, store_id, name, price, estimated_days, is_active, created_at')
+          .eq('store_id', storeId)
+          .eq('is_active', true)
+          .order('price', { ascending: true })
+        data = legacy.data as ShippingMethod[] | null
+        error = legacy.error
+      }
 
       if (error) {
         setErrorMessage('Gagal memuat metode pengiriman.')
@@ -224,6 +274,41 @@ export default function CheckoutPage() {
     }
   }
 
+  async function applyVoucher() {
+    if (!storeId || !voucherCode.trim()) {
+      setVoucherMessage('Masukkan kode voucher dulu.')
+      return
+    }
+    setCheckingVoucher(true)
+    setVoucherMessage('')
+    try {
+      const result = await validateVoucherCodeAction(
+        storeId,
+        voucherCode,
+        subtotalValue
+      )
+      if (result.ok) {
+        setAppliedVoucher({ code: result.code ?? voucherCode.toUpperCase(), discount: result.discount })
+        setVoucherMessage(
+          `Voucher ${result.code} dipakai — hemat Rp ${result.discount.toLocaleString('id-ID')}.`
+        )
+      } else {
+        setAppliedVoucher(null)
+        setVoucherMessage(result.error ?? 'Kode voucher tidak valid.')
+      }
+    } catch {
+      setVoucherMessage('Gagal memeriksa voucher. Coba lagi.')
+    } finally {
+      setCheckingVoucher(false)
+    }
+  }
+
+  function removeVoucher() {
+    setAppliedVoucher(null)
+    setVoucherCode('')
+    setVoucherMessage('')
+  }
+
   async function handleSubmit() {
     if (!items.length) {
       setErrorMessage('Cart masih kosong.')
@@ -259,6 +344,7 @@ export default function CheckoutPage() {
           notes,
           shippingMethodId,
           paymentMethod,
+          voucherCode: appliedVoucher?.code,
           items: items.map((item) => ({
             productId: item.product.id,
             productName: item.product.name,
@@ -528,7 +614,15 @@ export default function CheckoutPage() {
                             </p>
                             <p className="text-xs text-neutral-500">
                               Estimasi {method.estimated_days || '-'}
+                              {method.courier_code ? ` • ${method.courier_code}` : ''}
                             </p>
+                            {Number(method.per_kg_price ?? 0) > 0 ? (
+                              <p className="text-xs text-neutral-500">
+                                Termasuk {formatWeight(Number(method.base_weight_gram ?? 1000))} pertama,
+                                lalu + Rp{' '}
+                                {Number(method.per_kg_price).toLocaleString('id-ID')}/kg
+                              </p>
+                            ) : null}
                           </div>
                           <p className="text-sm font-semibold text-neutral-900">
                             Rp {Number(method.price).toLocaleString('id-ID')}
@@ -565,6 +659,56 @@ export default function CheckoutPage() {
               <h2 className="text-base font-semibold text-neutral-900">
                 Langkah 3 — Metode pembayaran
               </h2>
+
+              {/* Voucher (Fase 3) */}
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-neutral-700">
+                    Kode voucher (opsional)
+                  </span>
+                  {appliedVoucher ? (
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                      <p className="text-sm font-semibold text-emerald-800">
+                        {appliedVoucher.code} — hemat Rp{' '}
+                        {appliedVoucher.discount.toLocaleString('id-ID')}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={removeVoucher}
+                        className="text-xs font-semibold text-emerald-700 underline"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                        className={inputClassName}
+                        placeholder="Contoh: HEMAT10"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyVoucher}
+                        disabled={checkingVoucher}
+                        className="shrink-0 rounded-2xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        {checkingVoucher ? 'Memeriksa...' : 'Pakai'}
+                      </button>
+                    </div>
+                  )}
+                </label>
+                {voucherMessage ? (
+                  <p
+                    className={`mt-2 text-xs font-medium ${
+                      appliedVoucher ? 'text-emerald-700' : 'text-red-600'
+                    }`}
+                  >
+                    {voucherMessage}
+                  </p>
+                ) : null}
+              </div>
 
               <div className="space-y-3">
                 {visiblePaymentOptions.map((option) => (
@@ -656,6 +800,13 @@ export default function CheckoutPage() {
                 <span>Rp {subtotalValue.toLocaleString('id-ID')}</span>
               </div>
 
+              {voucherDiscount > 0 ? (
+                <div className="flex items-center justify-between text-emerald-700">
+                  <span>Diskon voucher ({appliedVoucher?.code})</span>
+                  <span>− Rp {voucherDiscount.toLocaleString('id-ID')}</span>
+                </div>
+              ) : null}
+
               <div className="flex items-center justify-between text-neutral-600">
                 <span>
                   Ongkir
@@ -666,6 +817,11 @@ export default function CheckoutPage() {
                     ? `Rp ${shippingCost.toLocaleString('id-ID')}`
                     : 'Pilih di langkah 2'}
                 </span>
+              </div>
+
+              <div className="flex items-center justify-between text-neutral-600">
+                <span>Total berat</span>
+                <span>{formatWeight(totalWeightGram)}</span>
               </div>
 
               <div className="flex items-center justify-between border-t border-neutral-200 pt-3 text-base font-bold text-neutral-900">

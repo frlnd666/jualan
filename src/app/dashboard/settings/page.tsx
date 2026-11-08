@@ -8,6 +8,7 @@ import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { normalizeStoreSlug, validateStoreSlug } from '@/lib/store-slug'
 import { ensureStoreSubscription } from '@/lib/actions/subscriptions'
+import ShopeePaySettingsForm from '@/components/dashboard/ShopeePaySettingsForm'
 import { clearStoredPlan, readStoredPlan } from '@/lib/register-plan'
 import { useRouter } from 'next/navigation'
 
@@ -481,6 +482,9 @@ export default function SettingsPage() {
           ) : null}
         </Field>
       </SectionCard>
+
+      {/* Fase 3: kredensial ShopeePay Partner per toko (QRIS dinamis). */}
+      <ShopeePaySettingsForm />
     </div>
   )
 }

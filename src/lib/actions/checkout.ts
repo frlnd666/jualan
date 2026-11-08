@@ -9,6 +9,13 @@ import {
   allowedCheckoutMethods,
   getStoreSubscription,
 } from '@/lib/subscriptions'
+import { normalizeVoucherCode } from '@/lib/vouchers'
+import {
+  loadVoucherForCheckout,
+} from '@/lib/actions/vouchers'
+import { calcShippingCost, totalWeightGrams } from '@/lib/shipping'
+import { tryGenerateDynamicQrForInvoice } from '@/lib/shopeepay/qris-server'
+import { notifyOrderStatusChange } from '@/lib/notifications'
 import type { CheckoutFormInput, PaymentMethod } from '@/lib/types/order'
 import { normalizePhoneNumber } from '@/lib/utils/order'
 
@@ -57,6 +64,7 @@ interface DbProduct {
   price: number
   stock: number | null
   available: boolean | null
+  weight_gram: number | null
 }
 
 export async function createOrderAction(input: CheckoutFormInput) {
@@ -107,15 +115,48 @@ export async function createOrderAction(input: CheckoutFormInput) {
     throw new Error('Terlalu banyak pesanan dari koneksi ini. Coba lagi beberapa menit lagi.')
   }
 
-  const { data: shippingMethod, error: shippingError } = await supabase
-    .from('shipping_methods')
-    .select('id, store_id, name, price, estimated_days, is_active')
-    .eq('id', input.shippingMethodId)
-    .eq('store_id', input.storeId)
-    .maybeSingle()
-
-  if (shippingError) {
-    throw new Error('Gagal mengambil metode pengiriman.')
+  // Fase 3: kolom tarif per-kg + kode kurir dibaca bila ada; bila
+  // migrasi f3 belum dijalankan, select diulang dengan kolom lama saja
+  // (ongkir = harga dasar, tanpa komponen per-kg).
+  interface DbShippingMethod {
+    id: string
+    store_id: string
+    name: string
+    price: number | string
+    estimated_days: string | null
+    is_active?: boolean | null
+    courier_code?: string | null
+    per_kg_price?: number | null
+    base_weight_gram?: number | null
+  }
+  let shippingMethod: DbShippingMethod | null = null
+  {
+    const full = await supabase
+      .from('shipping_methods')
+      .select('id, store_id, name, price, estimated_days, is_active, courier_code, per_kg_price, base_weight_gram')
+      .eq('id', input.shippingMethodId)
+      .eq('store_id', input.storeId)
+      .maybeSingle()
+    if (!full.error) {
+      shippingMethod = full.data as DbShippingMethod
+    } else if (
+      isMissingColumnError(full.error, 'per_kg_price') ||
+      isMissingColumnError(full.error, 'courier_code') ||
+      isMissingColumnError(full.error, 'base_weight_gram')
+    ) {
+      const legacy = await supabase
+        .from('shipping_methods')
+        .select('id, store_id, name, price, estimated_days, is_active')
+        .eq('id', input.shippingMethodId)
+        .eq('store_id', input.storeId)
+        .maybeSingle()
+      if (legacy.error) {
+        throw new Error('Gagal mengambil metode pengiriman.')
+      }
+      shippingMethod = legacy.data as DbShippingMethod
+    } else {
+      throw new Error('Gagal mengambil metode pengiriman.')
+    }
   }
 
   if (!shippingMethod) {
@@ -137,7 +178,7 @@ export async function createOrderAction(input: CheckoutFormInput) {
 
   const { data: productRows, error: productsError } = await supabase
     .from('products')
-    .select('id, name, price, stock, available')
+    .select('id, name, price, stock, available, weight_gram')
     .in('id', requestedIds)
     .eq('store_id', input.storeId)
 
@@ -175,8 +216,54 @@ export async function createOrderAction(input: CheckoutFormInput) {
 
   const normalizedPhone = normalizePhoneNumber(input.customerPhone)
   const subtotal = verifiedItems.reduce((sum, item) => sum + item.price * item.qty, 0)
-  const shippingCost = Number(shippingMethod.price)
-  const total = subtotal + shippingCost
+
+  // Fase 3 — ongkir berbasis berat: total berat dihitung dari
+  // weight_gram tiap produk (produk tanpa berat = 500 g), lalu tarif
+  // kurir toko diterapkan (harga dasar + per kg di atas berat dasar).
+  const totalWeightGram = totalWeightGrams(
+    verifiedItems.map((item) => ({
+      weightGram: item.product.weight_gram,
+      qty: item.qty,
+    }))
+  )
+  const shippingCost = calcShippingCost(
+    {
+      basePrice: Number(shippingMethod.price),
+      perKgPrice: Number(
+        (shippingMethod as { per_kg_price?: number | null }).per_kg_price ?? 0
+      ),
+      baseWeightGram: Number(
+        (shippingMethod as { base_weight_gram?: number | null }).base_weight_gram ?? 1000
+      ),
+    },
+    totalWeightGram
+  )
+
+  // Fase 3 — voucher: kode divalidasi ulang di server (aktif, masa
+  // berlaku, minimum order, kuota). Kode salah / tidak valid = checkout
+  // lanjut TANPA diskon (preview di halaman sudah memberi tahu pembeli).
+  // Kuota dicatat atomik setelah invoice jadi (lihat di bawah).
+  let voucherDiscount = 0
+  let appliedVoucher: { id: string; code: string; used_count: number } | null = null
+  const voucherCode = normalizeVoucherCode(input.voucherCode ?? '')
+  if (voucherCode) {
+    const found = await loadVoucherForCheckout(
+      supabase,
+      input.storeId,
+      voucherCode,
+      subtotal
+    )
+    if (found) {
+      voucherDiscount = found.discount
+      appliedVoucher = {
+        id: found.voucher.id,
+        code: found.voucher.code,
+        used_count: found.voucher.used_count,
+      }
+    }
+  }
+
+  const total = subtotal - voucherDiscount + shippingCost
 
   // Fase 2: bila pembeli login, ikat order ke akunnya supaya muncul di
   // riwayat pesanan (/akun/pesanan). Tamu tetap jalan (buyer_id null).
@@ -206,6 +293,11 @@ export async function createOrderAction(input: CheckoutFormInput) {
     status: 'PENDING_PAYMENT',
     payment_method: input.paymentMethod,
     shipping_method_name: shippingMethod.name,
+    voucher_code: appliedVoucher?.code ?? null,
+    discount_amount: voucherDiscount,
+    total_weight_gram: totalWeightGram,
+    courier_code:
+      (shippingMethod as { courier_code?: string | null }).courier_code ?? null,
     ...(buyerId ? { buyer_id: buyerId } : {}),
   }
 
@@ -232,6 +324,32 @@ export async function createOrderAction(input: CheckoutFormInput) {
       // Order tamu tanpa ikatan akun — keranjang tersimpan tidak ada
       // yang perlu dibersihkan.
       buyerId = null
+    }
+    // Fase 3: bila kolom voucher/berat belum ada (migrasi f3 belum
+    // dijalankan), insert diulang tanpa kolom itu — checkout tidak boleh
+    // mati karenanya. Diskon tetap dihitung di total (pembeli tidak
+    // dirugikan), tapi pemakaian voucher tidak tercatat sampai migrasi
+    // dijalankan — keadaan transisi, sama seperti buyer_id di Fase 2.
+    if (
+      orderError &&
+      (isMissingColumnError(orderError, 'voucher_code') ||
+        isMissingColumnError(orderError, 'discount_amount') ||
+        isMissingColumnError(orderError, 'total_weight_gram'))
+    ) {
+      const legacyPayload = { ...orderPayload } as Record<string, unknown>
+      delete legacyPayload.voucher_code
+      delete legacyPayload.discount_amount
+      delete legacyPayload.total_weight_gram
+      if (buyerId === null) delete legacyPayload.buyer_id
+      const retry = await supabase
+        .from('orders')
+        .insert(legacyPayload)
+        .select('id')
+        .single()
+      order = retry.data as { id: string } | null
+      orderError = retry.error as { message?: string } | null
+      appliedVoucher = null
+      voucherDiscount = 0
     }
   }
 
@@ -350,6 +468,69 @@ export async function createOrderAction(input: CheckoutFormInput) {
     await rollbackOrder()
     throw new Error('Gagal membuat invoice unik. Silakan coba lagi.')
   }
+
+  // Fase 3 — catat pemakaian voucher secara atomik: redemption disisipkan
+  // + used_count dinaikkan hanya bila nilainya belum berubah sejak
+  // validasi (kondisi .eq used_count). Bila kuota keduluan checkout lain,
+  // order di-rollback supaya diskon tidak diberikan tanpa kuota.
+  if (appliedVoucher && voucherDiscount > 0) {
+    const { error: redemptionError } = await supabase
+      .from('voucher_redemptions')
+      .insert({
+        voucher_id: appliedVoucher.id,
+        order_id: order.id,
+        buyer_id: buyerId,
+        discount_amount: voucherDiscount,
+      })
+    if (redemptionError) {
+      await rollbackOrder()
+      throw new Error('Gagal mencatat pemakaian voucher.')
+    }
+    const { data: incremented, error: incrementError } = await supabase
+      .from('vouchers')
+      .update({ used_count: appliedVoucher.used_count + 1 })
+      .eq('id', appliedVoucher.id)
+      .eq('used_count', appliedVoucher.used_count)
+      .select('id')
+    if (incrementError || !incremented?.length) {
+      await rollbackOrder()
+      throw new Error('Voucher baru saja habis dipakai. Silakan checkout ulang tanpa voucher.')
+    }
+  }
+
+  // Fase 3 — QRIS dinamis: coba buatkan QR ShopeePay untuk invoice ini.
+  // Best-effort — gagal (toko belum punya kredensial / ShopeePay menolak)
+  // = alur manual lama yang jalan, checkout tetap sukses.
+  if (input.paymentMethod === 'QRIS') {
+    await tryGenerateDynamicQrForInvoice(supabase, invoiceNumber)
+  }
+
+  // Fase 3 — beri tahu pemilik toko ada pesanan baru (in-app).
+  // Best-effort: kegagalan notifikasi tidak boleh menggagalkan pesanan.
+  try {
+    const { data: storeRow } = await supabase
+      .from('stores')
+      .select('owner_id, name')
+      .eq('id', input.storeId)
+      .maybeSingle()
+    const owner = storeRow as { owner_id: string; name: string } | null
+    if (owner) {
+      await notifyOrderStatusChange(
+        supabase,
+        {
+          ownerId: owner.owner_id,
+          buyerId,
+          storeId: input.storeId,
+          orderId: order.id,
+          invoiceNumber,
+          customerName: input.customerName.trim(),
+          total,
+        },
+        'ORDER_CREATED',
+        owner.name
+      )
+    }
+  } catch {}
 
   // Fase 2: pesanan pembeli login berhasil — bersihkan juga keranjang
   // tersimpan di akun (keranjang lokal dibersihkan halaman checkout).

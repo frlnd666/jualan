@@ -148,3 +148,59 @@ setelah ketiga langkah di atas selesai.
 - Setelah bucket `payment-proofs` privat, URL bukti transfer lama yang
   tersimpan berhenti bisa dibuka publik. Penayangan bukti di dashboard via
   signed URL adalah pekerjaan P1 berikutnya.
+
+## Fase 3 — Transaksi (2026-11-08)
+
+Urutan jalankan di Supabase SQL Editor, SETELAH seluruh migrasi Fase 0 + Fase 1 + Fase 2:
+
+1. **`migrations/20261108_f3_transactions.sql`** — QRIS dinamis, voucher,
+   notifikasi, catatan seller, ongkir berat. Idempotent (`IF NOT EXISTS` /
+   `CREATE OR REPLACE` / `DROP POLICY IF EXISTS`); tidak mengubah data yang
+   sudah ada. Isinya:
+   - `store_shopeepay_credentials` (1 baris per toko; secret + private key
+     TERENKRIPSI AES-256-GCM, RLS owner-only, staff tanpa akses);
+   - `qris_payments` (jejak QR dinamis; partnerReferenceNo unik; satu QR
+     PENDING per invoice via partial unique index);
+   - `invoices.expires_at` (invoice QRIS kedaluwarsa bersama QR-nya;
+     invoice manual NULL = tidak kedaluwarsa);
+   - `vouchers` (kode unik per toko, persen/nominal, min order, kuota,
+     masa berlaku) + `voucher_redemptions` (satu baris per order);
+   - `notifications` (in-app per user; tulis hanya via service_role);
+   - `orders.voucher_code / discount_amount / total_weight_gram /
+     seller_note`;
+   - `shipping_methods.courier_code / per_kg_price / base_weight_gram`.
+2. **Isi env server** (Vercel Production + `.env.local`) — lihat
+   `.env.local.example` bagian Fase 3:
+   - `SHOPEEPAY_ENCRYPTION_KEY` (WAJIB sebelum menyimpan kredensial
+     ShopeePay; 32 byte base64/hex; JANGAN diubah setelah kredensial
+     tersimpan — kredensial lama jadi tidak terbaca).
+   - `SHOPEEPAY_BASE_URL` (default sandbox; samakan dengan dokumen Partner).
+   - `SHOPEEPAY_QR_STATUS_PATH` (path inquiry — BELUM TERKONFIRMASI dari
+     dokumen Partner; samakan sebelum live).
+3. **Kredensial sandbox ShopeePay Partner** untuk toko pilot (Client ID,
+   Client Secret, Private Key PEM, Merchant ID) — diisi pemilik toko di
+   Pengaturan → Pembayaran ShopeePay. Tanpa ini, QRIS dinamis tidak bisa
+   diuji end-to-end; checkout QRIS tetap jalan lewat alur manual lama.
+
+**Perilaku sebelum migrasi dijalankan:** checkout tetap jalan — select
+metode pengiriman + insert order memakai fallback kolom lama (tanpa
+komponen per-kg, tanpa pencatatan voucher). Voucher, notifikasi, dan QRIS
+dinamis baru aktif setelah migrasi dijalankan; sebelum itu halaman terkait
+menampilkan pesan yang sesuai (bukan crash).
+
+**Yang perlu diverifikasi Ferlan setelah migrasi:** (1) buat voucher di
+`/dashboard/vouchers` (Free ditolak) → checkout pakai kode → diskon
+terpotong + kuota berkurang; (2) isi berat produk + tarif per-kg di
+Pengiriman → checkout menampilkan ongkir sesuai berat; (3) ubah status
+order / input resi → lonceng notifikasi bertambah (seller + pembeli
+login); (4) bulk update + export CSV di `/dashboard/orders`; (5) QRIS
+dinamis — HANYA setelah kredensial sandbox ada: isi kredensial →
+checkout QRIS → QR tampil + hitung mundur → bayar sandbox → webhook
+menandai PAID otomatis (cek checklist sandbox butir 1–7 di dokumen
+rencana QRIS).
+
+**Yang TIDAK dibangun di Fase 3:** cron transisi status langganan,
+auto-debit, notifikasi email/WhatsApp (TODO — tidak ada jalur mail di
+codebase; WhatsApp butuh keputusan provider), watermark/iklan Free
+(Fase 4), dan inquiry status QR bila path-nya belum dikonfirmasi
+(dokumen Partner).

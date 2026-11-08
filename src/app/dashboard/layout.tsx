@@ -5,6 +5,8 @@ import Link from 'next/link'
 import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
 import DesktopNav from '@/components/dashboard/DesktopNav'
 import LogoutButton from '@/components/dashboard/LogoutButton'
+import NotificationBell from '@/components/dashboard/NotificationBell'
+import { getUnreadNotificationCountAction } from '@/lib/actions/notifications'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 
 export default async function DashboardLayout({
@@ -39,6 +41,14 @@ export default async function DashboardLayout({
   const store = access?.store ?? null
   const isStaff = access?.role === 'staff'
   const { data: isAdmin } = await supabase.rpc('is_admin')
+  // Fase 3: lonceng notifikasi di header (best-effort — tabel belum ada
+  // sebelum migrasi f3, jadi gagal dihitung = 0).
+  let unreadCount = 0
+  try {
+    unreadCount = await getUnreadNotificationCountAction()
+  } catch {
+    unreadCount = 0
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
@@ -52,6 +62,7 @@ export default async function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-2">
+            <NotificationBell unreadCount={unreadCount} />
             {store && (
               <Link
                 href={`/${store.slug}`}

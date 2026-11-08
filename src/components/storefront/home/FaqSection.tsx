@@ -10,8 +10,8 @@ const faqs = [
     a: "Tergantung paket tokomu. Di paket Free, pembeli hanya bisa membayar dengan COD. Di paket Silver dan Gold, pembeli bisa memilih COD, transfer bank, atau QRIS dinamis. Setelah pesanan dibuat, halaman invoice menampilkan panduan pembayaran dan formulir upload bukti transfer. Kamu memeriksa bukti itu dari dashboard, lalu mengonfirmasi — status di halaman pembeli berubah seketika.",
   },
   {
-    q: "Apakah Jualan memotong hasil penjualan saya?",
-    a: "Tidak. Jualan tidak memegang uang pembeli sama sekali dan tidak mengambil komisi per transaksi di semua paket. Pembayaran masuk langsung ke rekening atau QRIS kamu. Yang kamu bayar hanya langganan paket Silver atau Gold kalau kamu memilihnya — paket Free tetap gratis.",
+    q: "Apakah CUAN memotong hasil penjualan saya?",
+    a: "Tidak. CUAN tidak memegang uang pembeli sama sekali dan tidak mengambil komisi per transaksi di semua paket. Pembayaran masuk langsung ke rekening atau QRIS kamu. Yang kamu bayar hanya langganan paket Silver atau Gold kalau kamu memilihnya — paket Free tetap gratis.",
   },
   {
     q: "Apa bedanya Free, Silver, dan Gold?",
@@ -23,7 +23,7 @@ const faqs = [
   },
   {
     q: "Saya tidak bisa coding. Bisakah saya memakainya?",
-    a: "Bisa — memang untuk itu Jualan dibuat. Kamu cukup mendaftar, mengisi profil toko, dan menambah produk lewat formulir biasa. Tidak ada yang perlu di-install dan tidak ada pengaturan teknis.",
+    a: "Bisa — memang untuk itu CUAN dibuat. Kamu cukup mendaftar, mengisi profil toko, dan menambah produk lewat formulir biasa. Tidak ada yang perlu di-install dan tidak ada pengaturan teknis.",
   },
   {
     q: "Bagaimana ongkos kirim ditentukan?",
@@ -31,7 +31,7 @@ const faqs = [
   },
   {
     q: "Bisakah semua ini dikelola dari HP?",
-    a: "Ya. Dashboard dan halaman toko dirancang mobile-first dan Jualan adalah PWA — bisa ditambahkan ke home screen HP dan dibuka seperti aplikasi, tanpa download dari Play Store.",
+    a: "Ya. Dashboard dan halaman toko dirancang mobile-first dan CUAN adalah PWA — bisa ditambahkan ke home screen HP dan dibuka seperti aplikasi, tanpa download dari Play Store.",
   },
   {
     q: "Apakah data pembeli saya aman?",
@@ -46,10 +46,10 @@ export function FaqSection() {
     <section id="faq" className="scroll-mt-20 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-3xl">
         <div className="text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary-deep)]">
             FAQ
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+          <h2 className="mt-3 text-balance text-2xl font-bold leading-tight tracking-tight text-[var(--text)] sm:text-3xl">
             Yang sering ditanyakan
           </h2>
         </div>
@@ -75,9 +75,9 @@ export function FaqSection() {
                 <AnimatePresence initial={false}>
                   {open ? (
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
+                      initial={{ height: 0 }}
+                      animate={{ height: "auto" }}
+                      exit={{ height: 0 }}
                       transition={{ duration: 0.22 }}
                       className="overflow-hidden"
                     >

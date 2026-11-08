@@ -39,14 +39,14 @@ export function HeroSection() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/register"
+              href="/register?plan=silver-trial"
               className="btn btn-primary px-6 py-3.5 text-sm"
             >
               Coba Silver gratis 14 hari
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/register"
+              href="/register?plan=free"
               className="btn btn-secondary px-6 py-3.5 text-sm"
             >
               Buat toko gratis

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/lib/use-cart'
 import { createOrderAction } from '@/lib/actions/checkout'
+import { getAllowedPaymentMethodsAction } from '@/lib/actions/subscriptions'
 import type { PaymentMethod, ShippingMethod } from '@/lib/types/order'
 import { createClient } from '@/lib/supabase/client'
 
@@ -55,6 +56,14 @@ export default function CheckoutPage() {
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([])
   const [shippingMethodId, setShippingMethodId] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER')
+  // Metode pembayaran yang diizinkan paket toko (Fase 1): Free hanya COD.
+  // Diambil dari server; penegakan yang mengikat tetap di createOrderAction.
+  const [allowedMethods, setAllowedMethods] = useState<PaymentMethod[] | null>(null)
+
+  const visiblePaymentOptions = useMemo(() => {
+    if (!allowedMethods) return PAYMENT_OPTIONS
+    return PAYMENT_OPTIONS.filter((o) => allowedMethods.includes(o.value))
+  }, [allowedMethods])
 
   const [loadingShipping, setLoadingShipping] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -107,7 +116,27 @@ export default function CheckoutPage() {
       setLoadingShipping(false)
     }
 
+    async function fetchAllowedMethods() {
+      if (!storeId) return
+      try {
+        const allowed = await getAllowedPaymentMethodsAction(storeId)
+        setAllowedMethods(allowed)
+        // Bila metode yang terpilih tidak diizinkan paket toko (mis. toko
+        // Free yang default-nya transfer), pindah ke metode pertama yang
+        // diizinkan — untuk Free itu COD.
+        if (allowed.length > 0) {
+          setPaymentMethod((current) =>
+            allowed.includes(current) ? current : allowed[0]
+          )
+        }
+      } catch {
+        // Gagal memuat = biarkan semua opsi tampil; server action yang
+        // akan menolak metode yang tidak diizinkan.
+      }
+    }
+
     fetchShippingMethods()
+    fetchAllowedMethods()
   }, [storeId])
 
   // Validasi per langkah — cerminan persis validasi server action, supaya
@@ -461,7 +490,7 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="space-y-3">
-                {PAYMENT_OPTIONS.map((option) => (
+                {visiblePaymentOptions.map((option) => (
                   <label
                     key={option.value}
                     className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${

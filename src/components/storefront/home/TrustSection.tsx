@@ -17,7 +17,7 @@ const pillars = [
   {
     icon: Smartphone,
     title: "Semua dikelola dari HP",
-    desc: "Tambah produk, verifikasi pembayaran, sampai input resi — cukup dari browser HP. Jualan adalah PWA, bisa ditambahkan ke home screen seperti aplikasi.",
+    desc: "Tambah produk, verifikasi pembayaran, sampai input resi — cukup dari browser HP. CUAN adalah PWA, bisa ditambahkan ke home screen seperti aplikasi.",
   },
 ];
 
@@ -29,14 +29,14 @@ export function TrustSection() {
       <div className="mx-auto max-w-6xl">
         <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
-              Kenapa Jualan
+            <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary-deep)]">
+              Kenapa CUAN
             </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+            <h2 className="mt-3 text-balance text-2xl font-bold leading-tight tracking-tight text-[var(--text)] sm:text-3xl">
               Dibangun mengikuti cara UMKM benar-benar berjualan
             </h2>
             <p className="mt-4 text-base leading-7 text-[var(--text-muted)]">
-              Bukan marketplace dengan potongan di setiap transaksi. Jualan
+              Bukan marketplace dengan potongan di setiap transaksi. CUAN
               adalah tokomu sendiri: pembeli membayar langsung ke rekening
               atau QRIS kamu, dan kamu yang memegang kendali penuh atas
               katalog, harga, dan pengiriman.
@@ -62,13 +62,13 @@ export function TrustSection() {
             {pillars.map((pillar, index) => (
               <motion.div
                 key={pillar.title}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ y: 14 }}
+                whileInView={{ y: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 transition={{ duration: 0.3, delay: index * 0.06 }}
                 className="flex gap-4 rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-5"
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary-deep)]">
                   <pillar.icon className="h-5 w-5" />
                 </span>
                 <div>

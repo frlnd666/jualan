@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getDashboardAccess } from '@/lib/dashboard-access'
 import OrderFulfillment from '@/components/dashboard/OrderFulfillment'
 import ConfirmPaymentButton from '@/components/dashboard/ConfirmPaymentButton'
 import { resolvePaymentProofUrl } from '@/lib/payment-proof'
@@ -60,15 +61,11 @@ export default async function DashboardOrderDetailPage({
 
   if (!user) redirect('/login')
 
-  const { data: store, error: storeError } = await supabase
-    .from('stores')
-    .select('id, slug')
-    .eq('owner_id', user.id)
-    .single()
-
-  if (storeError || !store) {
+  const access = await getDashboardAccess(supabase, user.id)
+  if (!access) {
     redirect('/dashboard/settings')
   }
+  const store = access.store
 
   const { data: order, error: orderError } = await supabase
     .from('orders')

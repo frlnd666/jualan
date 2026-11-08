@@ -452,9 +452,18 @@ export default async function DashboardOrderDetailPage({
                       invoiceId={invoice.id}
                       orderId={order.id}
                       invoiceNumber={invoice.invoice_number}
-                      disabled={!invoice.payment_proof_url}
+                      disabled={
+                        order.payment_method !== 'COD' &&
+                        !invoice.payment_proof_url
+                      }
                     />
-                    {!invoice.payment_proof_url ? (
+                    {order.payment_method === 'COD' &&
+                    !invoice.payment_proof_url ? (
+                      <p className="text-xs leading-5 text-gray-500">
+                        COD: tidak perlu bukti transfer — tekan tombol di atas
+                        saat uang sudah diterima dari customer.
+                      </p>
+                    ) : !invoice.payment_proof_url ? (
                       <p className="text-xs leading-5 text-gray-500">
                         Tombol aktif setelah customer mengupload bukti
                         transfer. Gambar bukti tampil di bagian Info invoice

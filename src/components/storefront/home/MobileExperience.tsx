@@ -47,7 +47,7 @@ export function MobileExperience() {
           </ul>
 
           <Link
-            href="/register"
+            href="/register?plan=silver-trial"
             className="btn btn-primary mt-8 px-6 py-3 text-sm"
           >
             Coba buat toko dari HP-mu

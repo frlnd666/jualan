@@ -2,6 +2,7 @@
 // form upgrade/perpanjang manual, riwayat pembayaran langganan.
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 import { redirect } from 'next/navigation'
 import {
   FREE_SUBSCRIPTION,
@@ -46,6 +47,16 @@ export default async function SubscriptionPage() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // Fase 2: langganan hanya untuk pemilik toko — staff tidak boleh masuk.
+  const { data: subProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  if ((subProfile as { role?: string } | null)?.role === 'staff') {
+    return <StaffDeniedCard title="Langganan" />
+  }
 
   const { data: store } = await supabase
     .from('stores')

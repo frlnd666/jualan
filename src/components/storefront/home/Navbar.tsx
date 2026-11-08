@@ -53,7 +53,7 @@ export function Navbar() {
             Masuk
           </Link>
           <Link
-            href="/register"
+            href="/register?plan=free"
             className="btn btn-primary px-5 py-2.5 text-sm"
           >
             Buat toko gratis
@@ -100,7 +100,7 @@ export function Navbar() {
                   Masuk
                 </Link>
                 <Link
-                  href="/register"
+                  href="/register?plan=free"
                   onClick={() => setOpen(false)}
                   className="btn btn-primary flex-1 px-4 py-2.5 text-center text-sm"
                 >

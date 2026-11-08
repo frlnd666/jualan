@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" role="img" aria-label="Logo CUAN">
+  <!-- CUAN — mark + wordmark. Sans-serif bold capitals, tight tracking, no external font.
+       Main emerald #0b6b4a, ink #1f1a17. Recommended background: paper cream #f7f0dd. -->
+  <g>
+    <path d="M 94 32 A 44 44 0 1 0 94 88" fill="none" stroke="#0b6b4a" stroke-width="16" stroke-linecap="butt"/>
+    <polyline points="40,78 58,60 70,70 84,52" fill="none" stroke="#1f1a17" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <polygon points="84,52 98,38 96,56" fill="#1f1a17"/>
+  </g>
+  <text x="134" y="82" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="800" letter-spacing="-1" fill="#1f1a17">CUAN</text>
+  <rect x="134" y="92" width="38" height="7" fill="#0b6b4a"/>
+</svg>

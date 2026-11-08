@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
@@ -20,11 +21,15 @@ export function Navbar() {
     <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[color:rgba(246,243,238,0.85)] backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link href="#top" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary)] text-base font-bold text-white">
-            J
-          </span>
+          <Image
+            src="/logo-cuan.svg"
+            alt="Logo CUAN"
+            width={36}
+            height={36}
+            className="h-9 w-9"
+          />
           <span className="text-lg font-bold tracking-tight text-[var(--text)]">
-            Jualan
+            CUAN
           </span>
         </Link>
 
@@ -43,13 +48,13 @@ export function Navbar() {
         <div className="hidden items-center gap-2 md:flex">
           <Link
             href="/login"
-            className="rounded-full px-4 py-2.5 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
+            className="btn btn-secondary px-4 py-2.5 text-sm"
           >
             Masuk
           </Link>
           <Link
             href="/register"
-            className="rounded-full bg-[var(--primary)] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--primary-hover)]"
+            className="btn btn-primary px-5 py-2.5 text-sm"
           >
             Buat toko gratis
           </Link>
@@ -90,14 +95,14 @@ export function Navbar() {
                 <Link
                   href="/login"
                   onClick={() => setOpen(false)}
-                  className="flex-1 rounded-full border border-[var(--line)] px-4 py-2.5 text-center text-sm font-medium text-[var(--text)]"
+                  className="btn btn-secondary flex-1 px-4 py-2.5 text-center text-sm"
                 >
                   Masuk
                 </Link>
                 <Link
                   href="/register"
                   onClick={() => setOpen(false)}
-                  className="flex-1 rounded-full bg-[var(--primary)] px-4 py-2.5 text-center text-sm font-medium text-white"
+                  className="btn btn-primary flex-1 px-4 py-2.5 text-center text-sm"
                 >
                   Buat toko gratis
                 </Link>

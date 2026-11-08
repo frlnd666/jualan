@@ -3,6 +3,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
+import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/rate-limit'
 import {
   allowedCheckoutMethods,
@@ -177,26 +178,62 @@ export async function createOrderAction(input: CheckoutFormInput) {
   const shippingCost = Number(shippingMethod.price)
   const total = subtotal + shippingCost
 
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      store_id: input.storeId,
-      customer_name: input.customerName.trim(),
-      customer_phone: normalizedPhone,
-      address: input.address.trim(),
-      province: input.province.trim(),
-      city: input.city.trim(),
-      postal_code: input.postalCode.trim(),
-      notes: input.notes?.trim() || null,
-      subtotal,
-      shipping_cost: shippingCost,
-      total,
-      status: 'PENDING_PAYMENT',
-      payment_method: input.paymentMethod,
-      shipping_method_name: shippingMethod.name,
-    })
-    .select('id')
-    .single()
+  // Fase 2: bila pembeli login, ikat order ke akunnya supaya muncul di
+  // riwayat pesanan (/akun/pesanan). Tamu tetap jalan (buyer_id null).
+  // Bila kolom buyer_id belum ada (migrasi f2 belum dijalankan), insert
+  // diulang tanpa kolom itu — checkout tidak boleh mati karenanya.
+  let buyerId: string | null = null
+  try {
+    const userClient = await createClient()
+    const {
+      data: { user: buyerUser },
+    } = await userClient.auth.getUser()
+    buyerId = buyerUser?.id ?? null
+  } catch {}
+
+  const orderPayload = {
+    store_id: input.storeId,
+    customer_name: input.customerName.trim(),
+    customer_phone: normalizedPhone,
+    address: input.address.trim(),
+    province: input.province.trim(),
+    city: input.city.trim(),
+    postal_code: input.postalCode.trim(),
+    notes: input.notes?.trim() || null,
+    subtotal,
+    shipping_cost: shippingCost,
+    total,
+    status: 'PENDING_PAYMENT',
+    payment_method: input.paymentMethod,
+    shipping_method_name: shippingMethod.name,
+    ...(buyerId ? { buyer_id: buyerId } : {}),
+  }
+
+  let order: { id: string } | null = null
+  let orderError: { message?: string } | null = null
+  {
+    const attempt = await supabase
+      .from('orders')
+      .insert(orderPayload)
+      .select('id')
+      .single()
+    order = attempt.data as { id: string } | null
+    orderError = attempt.error as { message?: string } | null
+    if (orderError && buyerId && isMissingColumnError(orderError, 'buyer_id')) {
+      const legacyPayload = { ...orderPayload }
+      delete legacyPayload.buyer_id
+      const retry = await supabase
+        .from('orders')
+        .insert(legacyPayload)
+        .select('id')
+        .single()
+      order = retry.data as { id: string } | null
+      orderError = retry.error as { message?: string } | null
+      // Order tamu tanpa ikatan akun — keranjang tersimpan tidak ada
+      // yang perlu dibersihkan.
+      buyerId = null
+    }
+  }
 
   if (orderError || !order) {
     throw new Error('Gagal membuat order.')
@@ -312,6 +349,19 @@ export async function createOrderAction(input: CheckoutFormInput) {
   if (!invoiceInserted) {
     await rollbackOrder()
     throw new Error('Gagal membuat invoice unik. Silakan coba lagi.')
+  }
+
+  // Fase 2: pesanan pembeli login berhasil — bersihkan juga keranjang
+  // tersimpan di akun (keranjang lokal dibersihkan halaman checkout).
+  // Best-effort: kegagalan di sini tidak boleh menggagalkan pesanan.
+  if (buyerId) {
+    try {
+      await supabase
+        .from('buyer_carts')
+        .delete()
+        .eq('buyer_id', buyerId)
+        .eq('store_id', input.storeId)
+    } catch {}
   }
 
   // &baru=1 membuat halaman invoice menampilkan sambutan "pesanan berhasil

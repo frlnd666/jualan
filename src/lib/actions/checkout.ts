@@ -184,17 +184,21 @@ export async function createOrderAction(input: CheckoutFormInput) {
     throw new Error('Gagal membuat order.')
   }
 
-  // Rollback manual: Supabase JS tidak punya transaksi multi-tabel, jadi
-  // kegagalan di langkah mana pun setelah ini harus membersihkan order +
-  // mengembalikan stok yang sudah terlanjur dikurangi.
+  // Rollback: Supabase JS tidak punya transaksi multi-tabel, jadi kegagalan
+  // di langkah mana pun setelah order dibuat harus membersihkan order +
+  // itemnya. Stok yang sudah terlanjur dikurangi dikembalikan lewat RPC
+  // increment_stock (MENAMBAH qty secara atomik) — bukan dengan menulis
+  // ulang nilai stok lama seperti sebelumnya, supaya tidak menimpa
+  // perubahan stok lain yang terjadi bersamaan (checkout lain / edit
+  // seller). Definisi RPC: supabase/migrations/20261108_f0_stock_rpc.sql
   const orderId = order.id
   const decremented: { product: DbProduct; qty: number }[] = []
   async function rollbackOrder() {
     for (const entry of decremented) {
-      await supabase
-        .from('products')
-        .update({ stock: Number(entry.product.stock ?? 0) })
-        .eq('id', entry.product.id)
+      await supabase.rpc('increment_stock', {
+        p_product_id: entry.product.id,
+        p_qty: entry.qty,
+      })
     }
     await supabase.from('order_items').delete().eq('order_id', orderId)
     await supabase.from('orders').delete().eq('id', orderId)
@@ -219,20 +223,19 @@ export async function createOrderAction(input: CheckoutFormInput) {
     throw new Error('Gagal menyimpan item order.')
   }
 
-  // Kurangi stok dengan optimistic lock (nilai stok lama ikut dibandingkan),
-  // supaya dua checkout bersamaan tidak bisa sama-sama lolos dari stok yang
-  // sama. Untuk atomisitas penuh, migrasi P0 menyediakan catatan RPC —
-  // lihat supabase/migrations/20261107_p0_security.sql bagian catatan.
+  // Kurangi stok lewat RPC atomik: fungsi decrement_stock mengunci baris
+  // produk (SELECT ... FOR UPDATE), memeriksa stok cukup, lalu mengurangi
+  // — semuanya dalam satu transaksi Postgres. Dua checkout bersamaan tidak
+  // bisa sama-sama lolos dari stok yang sama. Optimistic lock di kode
+  // aplikasi (update ... where stock = nilai_lama) sudah digantikan RPC
+  // ini; definisi fungsi: supabase/migrations/20261108_f0_stock_rpc.sql
   for (const item of verifiedItems) {
-    const currentStock = Number(item.product.stock ?? 0)
-    const { data: updated, error: stockError } = await supabase
-      .from('products')
-      .update({ stock: currentStock - item.qty })
-      .eq('id', item.product.id)
-      .eq('stock', currentStock)
-      .select('id')
+    const { data: stockDecreased, error: stockError } = await supabase.rpc(
+      'decrement_stock',
+      { p_product_id: item.product.id, p_qty: item.qty }
+    )
 
-    if (stockError || !updated || updated.length === 0) {
+    if (stockError || stockDecreased !== true) {
       await rollbackOrder()
       throw new Error(`Stok "${item.product.name}" baru saja berubah. Silakan coba lagi.`)
     }

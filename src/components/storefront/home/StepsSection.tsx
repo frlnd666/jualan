@@ -31,10 +31,10 @@ export function StepsSection() {
     <section id="cara-kerja" className="scroll-mt-20 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary-deep)]">
             Cara kerja
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+          <h2 className="mt-3 text-balance text-2xl font-bold leading-tight tracking-tight text-[var(--text)] sm:text-3xl">
             Dari daftar sampai pesanan terkirim
           </h2>
         </div>
@@ -43,17 +43,17 @@ export function StepsSection() {
           {steps.map((step, index) => (
             <motion.div
               key={step.title}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ y: 14 }}
+              whileInView={{ y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.3, delay: index * 0.06 }}
               className="relative rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]"
             >
               <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary-deep)]">
                   <step.icon className="h-5 w-5" />
                 </span>
-                <span className="text-sm font-bold text-[var(--stone)]">
+                <span className="text-sm font-bold text-[var(--primary-deep)]">
                   0{index + 1}
                 </span>
               </div>

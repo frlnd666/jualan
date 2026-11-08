@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -13,6 +13,24 @@ import AuthShell, {
   authSubmitClass,
 } from '@/components/auth/AuthShell'
 
+import {
+  REGISTER_PLAN_KEY,
+  type RegisterPlan,
+} from '@/lib/register-plan'
+
+const PLAN_COPY: Record<RegisterPlan, string> = {
+  free: 'Paket Free — 4 produk, pembayaran COD saja.',
+  'silver-trial': 'Trial Silver 14 hari — semua fitur Silver, gratis. Tanpa kartu kredit.',
+  gold: 'Paket Gold — setelah daftar, kamu diarahkan ke pembayaran manual (QRIS/transfer) untuk mengaktifkan Gold.',
+}
+
+function readPlanFromUrl(): RegisterPlan {
+  if (typeof window === 'undefined') return 'free'
+  const plan = new URLSearchParams(window.location.search).get('plan')
+  if (plan === 'silver-trial' || plan === 'gold') return plan
+  return 'free'
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -22,6 +40,16 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [plan] = useState<RegisterPlan>(() => readPlanFromUrl())
+
+  // Simpan pilihan paket sekali saat halaman dibuka, sebelum user
+  // sempat mendaftar lewat email maupun Google.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(REGISTER_PLAN_KEY, plan)
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -56,6 +84,9 @@ export default function RegisterPage() {
   }
 
   async function handleGoogle() {
+    try {
+      window.localStorage.setItem(REGISTER_PLAN_KEY, plan)
+    } catch {}
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${location.origin}/auth/callback` },
@@ -77,6 +108,10 @@ export default function RegisterPage() {
     >
       <GoogleAuthButton label="Daftar dengan Google" onClick={handleGoogle} />
       <AuthOrDivider />
+
+      <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        Paket yang kamu pilih: <strong>{PLAN_COPY[plan]}</strong>
+      </p>
 
       <form onSubmit={handleRegister} className="space-y-4">
         <div>

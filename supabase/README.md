@@ -50,6 +50,28 @@ tanpa `access_token` (lihat `src/lib/actions/checkout.ts`) sampai
 migrasi P0 terkonfirmasi sudah dijalankan di live — fallback itu baru
 boleh dihapus setelah `verify_live_schema.sql` bagian 7a menunjukkan OK.
 
+## Fase 1 — Langganan (2026-11-08)
+
+Urutan jalankan di Supabase SQL Editor, SETELAH seluruh migrasi Fase 0:
+
+1. **`migrations/20261108_f1_subscriptions.sql`** — tabel
+   `subscriptions` (1 baris per toko) + `subscription_payments` +
+   backfill toko lama sebagai Free/ACTIVE + RLS. Idempotent; tidak
+   mengubah data yang sudah ada.
+2. **Tidak ada langkah SQL lain** — baris subscriptions toko baru dibuat
+   kode aplikasi (server action `ensureStoreSubscription`) saat toko
+   pertama dibuat; baris profiles dibuat otomatis di layout dashboard.
+
+**Yang TIDAK dilakukan migrasi ini:** detail rekening/QRIS platform
+untuk pembayaran langganan manual belum diisi — lihat
+`src/lib/subscription-payment-config.ts` (TODO Ferlan). Tanpa detail
+itu, penjual tidak tahu harus bayar ke mana, jadi alur upgrade belum
+boleh dianggap selesai.
+
+**Yang perlu diverifikasi Ferlan setelah migrasi:** register Free,
+trial Silver 14 hari, upgrade manual + verifikasi admin, dan downgrade
+(produk di atas 4 disembunyikan dari storefront, bukan dihapus).
+
 ## Perilaku sebelum migrasi dijalankan
 
 Kode dirancang tetap hidup di masa transisi:

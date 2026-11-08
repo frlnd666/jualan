@@ -241,3 +241,57 @@ ubah harga tercatat; (6) `GET /api/health` → `{"status":"ok",...}`.
 
 **Yang TIDAK dibangun di Fase 4:** cron transisi status langganan,
 auto-debit, notifikasi email/WhatsApp, custom domain (Fase 5).
+
+## Fase 5 — Gold: custom domain + subdomain + SEO (2026-11-09)
+
+Urutan jalankan di Supabase SQL Editor, SETELAH seluruh migrasi Fase 0–4:
+
+1. **`migrations/20261108_f5_domains.sql`** — tabel `store_domains`
+   (domain, status pending/verified/failed, vercel_added, verified_at).
+   Idempotent (`IF NOT EXISTS` / `CREATE OR REPLACE` /
+   `DROP POLICY IF EXISTS`); tidak mengubah data yang sudah ada. RLS:
+   owner-only untuk kelola, admin baca semua, publik hanya membaca
+   yang `verified` (dipakai middleware untuk resolve hostname custom).
+2. **Isi env server** (Vercel Production + `.env.local`) — lihat
+   `.env.local.example` bagian Fase 5:
+   - `VERCEL_API_TOKEN` (opsional tapi disarankan — tanpa ini, domain
+     harus ditambahkan manual di Vercel Dashboard → Settings → Domains;
+     JANGAN commit nilainya).
+   - `VERCEL_PROJECT_ID` (sudah ada fallback `prj_N19xmVADtzl3Dvcnvoup2DW4L4s0`).
+   - `NEXT_PUBLIC_PLATFORM_DOMAIN` (opsional — domain platform untuk
+     subdomain `{slug}.domain`, mis. cuan.id; kosong = subdomain tidak aktif).
+   - `NEXT_PUBLIC_SITE_URL` (default https://jualin-delta.vercel.app).
+3. **Subdomain platform** (bila domain platform sudah ada): tambah
+   `*.domain` di Vercel Dashboard → Settings → Domains, lalu pasang DNS
+   wildcard `* CNAME cname.vercel-dns.com` di registrar.
+
+**Cara kerja routing:** middleware membaca header `host`. Host platform
+(jualin-delta.vercel.app, `*.vercel.app`, localhost, domain platform)
+jalan biasa. Subdomain `{slug}.domain-platform` di-rewrite ke
+`/{slug}` (header `x-cuan-host-kind: subdomain`). Domain custom
+terverifikasi di tabel `store_domains` di-rewrite ke `/{slug}` (header
+`x-cuan-host-kind: custom`). Hanya path storefront (`/` dan
+`/products/...`) yang di-rewrite — checkout, cart, invoice, auth, api,
+dan sitemap lewat seperti biasa. Tautan di storefront memakai helper
+`storePathForHost` supaya pengunjung tetap di host yang sama.
+
+**Perilaku sebelum migrasi dijalankan:** halaman `/dashboard/domains`
+menampilkan pesan "jalankan migrasi Fase 5 dulu" (bukan crash);
+middleware memperlakukan semua host custom sebagai "tidak dikenal"
+(halaman `/domain-tidak-dikenal`); SEO dasar tetap jalan; sitemap hanya
+berisi halaman landing + toko/produk tanpa domain custom.
+
+**Yang perlu diverifikasi Ferlan setelah migrasi:** (1) sebagai Gold,
+buka `/dashboard/domains` → tambah domain sendiri → pasang DNS sesuai
+instruksi → "Cek verifikasi" → status verified → buka domain itu →
+storefront tokomu tampil (URL tetap domain sendiri); (2) Free/Silver
+ditolak menambah domain; (3) subdomain `{slug}.domain-platform` tampil
+bila domain platform + wildcard sudah dipasang (bila belum, halaman
+menjelaskan yang dibutuhkan); (4) `/sitemap.xml` memuat toko + produk,
+`/robots.txt` memuat sitemap; (5) halaman toko/produk punya title,
+description, canonical, OG, dan JSON-LD (cek View Source).
+
+**Yang TIDAK dibangun di Fase 5:** cron transisi status langganan,
+auto-debit, notifikasi email/WhatsApp, verifikasi DNS dari sisi server
+selain lewat Vercel API (cek DNS langsung dari aplikasi tidak dibuat —
+Vercel yang menjadi sumber kebenaran status domain).

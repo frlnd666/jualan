@@ -33,6 +33,8 @@ type ProductDetailClientProps = {
   flashSale?: FlashSaleLike | null
   /** Tampilkan watermark platform di foto (paket Free). */
   watermarked?: boolean
+  /** Tautan "kembali ke toko" — '/' di domain custom/subdomain, '/{slug}' di platform (Fase 5). */
+  homeHref?: string
 }
 
 function formatRupiah(value: number | string | null | undefined) {
@@ -76,7 +78,9 @@ export default function ProductDetailClient({
   product,
   flashSale = null,
   watermarked = false,
+  homeHref,
 }: ProductDetailClientProps) {
+  const backHref = homeHref ?? `/${storeSlug}`
   const images = useMemo(() => {
     return Array.isArray(product.images) ? product.images.filter(Boolean) : []
   }, [product.images])
@@ -125,7 +129,7 @@ export default function ProductDetailClient({
       <div className="mx-auto max-w-4xl">
         <div className="px-4 pt-4 sm:px-6">
           <Link
-            href={`/${storeSlug}`}
+            href={backHref}
             className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-4 py-2 text-sm font-semibold text-[#241b17] shadow-[0_8px_20px_rgba(33,24,20,0.05)] transition hover:bg-[#faf6f1]"
           >
             <span aria-hidden="true">←</span>
@@ -344,7 +348,7 @@ export default function ProductDetailClient({
           </div>
 
           <Link
-            href={`/${storeSlug}`}
+            href={backHref}
             className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm font-semibold text-[#241b17] transition hover:bg-[#faf6f1]"
           >
             Lihat menu lain

@@ -1,3 +1,5 @@
+import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -6,6 +8,15 @@ import WatermarkedImage from '@/components/storefront/WatermarkedImage'
 import AffiliateAdSlide from '@/components/storefront/AffiliateAdSlide'
 import { getPublicStoreSubscription } from '@/lib/subscriptions-server'
 import { limitsFor } from '@/lib/subscription-tiers'
+import { storePathForHost, storeUrlForHost } from '@/lib/store-links'
+import {
+  siteUrlFromEnv,
+  storeTitle,
+  storeDescription,
+  storeCanonicalUrl,
+  storeJsonLd,
+} from '@/lib/seo'
+import type { HostKind } from '@/lib/domains'
 import {
   activeFlashSaleForProduct,
   discountPercent,
@@ -18,6 +29,61 @@ type StorefrontPageProps = {
   params: Promise<{
     storeSlug: string
   }>
+}
+
+// Fase 5 — info host yang melayani halaman ini (middleware menulis
+// header x-cuan-host-kind / x-cuan-store-slug saat rewrite dari domain
+// custom/subdomain; tanpa header = domain platform biasa).
+async function getHostInfo(): Promise<{ hostKind: HostKind; hostname: string }> {
+  const requestHeaders = await headers()
+  const kind = requestHeaders.get('x-cuan-host-kind')
+  const hostname = requestHeaders.get('host') ?? ''
+  if (kind === 'custom' || kind === 'subdomain') {
+    return { hostKind: kind, hostname }
+  }
+  return { hostKind: 'platform', hostname }
+}
+
+// Fase 5 — SEO toko: title/description dinamis, canonical sesuai host,
+// Open Graph (logo toko / foto produk pertama).
+export async function generateMetadata({
+  params,
+}: StorefrontPageProps): Promise<Metadata> {
+  const { storeSlug } = await params
+  const supabase = await createClient()
+  const { data: store } = await supabase
+    .from('stores')
+    .select('id, name, slug, description, city, logo_url')
+    .eq('slug', storeSlug)
+    .maybeSingle()
+  if (!store) return {}
+  const { hostKind, hostname } = await getHostInfo()
+  const siteUrl = siteUrlFromEnv(process.env.NEXT_PUBLIC_SITE_URL)
+  const canonical = storeCanonicalUrl(store, hostKind, hostname, siteUrl)
+  const { data: firstProduct } = await supabase
+    .from('products')
+    .select('images')
+    .eq('store_id', store.id)
+    .eq('available', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const ogImage =
+    store.logo_url ??
+    ((firstProduct as { images?: string[] | null } | null)?.images?.[0] ?? null)
+  return {
+    title: storeTitle(store),
+    description: storeDescription(store),
+    alternates: { canonical },
+    openGraph: {
+      title: storeTitle(store),
+      description: storeDescription(store),
+      url: canonical,
+      type: 'website',
+      ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+    },
+    twitter: { card: 'summary_large_image', title: storeTitle(store), description: storeDescription(store) },
+  }
 }
 
 function formatRupiah(value: number | string | null | undefined) {
@@ -81,6 +147,13 @@ function getInitials(name: string) {
 export default async function StorefrontPage({ params }: StorefrontPageProps) {
   const { storeSlug } = await params
   const supabase = await createClient()
+  const { hostKind, hostname } = await getHostInfo()
+  const siteUrl = siteUrlFromEnv(process.env.NEXT_PUBLIC_SITE_URL)
+  // Fase 5 — tautan produk tetap di host yang melayani (domain custom/
+  // subdomain = path tanpa /{slug}; platform = /{slug}/products/...).
+  const productHref = (productSlug: string) =>
+    storePathForHost(hostKind, storeSlug, `/products/${productSlug}`)
+  const canonicalUrl = storeUrlForHost(hostKind, hostname, storeSlug, '/', siteUrl)
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
@@ -180,6 +253,22 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
 
   return (
     <div className="min-h-screen bg-[#f6f1ea] pb-24 text-zinc-900">
+      {/* Fase 5 — JSON-LD Store untuk mesin pencari. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            storeJsonLd({
+              name: store.name,
+              slug: store.slug,
+              description: store.description,
+              city: store.city,
+              logoUrl: store.logo_url,
+              canonicalUrl,
+            })
+          ),
+        }}
+      />
       <div className="mx-auto max-w-4xl">
         <section className="relative overflow-hidden bg-[#2f241f] text-white">
           {store.banner_url ? (
@@ -331,7 +420,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 {featuredProducts.map((product) => (
                   <Link
                     key={`featured-${product.id}`}
-                    href={`/${store.slug}/products/${product.slug}`}
+                    href={productHref(product.slug)}
                     className="overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
                   >
                     <div className="grid grid-cols-[112px_1fr]">
@@ -430,7 +519,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 {productList.map((product) => (
                   <Link
                     key={product.id}
-                    href={`/${store.slug}/products/${product.slug}`}
+                    href={productHref(product.slug)}
                     className="group overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
                   >
                     <div className="relative aspect-[4/5] overflow-hidden bg-[#efe7de]">

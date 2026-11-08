@@ -17,6 +17,9 @@ export type AuditAction =
   | 'staff_removed'
   | 'payment_confirmed'
   | 'price_changed'
+  | 'domain_added'
+  | 'domain_verified'
+  | 'domain_removed'
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   subscription_verified: 'Langganan diverifikasi',
@@ -28,6 +31,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   staff_removed: 'Staff dihapus',
   payment_confirmed: 'Pembayaran dikonfirmasi',
   price_changed: 'Harga produk diubah',
+  domain_added: 'Domain ditambahkan',
+  domain_verified: 'Domain terverifikasi',
+  domain_removed: 'Domain dihapus',
 }
 
 // Opsi filter untuk halaman log audit — di lib murni (bukan file

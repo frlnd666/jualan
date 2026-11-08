@@ -2,9 +2,22 @@
 
 import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
+import { storeHref } from '@/lib/store-links'
+import { platformHosts, platformDomainFromEnv } from '@/lib/domains'
 
 export default function CartPage() {
   const { items, updateQty, removeItem, subtotal, clearCart, storeSlug } = useCart()
+  // Fase 5 — "Kembali ke toko" tetap di host yang melayani (domain
+  // custom/subdomain = root, platform = /{slug}).
+  const backHref = storeSlug
+    ? storeHref(
+        storeSlug,
+        '/',
+        platformHosts(
+          platformDomainFromEnv(process.env.NEXT_PUBLIC_PLATFORM_DOMAIN)
+        )
+      )
+    : '/'
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -12,7 +25,7 @@ export default function CartPage() {
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-bold text-gray-900">Cart</h1>
           {storeSlug ? (
-            <Link href={`/${storeSlug}`} className="text-sm font-semibold text-indigo-600">
+            <Link href={backHref} className="text-sm font-semibold text-indigo-600">
               ← Kembali ke toko
             </Link>
           ) : null}

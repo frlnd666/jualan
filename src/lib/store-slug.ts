@@ -20,7 +20,7 @@ export const RESERVED_STORE_SLUGS = new Set([
   'favicon.ico',
 ])
 
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export function normalizeStoreSlug(raw: string): string {
   return raw

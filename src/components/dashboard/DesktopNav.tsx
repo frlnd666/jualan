@@ -13,6 +13,7 @@ const items = [
   { href: '/dashboard/analytics', label: 'Analitik' },
   { href: '/dashboard/flash-sales', label: 'Flash Sale' },
   { href: '/dashboard/banners', label: 'Banner' },
+  { href: '/dashboard/domains', label: 'Domain' },
   { href: '/dashboard/subscription', label: 'Langganan' },
   { href: '/dashboard/settings', label: 'Pengaturan' },
 ]

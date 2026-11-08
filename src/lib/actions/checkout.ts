@@ -4,6 +4,10 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { checkRateLimit } from '@/lib/rate-limit'
+import {
+  allowedCheckoutMethods,
+  getStoreSubscription,
+} from '@/lib/subscriptions'
 import type { CheckoutFormInput, PaymentMethod } from '@/lib/types/order'
 import { normalizePhoneNumber } from '@/lib/utils/order'
 
@@ -71,6 +75,20 @@ export async function createOrderAction(input: CheckoutFormInput) {
   if (!input.shippingMethodId?.trim()) throw new Error('Metode pengiriman wajib dipilih.')
   if (!isValidPaymentMethod(input.paymentMethod)) throw new Error('Metode pembayaran tidak valid.')
   if (!input.items?.length) throw new Error('Cart kosong.')
+
+  // Fase 1 (Bab 3): toko Free hanya boleh COD; toko yang dibekukan admin
+  // (SUSPENDED) tidak menerima pesanan sama sekali. Cek ini di server —
+  // pilihan di halaman checkout hanya cerminan, bukan penegak.
+  const subscription = await getStoreSubscription(supabase, input.storeId)
+  if (subscription.status === 'SUSPENDED') {
+    throw new Error('Toko ini sedang dibekukan dan tidak menerima pesanan.')
+  }
+  const allowedMethods = allowedCheckoutMethods(subscription)
+  if (!allowedMethods.includes(input.paymentMethod)) {
+    throw new Error(
+      'Toko ini hanya menerima pembayaran COD. Pilih COD untuk melanjutkan.'
+    )
+  }
 
   // Anti-spam order: batasi per nomor WhatsApp dan per alamat IP.
   // (Limiter in-memory per instance — lihat lib/rate-limit.ts.)

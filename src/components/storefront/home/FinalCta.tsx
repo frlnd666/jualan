@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -8,10 +9,10 @@ export function FinalCta() {
     <>
       <section className="px-4 pb-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl rounded-3xl bg-[var(--text)] px-6 py-14 text-center sm:px-12 lg:py-16">
-          <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h2 className="mx-auto max-w-2xl text-balance text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
             Coba Silver gratis 14 hari — tokomu berikutnya cuma sejauh satu link
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/70">
+          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/80">
             Daftar, tambah produk pertamamu, dan bagikan linknya. Lima menit
             dari sekarang, pelangganmu bisa checkout sendiri tanpa menunggu
             kamu membalas chat. Trial Silver 14 hari, tanpa kartu kredit —
@@ -20,14 +21,14 @@ export function FinalCta() {
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link
               href="/register"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
+              className="btn btn-light px-7 py-3.5 text-sm"
             >
               Coba Silver gratis 14 hari
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/kopisore"
-              className="inline-flex items-center justify-center rounded-full border border-white/25 px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              className="btn btn-outline-light px-7 py-3.5 text-sm"
             >
               Lihat toko yang sudah live
             </Link>
@@ -38,10 +39,16 @@ export function FinalCta() {
       <footer className="border-t border-[var(--line)] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-[var(--text-muted)] sm:flex-row">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--primary)] text-xs font-bold text-white">
-              J
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--primary)]">
+              <Image
+                src="/logo-cuan-mark-light.svg"
+                alt="Logo CUAN"
+                width={20}
+                height={20}
+                className="h-5 w-5"
+              />
             </span>
-            <span className="font-semibold text-[var(--text)]">Jualan</span>
+            <span className="font-semibold text-[var(--text)]">CUAN</span>
             <span>· Platform toko online untuk UMKM Indonesia</span>
           </div>
           <nav className="flex items-center gap-5">

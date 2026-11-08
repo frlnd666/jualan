@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { normalizeStoreSlug, validateStoreSlug } from '@/lib/store-slug'
+import { ensureStoreSubscription } from '@/lib/actions/subscriptions'
+import { clearStoredPlan, readStoredPlan } from '@/lib/register-plan'
 import { useRouter } from 'next/navigation'
 
 type SectionKey = 'profil' | 'kontak' | 'tampilan'
@@ -134,6 +136,11 @@ export default function SettingsPage() {
         setTheme(store.theme)
         setLogoUrl(store.logo_url ?? '')
         setBannerUrl(store.banner_url ?? '')
+        // Toko lama (dari sebelum Fase 1) belum punya baris langganan:
+        // buatkan Free/ACTIVE sekali secara diam-diam + naikkan peran
+        // jadi seller. Idempotent — toko yang sudah punya baris tidak
+        // disentuh.
+        void ensureStoreSubscription(store.id, 'free')
       }
       setLoading(false)
     }
@@ -204,7 +211,23 @@ export default function SettingsPage() {
         .select()
         .single()
       saveError = error
-      if (data) setStoreId(data.id)
+      if (data) {
+        setStoreId(data.id)
+        // Toko baru: buat baris langganan sesuai paket yang dipilih
+        // saat register + naikkan peran jadi seller (server action).
+        // Paket dibaca sekali lalu dihapus supaya tidak terpakai ulang.
+        const plan = readStoredPlan()
+        clearStoredPlan()
+        const sub = await ensureStoreSubscription(data.id, plan)
+        if (sub.error) {
+          setSavingSection(null)
+          setSectionError({
+            section,
+            message: `Toko tersimpan, tapi langganan gagal dibuat: ${sub.error} — buka halaman Langganan untuk mengulang.`,
+          })
+          return
+        }
+      }
     }
 
     setSavingSection(null)

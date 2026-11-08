@@ -33,7 +33,23 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && (pathname === '/login' || pathname === '/register')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    // Fase 2: pembeli yang sudah login diarahkan ke /akun, bukan
+    // /dashboard. Peran dibaca dari profiles; bila belum ada baris
+    // (pembeli baru dari register ?type=buyer), pakai cookie
+    // cuan_account_type sebagai penanda sementara.
+    let destination = '/dashboard'
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (profile?.role === 'buyer') destination = '/akun'
+      else if (request.cookies.get('cuan_account_type')?.value === 'buyer') {
+        destination = '/akun'
+      }
+    } catch {}
+    return NextResponse.redirect(new URL(destination, request.url))
   }
 
   return response

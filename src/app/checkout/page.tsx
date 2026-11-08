@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
 import { createOrderAction } from '@/lib/actions/checkout'
 import { getAllowedPaymentMethodsAction } from '@/lib/actions/subscriptions'
+import {
+  listBuyerAddressesAction,
+  type BuyerAddress,
+} from '@/lib/actions/buyer-addresses'
 import type { PaymentMethod, ShippingMethod } from '@/lib/types/order'
 import { createClient } from '@/lib/supabase/client'
 
@@ -56,6 +61,10 @@ export default function CheckoutPage() {
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([])
   const [shippingMethodId, setShippingMethodId] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('BANK_TRANSFER')
+  // Alamat tersimpan pembeli login (Fase 2): dipilih → mengisi form
+  // langkah 1. Tamu tidak melihat bagian ini.
+  const [savedAddresses, setSavedAddresses] = useState<BuyerAddress[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState('')
   // Metode pembayaran yang diizinkan paket toko (Fase 1): Free hanya COD.
   // Diambil dari server; penegakan yang mengikat tetap di createOrderAction.
   const [allowedMethods, setAllowedMethods] = useState<PaymentMethod[] | null>(null)
@@ -138,6 +147,46 @@ export default function CheckoutPage() {
     fetchShippingMethods()
     fetchAllowedMethods()
   }, [storeId])
+
+  // Fase 2: pembeli login — muat buku alamat; alamat utama mengisi
+  // form secara otomatis bila form masih kosong.
+  useEffect(() => {
+    async function fetchSavedAddresses() {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      try {
+        const addresses = await listBuyerAddressesAction()
+        setSavedAddresses(addresses)
+        const main = addresses.find((a) => a.is_default) ?? addresses[0]
+        if (main) {
+          setSelectedAddressId(main.id)
+          setCustomerName((v) => v || main.recipient_name)
+          setCustomerPhone((v) => v || main.phone)
+          setAddress((v) => v || main.address)
+          setProvince((v) => v || main.province)
+          setCity((v) => v || main.city)
+          setPostalCode((v) => v || main.postal_code)
+        }
+      } catch {}
+    }
+    fetchSavedAddresses()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function applySavedAddress(id: string) {
+    setSelectedAddressId(id)
+    const chosen = savedAddresses.find((a) => a.id === id)
+    if (!chosen) return
+    setCustomerName(chosen.recipient_name)
+    setCustomerPhone(chosen.phone)
+    setAddress(chosen.address)
+    setProvince(chosen.province)
+    setCity(chosen.city)
+    setPostalCode(chosen.postal_code)
+  }
 
   // Validasi per langkah — cerminan persis validasi server action, supaya
   // pembeli tidak menabrak error server di akhir alur.
@@ -309,6 +358,34 @@ export default function CheckoutPage() {
               <h2 className="text-base font-semibold text-neutral-900">
                 Langkah 1 — Data &amp; alamat pengiriman
               </h2>
+
+              {savedAddresses.length > 0 ? (
+                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-neutral-700">
+                      Pakai alamat tersimpan
+                    </span>
+                    <select
+                      value={selectedAddressId}
+                      onChange={(e) => applySavedAddress(e.target.value)}
+                      className={inputClassName}
+                    >
+                      {savedAddresses.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.label} — {a.recipient_name}, {a.city}
+                          {a.is_default ? ' (utama)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Link
+                    href="/akun/alamat"
+                    className="mt-2 inline-block text-xs font-semibold text-neutral-700 underline"
+                  >
+                    Kelola buku alamat
+                  </Link>
+                </div>
+              ) : null}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">

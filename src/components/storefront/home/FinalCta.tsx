@@ -20,7 +20,7 @@ export function FinalCta() {
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link
-              href="/register"
+              href="/register?plan=silver-trial"
               className="btn btn-light px-7 py-3.5 text-sm"
             >
               Coba Silver gratis 14 hari

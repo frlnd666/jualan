@@ -48,10 +48,10 @@ export function FeatureGrid() {
     <section id="fitur" className="scroll-mt-20 border-y border-[var(--line)] bg-[var(--surface)] px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary-deep)]">
             Fitur
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+          <h2 className="mt-3 text-balance text-2xl font-bold leading-tight tracking-tight text-[var(--text)] sm:text-3xl">
             Semua yang dibutuhkan untuk jualan harian
           </h2>
           <p className="mt-4 text-base leading-7 text-[var(--text-muted)]">
@@ -64,13 +64,13 @@ export function FeatureGrid() {
           {features.map((feature, index) => (
             <motion.article
               key={feature.title}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ y: 14 }}
+              whileInView={{ y: 0 }}
               viewport={{ once: true, amount: 0.25 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
               className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-6"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary-deep)]">
                 <feature.icon className="h-5 w-5" />
               </span>
               <h3 className="mt-5 text-base font-semibold text-[var(--text)]">

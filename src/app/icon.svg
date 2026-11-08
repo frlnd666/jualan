@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Favicon CUAN">
+  <!-- CUAN — favicon, optimized for 16-32px. Same C-coin + arrow idea,
+       simplified: thicker C, straight diagonal arrow, no dip in the graph,
+       no thin details. Main emerald #0b6b4a, ink #1f1a17. -->
+  <path d="M 92 33 A 42 42 0 1 0 92 87" fill="none" stroke="#0b6b4a" stroke-width="20" stroke-linecap="butt"/>
+  <line x1="42" y1="78" x2="80" y2="46" stroke="#1f1a17" stroke-width="11" stroke-linecap="round"/>
+  <polygon points="78,44 96,34 92,56" fill="#1f1a17"/>
+</svg>

@@ -52,7 +52,7 @@ const inputClassName =
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, subtotal, clearCart, storeId: cartStoreId } = useCart()
+  const { items, clearCart, storeId: cartStoreId } = useCart()
 
   const [step, setStep] = useState(1)
 
@@ -90,6 +90,9 @@ export default function CheckoutPage() {
   }, [allowedMethods])
 
   const [loadingShipping, setLoadingShipping] = useState(true)
+
+  // Fase 4 — harga promo flash sale aktif per produk (tampilan saja).
+  const [flashPrices, setFlashPrices] = useState<Map<string, number>>(new Map())
   const [errorMessage, setErrorMessage] = useState('')
   const [isPending, startTransition] = useTransition()
 
@@ -101,7 +104,17 @@ export default function CheckoutPage() {
     return shippingMethods.find((method) => method.id === shippingMethodId) || null
   }, [shippingMethods, shippingMethodId])
 
-  const subtotalValue = subtotal()
+  const subtotalValue = useMemo(() => {
+    // Fase 4 — preview harga flash sale: harga promo aktif menggantikan
+    // harga tersimpan di keranjang (tampilan saja; harga yang mengikat
+    // dihitung server dari database di createOrderAction).
+    return items.reduce((sum, item) => {
+      const base = Number(item.product.price)
+      const promo = flashPrices.get(item.product.id)
+      const price = promo !== undefined && promo > 0 && promo < base ? promo : base
+      return sum + price * item.qty
+    }, 0)
+  }, [items, flashPrices])
   // Fase 3: total berat keranjang + ongkir berbasis berat (harga dasar +
   // per kg di atas berat dasar). Harga yang mengikat tetap dihitung
   // server dari database — ini hanya preview.
@@ -196,6 +209,44 @@ export default function CheckoutPage() {
 
     fetchShippingMethods()
     fetchAllowedMethods()
+  }, [storeId])
+
+  // Fase 4 — muat flash sale aktif toko untuk preview harga promo.
+  // Policy publik hanya membaca yang aktif + di dalam jadwal; bila
+  // tabel belum ada (migrasi f4 belum dijalankan), abaikan.
+  useEffect(() => {
+    async function fetchFlashSales() {
+      if (!storeId) return
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('flash_sales')
+          .select('product_id, promo_price, starts_at, ends_at, is_active')
+          .eq('store_id', storeId)
+          .eq('is_active', true)
+        if (error || !data) return
+        const now = new Date().getTime()
+        const map = new Map<string, number>()
+        for (const row of data as Array<{
+          product_id: string
+          promo_price: number
+          starts_at: string
+          ends_at: string
+          is_active: boolean
+        }>) {
+          const start = new Date(row.starts_at).getTime()
+          const end = new Date(row.ends_at).getTime()
+          if (Number.isNaN(start) || Number.isNaN(end)) continue
+          if (now < start || now > end) continue
+          const promo = Math.floor(Number(row.promo_price) || 0)
+          if (promo > 0) map.set(row.product_id, promo)
+        }
+        setFlashPrices(map)
+      } catch {
+        // Tanpa flash sale = harga normal.
+      }
+    }
+    fetchFlashSales()
   }, [storeId])
 
   // Fase 2: pembeli login — muat buku alamat; alamat utama mengisi
@@ -774,24 +825,46 @@ export default function CheckoutPage() {
 
           <div className="mt-5 space-y-4">
             <div className="space-y-3">
-              {items.map((item) => (
-                <div
-                  key={item.product.id}
-                  className="flex items-start justify-between gap-3 rounded-2xl bg-neutral-50 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="line-clamp-2 text-sm font-semibold text-neutral-900">
-                      {item.product.name}
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      {item.qty} x Rp {Number(item.product.price).toLocaleString('id-ID')}
+              {items.map((item) => {
+                const base = Number(item.product.price)
+                const promo = flashPrices.get(item.product.id)
+                const effective =
+                  promo !== undefined && promo > 0 && promo < base ? promo : base
+                const onFlash = effective < base
+                return (
+                  <div
+                    key={item.product.id}
+                    className="flex items-start justify-between gap-3 rounded-2xl bg-neutral-50 px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="line-clamp-2 text-sm font-semibold text-neutral-900">
+                        {item.product.name}
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {item.qty} x{' '}
+                        {onFlash ? (
+                          <>
+                            <span className="line-through">
+                              Rp {base.toLocaleString('id-ID')}
+                            </span>{' '}
+                            <span className="font-semibold text-red-600">
+                              Rp {effective.toLocaleString('id-ID')}
+                            </span>{' '}
+                            <span className="font-semibold text-red-600">
+                              FLASH SALE
+                            </span>
+                          </>
+                        ) : (
+                          <>Rp {base.toLocaleString('id-ID')}</>
+                        )}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold text-neutral-900">
+                      Rp {(effective * item.qty).toLocaleString('id-ID')}
                     </p>
                   </div>
-                  <p className="shrink-0 text-sm font-semibold text-neutral-900">
-                    Rp {(Number(item.product.price) * item.qty).toLocaleString('id-ID')}
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <div className="space-y-3 border-t border-neutral-200 pt-4 text-sm">

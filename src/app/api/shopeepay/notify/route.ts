@@ -23,6 +23,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { decryptSecret, sha256Hex, verifyWebhookSignature } from '@/lib/shopeepay/crypto'
+import { logEvent } from '@/lib/observability'
 import {
   applyQrisPaid,
   type QrisPaymentRow,
@@ -74,6 +75,9 @@ export async function POST(request: Request) {
   if (!partnerReferenceNo) {
     return snapError('4004701', 'partnerReferenceNo kosong', 400)
   }
+
+  // Fase 4 (observability) — setiap webhook tercatat, apa pun hasilnya.
+  logEvent('qris_webhook_received', { partnerReferenceNo })
 
   const supabase = await createPublicInvoiceClient()
   const admin = createAdminClient()
@@ -143,7 +147,11 @@ export async function POST(request: Request) {
     )
   )
   if (!verified) {
-    console.error('[shopeepay-notify] signature tidak valid', partnerReferenceNo)
+    // Fase 4 (observability) — jejak terstruktur penolakan webhook.
+    logEvent('qris_webhook_rejected', {
+      partnerReferenceNo,
+      reason: 'signature_invalid',
+    })
     return snapError('4014700', 'Signature tidak valid', 401)
   }
 
@@ -161,7 +169,10 @@ export async function POST(request: Request) {
     Number.isFinite(notifiedAmount) &&
     Math.abs(notifiedAmount - Number(qrisRow.amount)) > 1
   ) {
-    console.error('[shopeepay-notify] nominal tidak cocok', partnerReferenceNo)
+    logEvent('qris_webhook_rejected', {
+      partnerReferenceNo,
+      reason: 'amount_mismatch',
+    })
     return snapError('4004703', 'Nominal tidak cocok', 400)
   }
 
@@ -170,5 +181,13 @@ export async function POST(request: Request) {
   if (!result.applied && !result.alreadyPaid) {
     return snapError('4004704', 'Transaksi tidak bisa ditandai lunas', 400)
   }
+  // Fase 4 (observability) — webhook lunas diterima (idempotent: webhook
+  // ganda tercatat sebagai alreadyPaid, bukan paid baru).
+  logEvent('qris_webhook_paid', {
+    partnerReferenceNo,
+    storeId: qrisRow.store_id,
+    amount: Number(qrisRow.amount),
+    alreadyPaid: result.alreadyPaid === true,
+  })
   return snapSuccess()
 }

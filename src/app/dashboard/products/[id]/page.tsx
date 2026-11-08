@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { removeProductImageObject } from '@/lib/product-image'
 import { getProductForEditAction } from '@/lib/actions/dashboard-store'
+import { logPriceChangedAction } from '@/lib/actions/audit'
 
 type EditProductPageProps = {
   params: Promise<{
@@ -31,6 +32,8 @@ export default function EditProductPage({ params }: EditProductPageProps) {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [price, setPrice] = useState('')
+  // Harga awal (untuk audit log bila harga berubah — Fase 4).
+  const initialPriceRef = useRef<number | null>(null)
   const [stock, setStock] = useState('0')
   // Fase 3: berat produk (gram) — dipakai hitung ongkir di checkout.
   const [weightGram, setWeightGram] = useState('')
@@ -82,6 +85,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         setName(product.name || '')
         setSlug(product.slug || '')
         setPrice(String(product.price ?? ''))
+        initialPriceRef.current = Number(product.price ?? 0)
         setStock(String(product.stock ?? 0))
         setWeightGram(product.weight_gram ? String(product.weight_gram) : '')
         setDescription(product.description || '')
@@ -247,6 +251,20 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         .eq('store_id', storeId)
 
       if (error) throw error
+
+      // Fase 4 — audit log bila harga berubah (best-effort; kegagalan
+      // pencatatan tidak menggagalkan penyimpanan produk).
+      try {
+        const oldPrice = initialPriceRef.current ?? Number(price)
+        if (Math.floor(oldPrice) !== Math.floor(Number(price))) {
+          await logPriceChangedAction({
+            productId,
+            productName: name.trim(),
+            oldPrice,
+            newPrice: Number(price),
+          })
+        }
+      } catch {}
 
       router.push('/dashboard/products')
     } catch {

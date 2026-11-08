@@ -10,6 +10,9 @@ const items = [
   { href: '/dashboard/chat', label: 'Chat' },
   { href: '/dashboard/shipping', label: 'Pengiriman' },
   { href: '/dashboard/vouchers', label: 'Voucher' },
+  { href: '/dashboard/analytics', label: 'Analitik' },
+  { href: '/dashboard/flash-sales', label: 'Flash Sale' },
+  { href: '/dashboard/banners', label: 'Banner' },
   { href: '/dashboard/subscription', label: 'Langganan' },
   { href: '/dashboard/settings', label: 'Pengaturan' },
 ]

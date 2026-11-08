@@ -3,6 +3,10 @@ import { notFound } from 'next/navigation'
 import ProductDetailClient from '@/components/ProductDetailClient'
 import { getPublicStoreSubscription } from '@/lib/subscriptions-server'
 import { limitsFor } from '@/lib/subscription-tiers'
+import {
+  activeFlashSaleForProduct,
+  type FlashSaleLike,
+} from '@/lib/flash-sales'
 
 type ProductDetailPageProps = {
   params: Promise<{
@@ -58,9 +62,33 @@ export default async function ProductDetailPage({
     notFound()
   }
 
+  // Fase 4 — flash sale aktif produk ini (bila tabel f4 belum ada,
+  // abaikan — harga normal). Watermark foto untuk paket Free.
+  let flashSale: FlashSaleLike | null = null
+  try {
+    const { data: flashRows } = await supabase
+      .from('flash_sales')
+      .select('id, store_id, product_id, promo_price, starts_at, ends_at, is_active')
+      .eq('store_id', store.id)
+      .eq('product_id', product.id)
+      .eq('is_active', true)
+    flashSale = activeFlashSaleForProduct(
+      ((flashRows ?? []) as FlashSaleLike[]).map((s) => ({
+        ...s,
+        promo_price: Number(s.promo_price),
+      })),
+      product.id,
+      new Date()
+    )
+  } catch {
+    flashSale = null
+  }
+
   return (
     <ProductDetailClient
       storeSlug={store.slug}
+      flashSale={flashSale}
+      watermarked={tierLimits.watermark}
       product={{
         ...product,
         images: (product.images ?? []).slice(

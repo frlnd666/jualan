@@ -169,6 +169,12 @@ export default async function AdminIndexPage() {
           Verifikasi langganan
           {pendingPayments ? ` (${pendingPayments} menunggu)` : ''}
         </Link>
+        <Link
+          href="/dashboard/admin/audit"
+          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold text-[var(--text)]"
+        >
+          Log audit
+        </Link>
       </div>
 
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]">

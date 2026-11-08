@@ -299,6 +299,33 @@ export default async function DashboardPage() {
               </p>
             </Link>
             <Link
+              href="/dashboard/analytics"
+              className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
+            >
+              <p className="text-sm font-bold">Analitik</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                GMV, produk terlaris, dan export CSV (Gold).
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/flash-sales"
+              className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
+            >
+              <p className="text-sm font-bold">Flash Sale</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Harga promo terjadwal (Silver/Gold).
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/banners"
+              className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
+            >
+              <p className="text-sm font-bold">Banner Toko</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Satu slide marketing di storefront (Silver/Gold).
+              </p>
+            </Link>
+            <Link
               href="/dashboard/subscription"
               className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 text-[var(--text)] shadow-[var(--shadow-sm)] transition active:scale-[0.99]"
             >

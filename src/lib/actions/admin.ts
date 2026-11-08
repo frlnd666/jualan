@@ -13,6 +13,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminUser } from '@/lib/admin-access'
+import { logAudit } from '@/lib/audit'
 
 export async function suspendStoreAction(
   storeId: string
@@ -29,6 +30,16 @@ export async function suspendStoreAction(
     .update({ status: 'SUSPENDED' })
     .eq('store_id', storeId)
   if (error) return { error: 'Gagal membekukan toko.' }
+
+  // Fase 4 — audit log (best-effort).
+  await logAudit({
+    actorId: adminCheck.userId,
+    actorRole: 'admin',
+    storeId,
+    action: 'store_suspended',
+    entityType: 'store',
+    entityId: storeId,
+  })
 
   revalidatePath('/dashboard/admin')
   revalidatePath(`/dashboard/admin/stores/${storeId}`)
@@ -73,6 +84,17 @@ export async function unsuspendStoreAction(
     .update({ status: restoreTo })
     .eq('store_id', storeId)
   if (error) return { error: 'Gagal membuka pembekuan toko.' }
+
+  // Fase 4 — audit log (best-effort).
+  await logAudit({
+    actorId: adminCheck.userId,
+    actorRole: 'admin',
+    storeId,
+    action: 'store_unsuspended',
+    entityType: 'store',
+    entityId: storeId,
+    details: { from_status: 'SUSPENDED', to_status: restoreTo },
+  })
 
   revalidatePath('/dashboard/admin')
   revalidatePath(`/dashboard/admin/stores/${storeId}`)

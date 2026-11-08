@@ -16,6 +16,8 @@ import {
 import { calcShippingCost, totalWeightGrams } from '@/lib/shipping'
 import { tryGenerateDynamicQrForInvoice } from '@/lib/shopeepay/qris-server'
 import { notifyOrderStatusChange } from '@/lib/notifications'
+import { loadActiveFlashSalesForStore } from '@/lib/actions/flash-sales'
+import { logEvent } from '@/lib/observability'
 import type { CheckoutFormInput, PaymentMethod } from '@/lib/types/order'
 import { normalizePhoneNumber } from '@/lib/utils/order'
 
@@ -215,6 +217,27 @@ export async function createOrderAction(input: CheckoutFormInput) {
   })
 
   const normalizedPhone = normalizePhoneNumber(input.customerPhone)
+
+  // Fase 4 — flash sale: harga promo yang sedang aktif menggantikan
+  // harga normal produk (server-side, tidak dipercaya dari browser).
+  // Bila tabel flash_sales belum ada (migrasi f4 belum dijalankan),
+  // pemetaan kosong → harga normal. Promo yang harganya >= harga
+  // normal tidak pernah dipakai.
+  const flashPrices = await loadActiveFlashSalesForStore(
+    supabase,
+    input.storeId
+  )
+  for (const item of verifiedItems) {
+    const promo = flashPrices.get(item.product.id)
+    if (
+      promo !== undefined &&
+      promo > 0 &&
+      promo < item.price
+    ) {
+      item.price = promo
+    }
+  }
+
   const subtotal = verifiedItems.reduce((sum, item) => sum + item.price * item.qty, 0)
 
   // Fase 3 — ongkir berbasis berat: total berat dihitung dari
@@ -504,6 +527,17 @@ export async function createOrderAction(input: CheckoutFormInput) {
   if (input.paymentMethod === 'QRIS') {
     await tryGenerateDynamicQrForInvoice(supabase, invoiceNumber)
   }
+
+  // Fase 4 (observability) — jejak terstruktur pesanan baru.
+  logEvent('order_created', {
+    orderId: order.id,
+    storeId: input.storeId,
+    invoiceNumber,
+    total,
+    paymentMethod: input.paymentMethod,
+    itemCount: verifiedItems.length,
+    buyerLoggedIn: buyerId !== null,
+  })
 
   // Fase 3 — beri tahu pemilik toko ada pesanan baru (in-app).
   // Best-effort: kegagalan notifikasi tidak boleh menggagalkan pesanan.

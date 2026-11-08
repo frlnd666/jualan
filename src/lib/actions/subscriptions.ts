@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
+import { logAudit } from '@/lib/audit'
 import {
   getStoreSubscription,
   periodEndFor,
@@ -431,6 +432,20 @@ export async function verifySubscriptionPayment(
     }
   }
 
+  // Fase 4 — audit log (best-effort).
+  await logAudit({
+    actorId: adminUser.id,
+    actorRole: 'admin',
+    storeId: (payment as { store_id: string }).store_id,
+    action: decision === 'verify' ? 'subscription_verified' : 'subscription_rejected',
+    entityType: 'subscription_payment',
+    entityId: paymentId,
+    details: {
+      tier: (payment as { tier: string }).tier,
+      payment_id: paymentId,
+    },
+  })
+
   revalidatePath('/dashboard/admin/subscriptions')
   revalidatePath('/dashboard/subscription')
   return { success: true }
@@ -489,6 +504,17 @@ export async function cancelSubscription() {
       .eq('store_id', storeId)
     if (error) return { error: `Gagal membatalkan: ${error.message}` }
   }
+
+  // Fase 4 — audit log (best-effort).
+  await logAudit({
+    actorId: user.id,
+    actorRole: 'seller',
+    storeId,
+    action: 'subscription_cancelled',
+    entityType: 'subscription',
+    entityId: storeId,
+    details: { tier: row.tier, from_status: row.status },
+  })
 
   revalidatePath('/dashboard/subscription')
   return { success: true }

@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getOwnerStore } from '@/lib/dashboard-access'
 import { getStoreSubscription } from '@/lib/subscriptions'
 import { TIER_LIMITS, effectiveTier } from '@/lib/subscription-tiers'
+import { logAudit } from '@/lib/audit'
 
 // Cari akun auth berdasarkan email lewat listUsers berhalaman
 // (versi supabase-js di repo ini tidak menyediakan getUserByEmail).
@@ -170,6 +171,17 @@ export async function addStaffAction(
     .update({ role: 'staff', store_id: store.id })
     .eq('id', targetId)
   if (error) return { error: 'Gagal menambah staff. Coba lagi.' }
+
+  // Fase 4 — audit log (best-effort).
+  await logAudit({
+    actorId: owner.store.owner_id,
+    actorRole: 'seller',
+    storeId: store.id,
+    action: 'staff_added',
+    entityType: 'profile',
+    entityId: targetId,
+    details: { email: normalizedEmail },
+  })
   return { success: true }
 }
 
@@ -197,5 +209,15 @@ export async function removeStaffAction(
     .update({ role: 'buyer', store_id: null })
     .eq('id', userId)
   if (error) return { error: 'Gagal menghapus staff. Coba lagi.' }
+
+  // Fase 4 — audit log (best-effort).
+  await logAudit({
+    actorId: owner.store.owner_id,
+    actorRole: 'seller',
+    storeId: store.id,
+    action: 'staff_removed',
+    entityType: 'profile',
+    entityId: userId,
+  })
   return { success: true }
 }

@@ -204,3 +204,40 @@ auto-debit, notifikasi email/WhatsApp (TODO — tidak ada jalur mail di
 codebase; WhatsApp butuh keputusan provider), watermark/iklan Free
 (Fase 4), dan inquiry status QR bila path-nya belum dikonfirmasi
 (dokumen Partner).
+
+## Fase 4 — Pertumbuhan (2026-11-09)
+
+Urutan jalankan di Supabase SQL Editor, SETELAH seluruh migrasi Fase 0–3:
+
+1. **`migrations/20261108_f4_growth.sql`** — flash sale, banner toko,
+   audit log. Idempotent (`IF NOT EXISTS` / `CREATE OR REPLACE` /
+   `DROP POLICY IF EXISTS`); tidak mengubah data yang sudah ada. Isinya:
+   - `flash_sales` (harga promo + jadwal mulai/selesai; satu flash sale
+     AKTIF per produk via partial unique index; RLS owner-only, baca
+     publik hanya yang aktif + di dalam jadwal);
+   - `store_banners` (banner marketing; satu banner AKTIF per toko;
+     RLS owner-only, baca publik hanya yang aktif);
+   - `audit_log` (jejak aksi penting; tulis hanya service_role, baca
+     hanya admin platform via `is_admin()`).
+2. **Tidak ada langkah SQL lain.**
+
+Analitik + export tidak butuh tabel baru (pakai orders / order_items /
+invoices). Health check `GET /api/health` tidak butuh konfigurasi.
+
+**Perilaku sebelum migrasi dijalankan:** flash sale, banner, dan audit
+log tidak aktif (kode memakai fallback: harga normal di storefront +
+checkout, tanpa banner, log dilewati). Analitik tetap jalan. Export CSV
+analitik tetap ditegakkan server-side (hanya Gold).
+
+**Yang perlu diverifikasi Ferlan setelah migrasi:** (1) `/dashboard/analytics`
+→ GMV + produk terlaris + export CSV (Free/Silver ditolak); (2) buat
+flash sale di `/dashboard/flash-sales` (Free ditolak) → harga promo
+tampil di storefront + halaman produk → checkout memakai harga promo;
+(3) buat banner di `/dashboard/banners` → tampil di storefront
+(Silver/Gold); toko Free menampilkan slide "Iklan"; (4) foto produk
+toko Free ber-watermark CUAN, Silver/Gold polos; (5) `/dashboard/admin/audit`
+→ aksi verifikasi langganan / bekukan toko / staff / konfirmasi bayar /
+ubah harga tercatat; (6) `GET /api/health` → `{"status":"ok",...}`.
+
+**Yang TIDAK dibangun di Fase 4:** cron transisi status langganan,
+auto-debit, notifikasi email/WhatsApp, custom domain (Fase 5).

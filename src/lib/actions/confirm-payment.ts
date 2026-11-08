@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import { notifyOrderStatusChange } from '@/lib/notifications'
+import { logAudit } from '@/lib/audit'
+import { logEvent } from '@/lib/observability'
 
 export async function confirmPayment(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId') || '')
@@ -121,6 +123,29 @@ export async function confirmPayment(formData: FormData) {
       )
     }
   } catch {}
+
+  // Fase 4 — audit log + jejak terstruktur (best-effort).
+  await logAudit({
+    actorId: user.id,
+    actorRole: access.role === 'staff' ? 'staff' : 'seller',
+    storeId: ownedStore.id,
+    action: 'payment_confirmed',
+    entityType: 'invoice',
+    entityId: invoiceId,
+    details: {
+      invoice_number: invoiceNumber,
+      order_id: orderId,
+      payment_method: order.payment_method,
+      total: Number(order.total),
+    },
+  })
+  logEvent('payment_confirmed', {
+    orderId,
+    invoiceNumber,
+    storeId: ownedStore.id,
+    paymentMethod: order.payment_method,
+    total: Number(order.total),
+  })
 
   revalidatePath('/dashboard/payments')
   revalidatePath('/dashboard/orders')

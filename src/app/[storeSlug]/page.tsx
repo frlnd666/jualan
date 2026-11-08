@@ -2,8 +2,17 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import StoreChatWidget from '@/components/storefront/StoreChatWidget'
+import WatermarkedImage from '@/components/storefront/WatermarkedImage'
+import AffiliateAdSlide from '@/components/storefront/AffiliateAdSlide'
 import { getPublicStoreSubscription } from '@/lib/subscriptions-server'
 import { limitsFor } from '@/lib/subscription-tiers'
+import {
+  activeFlashSaleForProduct,
+  discountPercent,
+  formatFlashRemaining,
+  flashSaleRemainingMs,
+  type FlashSaleLike,
+} from '@/lib/flash-sales'
 
 type StorefrontPageProps = {
   params: Promise<{
@@ -23,6 +32,41 @@ function getCategoryName(
 ): string | null {
   if (!product.category_id) return null
   return categoryNames.get(product.category_id) ?? null
+}
+
+type StoreBannerLike = {
+  title: string
+  image_url: string | null
+  link_url: string | null
+}
+
+// Fase 4 — banner marketing aktif toko (Silver/Gold). Helper terpisah
+// agar TypeScript tidak mempersempit `activeBanner` jadi `never`
+// (penugasan di dalam try/catch kondisional tidak terbaca CFA).
+// Gagal/migrasi belum jalan = tanpa banner.
+async function loadActiveBanner(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  storeId: string
+): Promise<StoreBannerLike | null> {
+  try {
+    const { data: bannerRow } = await supabase
+      .from('store_banners')
+      .select('title, image_url, link_url')
+      .eq('store_id', storeId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const row = bannerRow as StoreBannerLike | null
+    if (!row) return null
+    return {
+      title: String(row.title ?? ''),
+      image_url: row.image_url ?? null,
+      link_url: row.link_url ?? null,
+    }
+  } catch {
+    return null
+  }
 }
 
 function getInitials(name: string) {
@@ -60,7 +104,8 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
   // - Produk di atas batas paket tidak ditampilkan (diurutkan terbaru
   //   dulu, jadi yang tampil adalah produk terbaru sampai batas).
   // - Foto ke-2+ tidak ditampilkan untuk Free (max 1 foto).
-  // TODO Fase 4: watermark foto + iklan affiliate di banner toko Free.
+  // Fase 4: foto Free tampil dengan watermark platform (overlay display,
+  // file asli utuh) + banner Free menampilkan 1 slide iklan afiliasi.
   const subscription = await getPublicStoreSubscription(store.id)
   if (subscription.status === 'SUSPENDED') {
     notFound()
@@ -72,6 +117,41 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
       ...p,
       images: (p.images ?? []).slice(0, tierLimits.maxPhotosPerProduct),
     }))
+
+  // Fase 4 — flash sale aktif toko ini (policy publik hanya membaca
+  // yang aktif + di dalam jadwal). Bila tabel belum ada (migrasi f4
+  // belum dijalankan), abaikan — harga normal yang tampil.
+  const now = new Date()
+  let flashSales: FlashSaleLike[] = []
+  try {
+    const { data: flashRows } = await supabase
+      .from('flash_sales')
+      .select('id, store_id, product_id, promo_price, starts_at, ends_at, is_active')
+      .eq('store_id', store.id)
+      .eq('is_active', true)
+    flashSales = ((flashRows ?? []) as FlashSaleLike[]).map((s) => ({
+      ...s,
+      promo_price: Number(s.promo_price),
+    }))
+  } catch {
+    flashSales = []
+  }
+  const pricedProducts = visibleProducts.map((p) => {
+    const sale = activeFlashSaleForProduct(flashSales, p.id, now)
+    const normalPrice = Number(p.price)
+    const hasFlash = sale !== null && Number(sale.promo_price) < normalPrice
+    return {
+      ...p,
+      flashSale: hasFlash ? sale : null,
+      displayPrice: hasFlash ? Number(sale!.promo_price) : normalPrice,
+    }
+  })
+
+  // Fase 4 — banner marketing aktif toko (Silver/Gold). Toko Free tidak
+  // punya banner sendiri; sebagai gantinya tampil slide iklan afiliasi.
+  const activeBanner: StoreBannerLike | null = !tierLimits.affiliateAds
+    ? await loadActiveBanner(supabase, store.id)
+    : null
 
   // Nama kategori diambil dari tabel product_categories (nama tabel asli
   // di database) dengan query terpisah — bukan embed relasi — agar tahan
@@ -94,7 +174,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
     }
   }
 
-  const productList = visibleProducts
+  const productList = pricedProducts
   const totalProducts = productList.length
   const featuredProducts = productList.slice(0, 2)
 
@@ -203,6 +283,37 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
         </section>
 
         <main className="px-4 pb-8 pt-5 sm:px-6">
+          {/* Fase 4 — banner marketing toko (Silver/Gold) atau 1 slide
+              iklan afiliasi berlabel "Iklan" (Free). */}
+          {activeBanner ? (
+            <section className="mb-6 overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_30px_rgba(33,24,20,0.06)]">
+              {activeBanner.image_url ? (
+                <img
+                  src={activeBanner.image_url}
+                  alt={activeBanner.title}
+                  className="h-36 w-full object-cover"
+                />
+              ) : null}
+              <div className="p-4">
+                <p className="text-base font-bold text-[#241b17]">
+                  {activeBanner.title}
+                </p>
+                {activeBanner.link_url ? (
+                  <Link
+                    href={activeBanner.link_url}
+                    className="mt-2 inline-flex items-center justify-center rounded-full bg-[#0b6b4a] px-4 py-2 text-xs font-semibold text-white"
+                  >
+                    Lihat selengkapnya
+                  </Link>
+                ) : null}
+              </div>
+            </section>
+          ) : tierLimits.affiliateAds ? (
+            <div className="mb-6">
+              <AffiliateAdSlide />
+            </div>
+          ) : null}
+
           {featuredProducts.length > 0 ? (
             <section className="mb-6">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -226,9 +337,10 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                     <div className="grid grid-cols-[112px_1fr]">
                       <div className="relative h-full min-h-[112px] bg-[#efe6dc]">
                         {product.images?.[0] ? (
-                          <img
+                          <WatermarkedImage
                             src={product.images[0]}
                             alt={product.name}
+                            watermarked={tierLimits.watermark}
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -255,9 +367,24 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                         </div>
 
                         <div className="mt-4 flex items-center justify-between gap-3">
-                          <p className="text-sm font-bold text-[#5b3df5]">
-                            Rp {formatRupiah(product.price)}
-                          </p>
+                          <div>
+                            {product.flashSale ? (
+                              <p className="text-xs font-medium text-[#8d7f73] line-through">
+                                Rp {formatRupiah(product.price)}
+                              </p>
+                            ) : null}
+                            <p className="text-sm font-bold text-[#5b3df5]">
+                              Rp {formatRupiah(product.displayPrice)}
+                            </p>
+                            {product.flashSale ? (
+                              <p className="mt-0.5 text-[11px] font-bold text-red-600">
+                                FLASH SALE −{discountPercent(product.price, product.displayPrice)}% •{' '}
+                                {formatFlashRemaining(
+                                  flashSaleRemainingMs(product.flashSale, now)
+                                )}
+                              </p>
+                            ) : null}
+                          </div>
                           <span className="inline-flex items-center justify-center rounded-full bg-[#f3efe9] px-3 py-1.5 text-xs font-semibold text-[#241b17]">
                             Lihat
                           </span>
@@ -308,9 +435,10 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                   >
                     <div className="relative aspect-[4/5] overflow-hidden bg-[#efe7de]">
                       {product.images?.[0] ? (
-                        <img
+                        <WatermarkedImage
                           src={product.images[0]}
                           alt={product.name}
+                          watermarked={tierLimits.watermark}
                           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                         />
                       ) : (
@@ -339,9 +467,21 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                         {product.name}
                       </p>
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <p className="text-sm font-bold text-[#5b3df5]">
-                          Rp {formatRupiah(product.price)}
-                        </p>
+                        <div>
+                          {product.flashSale ? (
+                            <p className="text-[11px] font-medium text-[#8d7f73] line-through">
+                              Rp {formatRupiah(product.price)}
+                            </p>
+                          ) : null}
+                          <p className="text-sm font-bold text-[#5b3df5]">
+                            Rp {formatRupiah(product.displayPrice)}
+                          </p>
+                          {product.flashSale ? (
+                            <p className="mt-0.5 text-[10px] font-bold text-red-600">
+                              FLASH SALE −{discountPercent(product.price, product.displayPrice)}%
+                            </p>
+                          ) : null}
+                        </div>
                         <span className="rounded-full bg-[#f4efe9] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6d5f54]">
                           Detail
                         </span>

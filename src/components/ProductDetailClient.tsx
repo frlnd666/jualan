@@ -3,6 +3,13 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
+import WatermarkedImage from '@/components/storefront/WatermarkedImage'
+import {
+  discountPercent,
+  formatFlashRemaining,
+  flashSaleRemainingMs,
+  type FlashSaleLike,
+} from '@/lib/flash-sales'
 
 type Product = {
   id: string
@@ -22,6 +29,10 @@ type Product = {
 type ProductDetailClientProps = {
   storeSlug: string
   product: Product
+  /** Flash sale aktif untuk produk ini (Fase 4) — null bila tidak ada. */
+  flashSale?: FlashSaleLike | null
+  /** Tampilkan watermark platform di foto (paket Free). */
+  watermarked?: boolean
 }
 
 function formatRupiah(value: number | string | null | undefined) {
@@ -63,10 +74,20 @@ function getStockLabel(stock: number | null | undefined, available: boolean | nu
 export default function ProductDetailClient({
   storeSlug,
   product,
+  flashSale = null,
+  watermarked = false,
 }: ProductDetailClientProps) {
   const images = useMemo(() => {
     return Array.isArray(product.images) ? product.images.filter(Boolean) : []
   }, [product.images])
+
+  // Fase 4 — harga efektif: harga promo bila ada flash sale aktif dan
+  // lebih murah dari harga normal. Harga yang masuk keranjang adalah
+  // harga efektif ini; server tetap memverifikasi ulang di checkout.
+  const normalPrice = Number(product.price)
+  const hasFlash =
+    flashSale !== null && Number(flashSale.promo_price) < normalPrice
+  const displayPrice = hasFlash ? Number(flashSale.promo_price) : normalPrice
 
   const [activeImage, setActiveImage] = useState(images[0] || '')
   const stockInfo = getStockLabel(product.stock, product.available)
@@ -85,7 +106,7 @@ export default function ProductDetailClient({
         id: product.id,
         name: product.name,
         slug: product.slug,
-        price: Number(product.price),
+        price: displayPrice,
         store_id: product.store_id ?? null,
         images: product.images ?? null,
         badge: product.badge ?? null,
@@ -117,9 +138,10 @@ export default function ProductDetailClient({
             <section className="relative bg-[#efe7de]">
               <div className="relative aspect-[4/5] w-full overflow-hidden sm:aspect-[16/10]">
                 {activeImage ? (
-                  <img
+                  <WatermarkedImage
                     src={activeImage}
                     alt={product.name}
+                    watermarked={watermarked}
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -193,9 +215,22 @@ export default function ProductDetailClient({
                   <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8d7f73]">
                     Harga
                   </p>
+                  {hasFlash ? (
+                    <p className="mt-1 text-sm font-medium text-[#8d7f73] line-through">
+                      Rp {formatRupiah(normalPrice)}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-2xl font-bold text-[#5b3df5]">
-                    Rp {formatRupiah(product.price)}
+                    Rp {formatRupiah(displayPrice)}
                   </p>
+                  {hasFlash && flashSale ? (
+                    <p className="mt-1 inline-flex rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                      FLASH SALE −{discountPercent(normalPrice, displayPrice)}% •{' '}
+                      {formatFlashRemaining(
+                        flashSaleRemainingMs(flashSale, new Date())
+                      )}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="text-right">
@@ -304,7 +339,7 @@ export default function ProductDetailClient({
               Harga
             </p>
             <p className="truncate text-base font-bold text-[#241b17]">
-              Rp {formatRupiah(product.price)}
+              Rp {formatRupiah(displayPrice)}
             </p>
           </div>
 

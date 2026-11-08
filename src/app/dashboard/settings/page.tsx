@@ -1,7 +1,10 @@
 'use client'
 
+import Link from 'next/link'
+
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { normalizeStoreSlug, validateStoreSlug } from '@/lib/store-slug'
 import { ensureStoreSubscription } from '@/lib/actions/subscriptions'
@@ -91,6 +94,8 @@ export default function SettingsPage() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
+  const [denied, setDenied] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(null)
   const [storeId, setStoreId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -118,6 +123,19 @@ export default function SettingsPage() {
       } = await supabase.auth.getUser()
       if (!user) return
 
+      // Fase 2: pengaturan hanya untuk pemilik toko — staff ditolak di
+      // sini (dan di RLS: policy stores owner-only).
+      const { data: settingsProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      if ((settingsProfile as { role?: string } | null)?.role === 'staff') {
+        setDenied(true)
+        setLoading(false)
+        return
+      }
+
       const { data: store } = await supabase
         .from('stores')
         .select('*')
@@ -126,6 +144,9 @@ export default function SettingsPage() {
 
       if (store) {
         setStoreId(store.id)
+        setOnboardingStep(
+          typeof store.onboarding_step === 'number' ? store.onboarding_step : 5
+        )
         setName(store.name)
         setSlug(store.slug)
         setDescription(store.description ?? '')
@@ -283,6 +304,11 @@ export default function SettingsPage() {
   if (loading)
     return <div className="p-4 text-sm text-[var(--text-muted)]">Memuat...</div>
 
+  if (denied) return <StaffDeniedCard title="Pengaturan Toko" />
+
+  const showOnboardingBanner =
+    onboardingStep !== null && onboardingStep > 0 && onboardingStep < 5
+
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
@@ -296,6 +322,23 @@ export default function SettingsPage() {
             : 'Tokomu belum dibuat. Isi bagian Profil lalu simpan untuk membuat tokomu; bagian lain bisa menyusul.'}
         </p>
       </div>
+
+      {showOnboardingBanner ? (
+        <section className="rounded-[32px] border border-amber-200 bg-amber-50 p-5 shadow-[var(--shadow-sm)]">
+          <p className="text-sm font-bold text-amber-900">
+            Setup tokomu belum selesai
+          </p>
+          <p className="mt-1 text-sm leading-6 text-amber-800">
+            Lanjutkan wizard setup supaya tokomu siap dibagikan.
+          </p>
+          <Link
+            href="/dashboard/onboarding"
+            className="mt-3 inline-flex items-center justify-center rounded-2xl bg-amber-700 px-4 py-3 text-sm font-semibold text-white"
+          >
+            Lanjutkan setup
+          </Link>
+        </section>
+      ) : null}
 
       <SectionCard
         title="Profil toko"

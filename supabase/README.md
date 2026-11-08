@@ -23,6 +23,33 @@ Bila migrasi dijalankan sebelum langkah 1–2 selesai, halaman invoice/track
 publik dan upload bukti transfer akan gagal membaca `invoices` (akses anon
 sudah ditutup, sementara server belum punya service_role).
 
+## Fase 0 — Fondasi SaaS (2026-11-08)
+
+Urutan jalankan di Supabase SQL Editor, SETELAH migrasi P0/P0b/P1/P2 +
+hotfix di atas selesai:
+
+1. **`migrations/20261108_f0_core_schema.sql`** — rekonstruksi skema inti
+   (stores, products, orders, dst.) + index + RLS enable. Idempotent;
+   tidak mengubah data. Bagian yang tidak bisa dipastikan dari kode
+   ditandai `NEEDS_LIVE_VERIFY` di komentar file.
+2. **`migrations/20261108_f0_stock_rpc.sql`** — RPC `decrement_stock` /
+   `increment_stock` (stok atomik). Kode checkout + pembatalan order
+   sudah memakainya.
+3. **`migrations/20261108_f0_roles.sql`** — tabel `profiles`
+   (buyer/seller/staff/admin) + policy + bootstrap admin pertama
+   (cara di komentar file; tanpa kredensial).
+
+**Sebelum langkah 1**, jalankan **`verify_live_schema.sql`** (read-only,
+hanya SELECT) dan bandingkan hasilnya dengan file migrasi. Bila live
+berbeda dengan rekonstruksi, yang benar adalah live — perbaiki file
+migrasi di repo, jangan paksa live mengikuti file. Bagian 7 skrip itu
+merangkum pemeriksaan dengan label OK / PERLU TINDAKAN.
+
+Catatan: checkout tetap memakai fallback mode legacy untuk invoice
+tanpa `access_token` (lihat `src/lib/actions/checkout.ts`) sampai
+migrasi P0 terkonfirmasi sudah dijalankan di live — fallback itu baru
+boleh dihapus setelah `verify_live_schema.sql` bagian 7a menunjukkan OK.
+
 ## Perilaku sebelum migrasi dijalankan
 
 Kode dirancang tetap hidup di masa transisi:

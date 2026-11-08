@@ -27,7 +27,7 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError(error.message)
@@ -35,7 +35,30 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    // Fase 2: pembeli masuk ke akun pembeli, bukan dashboard penjual.
+    // Peran dibaca dari profiles; bila belum ada baris, fallback ke
+    // cookie cuan_account_type (pembeli baru) lalu ke /dashboard.
+    let destination = '/dashboard'
+    try {
+      const userId = data.user?.id
+      if (userId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle()
+        if (profile?.role === 'buyer') destination = '/akun'
+      }
+      if (destination === '/dashboard') {
+        const accountType = document.cookie
+          .split(';')
+          .map((c) => c.trim())
+          .find((c) => c.startsWith('cuan_account_type='))
+          ?.split('=')[1]
+        if (accountType === 'buyer') destination = '/akun'
+      }
+    } catch {}
+    router.push(destination)
   }
 
   async function handleGoogle() {
@@ -54,6 +77,10 @@ export default function LoginPage() {
           Belum punya akun?{' '}
           <Link href="/register" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
             Daftar gratis
+          </Link>
+          {' · '}
+          <Link href="/register?type=buyer" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
+            Daftar sebagai pembeli
           </Link>
         </p>
       }

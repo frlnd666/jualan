@@ -7,11 +7,19 @@ import { ChevronDown } from "lucide-react";
 const faqs = [
   {
     q: "Bagaimana pembeli membayar?",
-    a: "Saat checkout, pembeli memilih metode yang kamu sediakan (misalnya transfer bank atau QRIS). Setelah pesanan dibuat, halaman invoice menampilkan panduan pembayaran dan formulir upload bukti transfer. Kamu memeriksa bukti itu dari dashboard, lalu mengonfirmasi — status di halaman pembeli berubah seketika.",
+    a: "Tergantung paket tokomu. Di paket Free, pembeli hanya bisa membayar dengan COD. Di paket Silver dan Gold, pembeli bisa memilih COD, transfer bank, atau QRIS dinamis. Setelah pesanan dibuat, halaman invoice menampilkan panduan pembayaran dan formulir upload bukti transfer. Kamu memeriksa bukti itu dari dashboard, lalu mengonfirmasi — status di halaman pembeli berubah seketika.",
   },
   {
     q: "Apakah Jualan memotong hasil penjualan saya?",
-    a: "Tidak. Jualan tidak memegang uang pembeli sama sekali. Pembayaran masuk langsung ke rekening atau QRIS kamu, dan saat ini platformnya gratis tanpa komisi per transaksi.",
+    a: "Tidak. Jualan tidak memegang uang pembeli sama sekali dan tidak mengambil komisi per transaksi di semua paket. Pembayaran masuk langsung ke rekening atau QRIS kamu. Yang kamu bayar hanya langganan paket Silver atau Gold kalau kamu memilihnya — paket Free tetap gratis.",
+  },
+  {
+    q: "Apa bedanya Free, Silver, dan Gold?",
+    a: "Free (Rp0) untuk coba jualan: 4 produk, 1 foto per produk dengan watermark, pembayaran COD saja, pengiriman ambil di tempat dan kurir toko, serta ada iklan affiliate di banner toko. Silver (Rp19.900/bulan) membuka semua fitur premium: 30 produk, 5 foto per produk tanpa watermark, COD + transfer + QRIS dinamis, ongkir berbasis berat/kurir, voucher dan flash sale, analitik lengkap, dan 1 staff — dengan trial gratis 14 hari. Gold (Rp50.000/3 bulan) seperti Silver, ditambah 175 produk, 10 foto per produk, ekspor analitik, 3 staff, dan custom domain (domain dibeli penjual sendiri).",
+  },
+  {
+    q: "Apa yang terjadi kalau langganan saya habis?",
+    a: "Tokomu otomatis turun ke paket Free, bukan hilang. Produk di atas batas Free (4 produk) disembunyikan dari storefront — bukan dihapus — begitu juga foto tambahan, voucher, dan flash sale yang aktif dijeda, dan custom domain dilepas. Datamu tetap aman, dan semuanya kembali seperti semula kalau kamu memperpanjang langganan.",
   },
   {
     q: "Saya tidak bisa coding. Bisakah saya memakainya?",

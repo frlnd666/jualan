@@ -23,7 +23,7 @@ const stores: DemoStore[] = [
   {
     name: "Kopi Sore",
     category: "Kedai kopi & makanan",
-    desc: "Toko asli yang sedang berjalan di Jualan — katalog, checkout, dan invoice-nya bisa kamu coba langsung.",
+    desc: "Toko asli yang sedang berjalan di CUAN — katalog, checkout, dan invoice-nya bisa kamu coba langsung.",
     photo: LANDING_PHOTOS.coffee,
     photoAlt: "Foto kopi latte art",
     badge: "Toko asli · Live",
@@ -68,10 +68,10 @@ export function DemoGrid() {
     <section id="demo" className="scroll-mt-20 px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary)]">
+          <p className="text-sm font-semibold uppercase tracking-wider text-[var(--primary-deep)]">
             Contoh toko
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl">
+          <h2 className="mt-3 text-balance text-2xl font-bold leading-tight tracking-tight text-[var(--text)] sm:text-3xl">
             Satu platform, banyak jenis usaha
           </h2>
           <p className="mt-4 text-base leading-7 text-[var(--text-muted)]">
@@ -85,8 +85,8 @@ export function DemoGrid() {
           {stores.map((store, index) => (
             <motion.article
               key={store.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ y: 14 }}
+              whileInView={{ y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.35, delay: index * 0.05 }}
               className="flex flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-sm)]"
@@ -125,7 +125,7 @@ export function DemoGrid() {
                 </p>
                 <Link
                   href={store.href}
-                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--primary)] transition hover:gap-2.5"
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--primary-deep)] transition hover:gap-2.5 hover:underline"
                 >
                   {store.cta}
                   {store.live ? (

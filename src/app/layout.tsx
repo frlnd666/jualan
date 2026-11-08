@@ -10,13 +10,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "UMKM Storefront",
+  title: "CUAN — Toko Online UMKM",
   description:
-    "Platform SaaS multi-tenant untuk bikin toko online UMKM Indonesia tanpa coding.",
+    "CUAN adalah platform toko online untuk UMKM Indonesia — bikin toko online tanpa coding, pembayaran langsung ke rekeningmu.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#6366F1",
+  themeColor: "#0b6b4a",
 };
 
 export default function RootLayout({

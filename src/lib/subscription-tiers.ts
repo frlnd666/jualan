@@ -69,6 +69,9 @@ export interface SubscriptionRow {
   tier: Tier
   status: SubscriptionStatus
   current_period_end: string | null
+  /** Opsional: diisi pemanggil yang membaca kolom ini (lazy expiry). */
+  trial_ends_at?: string | null
+  grace_ends_at?: string | null
 }
 
 /**
@@ -87,11 +90,38 @@ export function effectiveTier(
   now: Date = new Date()
 ): { tier: Tier; premiumLocked: boolean } {
   if (row.status === 'EXPIRED') return { tier: 'free', premiumLocked: true }
-  if (row.status === 'PAST_DUE') return { tier: row.tier, premiumLocked: true }
+  if (row.status === 'PAST_DUE') {
+    // Lazy: masa tenggang sudah lewat tapi cron belum menulis EXPIRED
+    // → perlakukan sebagai EXPIRED sekarang juga.
+    const grace = row.grace_ends_at ? new Date(row.grace_ends_at) : null
+    if (grace && now >= grace) return { tier: 'free', premiumLocked: true }
+    return { tier: row.tier, premiumLocked: true }
+  }
   if (row.status === 'CANCELLED') {
     const end = row.current_period_end ? new Date(row.current_period_end) : null
     if (end && now >= end) return { tier: 'free', premiumLocked: true }
     return { tier: row.tier, premiumLocked: false }
+  }
+  if (row.status === 'TRIALING') {
+    // Lazy expiry (audit 2026-11-09): jangan hanya percaya status —
+    // trial yang trial_ends_at-nya sudah lewat dianggap berakhir
+    // walau cron harian belum/buntu menjalankannya.
+    const trialEnd = row.trial_ends_at ? new Date(row.trial_ends_at) : null
+    if (trialEnd && now >= trialEnd) return { tier: 'free', premiumLocked: true }
+    return { tier: row.tier, premiumLocked: false }
+  }
+  if (row.status === 'ACTIVE' && row.tier !== 'free') {
+    // Lazy expiry: periode berbayar lewat current_period_end tapi cron
+    // belum menandai PAST_DUE → kunci premium sekarang (tier tetap
+    // selama masa tenggang, lalu Free setelah grace berakhir).
+    const end = row.current_period_end ? new Date(row.current_period_end) : null
+    if (end && now >= end) {
+      const grace = row.grace_ends_at
+        ? new Date(row.grace_ends_at)
+        : new Date(end.getTime() + GRACE_DAYS * 24 * 60 * 60 * 1000)
+      if (now >= grace) return { tier: 'free', premiumLocked: true }
+      return { tier: row.tier, premiumLocked: true }
+    }
   }
   return { tier: row.tier, premiumLocked: false }
 }

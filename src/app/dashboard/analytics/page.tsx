@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import { getSellerAnalyticsAction } from '@/lib/actions/analytics'
 import { ANALYTICS_RANGES, type AnalyticsRange } from '@/lib/analytics'
+import { getOrderStatusLabel } from '@/lib/order-status'
 import AnalyticsExportClient from '@/components/dashboard/AnalyticsExportClient'
 
 function formatRupiah(value: number) {
@@ -106,18 +107,36 @@ export default async function AnalyticsPage({
             Belum ada pesanan pada rentang ini.
           </p>
         ) : (
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-3">
             {Object.entries(summary.byStatus)
               .sort((a, b) => b[1] - a[1])
-              .map(([status, count]) => (
-                <div key={status} className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium text-[var(--text)]">
-                    {status}
-                  </span>
-                  <span className="text-sm font-bold text-[var(--text)]">{count}</span>
-                </div>
-              ))}
-            <p className="pt-2 text-xs text-[var(--text-muted)]">
+              .map(([status, count]) => {
+                const max = Math.max(
+                  1,
+                  ...Object.values(summary.byStatus)
+                )
+                return (
+                  <div key={status}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-[var(--text)]">
+                        {getOrderStatusLabel(status)}
+                      </span>
+                      <span className="text-sm font-bold text-[var(--text)]">
+                        {count}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--surface-soft)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--primary)]"
+                        style={{
+                          width: `${Math.max(4, Math.round((count / max) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            <p className="pt-1 text-xs text-[var(--text-muted)]">
               Dibatalkan: {summary.cancelledCount} • Lunas: {summary.paidOrderCount}
             </p>
           </div>
@@ -158,18 +177,35 @@ export default async function AnalyticsPage({
             Belum ada data harian.
           </p>
         ) : (
-          <div className="mt-4 space-y-2">
-            {summary.daily
-              .slice(-14)
-              .reverse()
-              .map((d) => (
-                <div key={d.date} className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-[var(--text-muted)]">{d.date}</span>
-                  <span className="text-sm font-semibold text-[var(--text)]">
-                    {d.orders} order • {formatRupiah(d.gmv)}
+          <div className="mt-4 flex h-36 items-end gap-1.5" role="img" aria-label="Grafik penjualan harian">
+            {summary.daily.slice(-14).map((d) => {
+              const max = Math.max(1, ...summary.daily.slice(-14).map((x) => x.gmv))
+              const heightPct = Math.max(3, Math.round((d.gmv / max) * 100))
+              const label = new Date(`${d.date}T00:00:00`).toLocaleDateString(
+                'id-ID',
+                { day: 'numeric', month: 'short', timeZone: 'Asia/Jakarta' }
+              )
+              return (
+                <div
+                  key={d.date}
+                  className="group flex min-w-0 flex-1 flex-col items-center gap-1.5"
+                  title={`${label}: ${d.orders} order • ${formatRupiah(d.gmv)}`}
+                >
+                  <span className="text-[11px] font-semibold text-[var(--text-muted)] opacity-0 transition group-hover:opacity-100">
+                    {formatRupiah(d.gmv)}
+                  </span>
+                  <div className="flex h-24 w-full items-end">
+                    <div
+                      className="w-full rounded-t-md bg-[var(--primary)] transition group-hover:bg-[var(--primary-hover)]"
+                      style={{ height: `${heightPct}%` }}
+                    />
+                  </div>
+                  <span className="w-full truncate text-center text-[11px] text-[var(--text-muted)]">
+                    {label}
                   </span>
                 </div>
-              ))}
+              )
+            })}
           </div>
         )}
       </section>

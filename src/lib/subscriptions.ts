@@ -117,7 +117,7 @@ export async function getStoreSubscription(
 ): Promise<SubscriptionRow> {
   const { data, error } = await client
     .from('subscriptions')
-    .select('tier, status, current_period_end')
+    .select('tier, status, current_period_end, trial_ends_at, grace_ends_at')
     .eq('store_id', storeId)
     .maybeSingle()
 
@@ -129,11 +129,19 @@ export async function getStoreSubscription(
     throw new Error('Gagal membaca langganan toko. Coba lagi.')
   }
   if (!data) return FREE_SUBSCRIPTION
+  const row = data as {
+    tier: Tier
+    status: SubscriptionStatus
+    current_period_end: string | null
+    trial_ends_at: string | null
+    grace_ends_at: string | null
+  }
   return {
-    tier: (data as { tier: Tier }).tier,
-    status: (data as { status: SubscriptionStatus }).status,
-    current_period_end: (data as { current_period_end: string | null })
-      .current_period_end,
+    tier: row.tier,
+    status: row.status,
+    current_period_end: row.current_period_end,
+    trial_ends_at: row.trial_ends_at,
+    grace_ends_at: row.grace_ends_at,
   }
 }
 

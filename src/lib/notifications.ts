@@ -86,6 +86,11 @@ export function buyerStatusMessage(
   storeName: string
 ): { title: string; body: string } {
   switch (status) {
+    case 'ORDER_CREATED':
+      return {
+        title: `Pesananmu di ${storeName} berhasil dibuat`,
+        body: 'Selesaikan pembayaran sesuai instruksi di halaman pesananmu.',
+      }
     case 'PAID':
     case 'PROCESSING':
       return {

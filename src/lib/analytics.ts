@@ -9,6 +9,8 @@
 // - Pendapatan lunas = total order yang invoice-nya PAID.
 // - Rata-rata order = GMV / jumlah order tidak batal.
 
+import { csvEscape } from './csv'
+
 export type AnalyticsRange = '7d' | '30d' | '90d' | 'all'
 
 export const ANALYTICS_RANGES: Array<{ key: AnalyticsRange; label: string }> = [
@@ -206,13 +208,9 @@ export function canExportAnalytics(
   return analyticsExportAllowed && !premiumLocked
 }
 
-function csvEscape(value: string | number | null | undefined): string {
-  const text = value === null || value === undefined ? '' : String(value)
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
+// csvEscape tinggal di lib/csv.ts (dipakai bersama export pesanan);
+// diekspor ulang dari sini demi kompatibilitas pemanggil lama.
+export { csvEscape }
 
 /** CSV analitik: ringkasan harian + produk terlaris (BOM untuk Excel). */
 export function buildAnalyticsCsv(

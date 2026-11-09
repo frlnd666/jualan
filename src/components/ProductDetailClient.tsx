@@ -12,6 +12,7 @@ import {
   flashSaleRemainingMs,
   type FlashSaleLike,
 } from '@/lib/flash-sales'
+import { Check, ImageOff } from 'lucide-react'
 
 type Product = {
   id: string
@@ -90,8 +91,11 @@ export default function ProductDetailClient({
   }, [product.images])
 
   // Fase 4 — harga efektif: harga promo bila ada flash sale aktif dan
-  // lebih murah dari harga normal. Harga yang masuk keranjang adalah
-  // harga efektif ini; server tetap memverifikasi ulang di checkout.
+  // lebih murah dari harga normal. Harga efektif hanya untuk TAMPILAN:
+  // yang masuk keranjang adalah harga NORMAL (audit 2026-11-09) —
+  // promo diterapkan dinamis oleh lapisan checkout dari data flash
+  // sale yang sedang aktif, supaya snapshot promo basi di keranjang
+  // tidak membuat total preview lebih murah dari tagihan server.
   const normalPrice = Number(product.price)
   const hasFlash =
     flashSale !== null && Number(flashSale.promo_price) < normalPrice
@@ -144,7 +148,7 @@ export default function ProductDetailClient({
         id: product.id,
         name: product.name,
         slug: product.slug,
-        price: displayPrice,
+        price: normalPrice,
         store_id: product.store_id ?? null,
         images: product.images ?? null,
         badge: product.badge ?? null,
@@ -183,9 +187,9 @@ export default function ProductDetailClient({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_top,#f4dcc8,_#ead7c6_50%,_#dfcbba_100%)] px-6 text-center">
-                    <span className="text-5xl">☕</span>
-                    <p className="mt-4 text-sm font-medium text-[#7a6b5f]">
+                  <div className="flex h-full w-full flex-col items-center justify-center bg-[var(--surface-soft)] px-6 text-center">
+                    <ImageOff className="h-12 w-12 text-[var(--text-muted)]" />
+                    <p className="mt-4 text-sm font-medium text-[var(--text-muted)]">
                       Foto produk akan segera ditambahkan
                     </p>
                   </div>
@@ -214,7 +218,7 @@ export default function ProductDetailClient({
                         onClick={() => setActiveImage(image)}
                         className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border transition ${
                           isActive
-                            ? 'border-[#5b3df5] ring-2 ring-[#5b3df5]/15'
+                            ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/15'
                             : 'border-black/5'
                         }`}
                       >
@@ -258,7 +262,7 @@ export default function ProductDetailClient({
                       Rp {formatRupiah(normalPrice)}
                     </p>
                   ) : null}
-                  <p className="mt-1 text-2xl font-bold text-[#5b3df5]">
+                  <p className="mt-1 text-2xl font-bold text-[var(--primary)]">
                     Rp {formatRupiah(displayPrice)}
                   </p>
                   {hasFlash && flashSale ? (
@@ -391,16 +395,16 @@ export default function ProductDetailClient({
           {added && !isDisabled ? (
             <Link
               href="/cart"
-              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(5,150,105,0.24)] transition hover:opacity-95"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(11,107,74,0.24)] transition hover:opacity-95"
             >
-              Ditambahkan ✓ Lihat keranjang
+              <Check className="h-4 w-4" /> Ditambahkan — Lihat keranjang
             </Link>
           ) : (
             <button
               type="button"
               disabled={isDisabled || checkingAuth}
               onClick={handleOrderNow}
-              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#5b3df5] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(91,61,245,0.24)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(11,107,74,0.24)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
             >
               {isDisabled
                 ? 'Belum tersedia'

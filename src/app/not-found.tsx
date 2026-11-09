@@ -1,12 +1,13 @@
 // Halaman 404 bermerek (R-06, 2026-11-09). Dipakai semua notFound()
 // di repo — sebelumnya memakai halaman 404 bawaan Next.js.
 import Link from 'next/link'
+import { SearchX } from 'lucide-react'
 
 export default function NotFound() {
   return (
     <div className="mx-auto max-w-lg px-4 py-16 text-center">
-      <p className="text-4xl" aria-hidden>
-        🔍
+      <p className="flex justify-center" aria-hidden>
+        <SearchX className="h-10 w-10 text-[var(--text-muted)]" />
       </p>
       <h1 className="mt-4 text-xl font-bold text-[var(--text)]">
         Halaman tidak ditemukan

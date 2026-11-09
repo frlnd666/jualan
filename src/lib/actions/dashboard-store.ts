@@ -45,10 +45,15 @@ export async function getProductQuotaAction(): Promise<
   const { tier } = effectiveTier(subscription)
   const tierLabel = tier === 'free' ? 'Free' : tier === 'silver' ? 'Silver' : 'Gold'
 
+  // Audit 2026-11-09: samakan dengan penegakan di createProductAction
+  // (subscriptions.ts) yang hanya menghitung produk available — tampilan
+  // kuota yang menghitung semua produk membuat seller mengira kuota
+  // habis padahal masih bisa menambah.
   const { count } = await admin
     .from('products')
     .select('id', { count: 'exact', head: true })
     .eq('store_id', access.store.id)
+    .eq('available', true)
 
   return {
     storeId: access.store.id,

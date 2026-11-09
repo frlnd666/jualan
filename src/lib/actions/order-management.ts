@@ -16,9 +16,13 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
-import { restoreStock } from '@/lib/actions/order-fulfillment'
+import {
+  applyCancellationEffects,
+  settleCodInvoiceOnComplete,
+} from '@/lib/actions/order-fulfillment'
 import { ALLOWED_TRANSITIONS } from '@/lib/order-transitions'
 import { notifyOrderEvent } from '@/lib/notify'
+import { csvEscape } from '@/lib/csv'
 import type { NotificationType } from '@/lib/notifications'
 import type { OrderStatus } from '@/lib/types/order'
 
@@ -121,11 +125,12 @@ export async function bulkUpdateOrderStatusAction(
     customer_phone: string | null
     total: number
     buyer_id: string | null
+    payment_method: string | null
   }
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, store_id, status, customer_name, customer_phone, total, buyer_id')
+    .select('id, store_id, status, customer_name, customer_phone, total, buyer_id, payment_method')
     .in('id', orderIds)
     .eq('store_id', store.id)
 
@@ -134,13 +139,29 @@ export async function bulkUpdateOrderStatusAction(
     foundById.set(o.id, o)
   }
 
+  // Nomor invoice per order untuk tautan notifikasi pembeli tamu
+  // (audit 2026-11-09: sebelumnya selalu '' → pesan tanpa tautan).
+  const invoiceNumberByOrder = new Map<string, string>()
+  {
+    const { data: invoiceRows } = await supabase
+      .from('invoices')
+      .select('order_id, invoice_number')
+      .in('order_id', orderIds)
+    for (const inv of (invoiceRows ?? []) as Array<{
+      order_id: string
+      invoice_number: string
+    }>) {
+      invoiceNumberByOrder.set(inv.order_id, inv.invoice_number)
+    }
+  }
+
   const notifyClient = await createPublicInvoiceClient()
 
   // Tulis status orders HANYA lewat service_role: setelah migrasi
   // lockdown (20261109_p0_order_write_lockdown.sql) peran authenticated
   // tidak lagi punya hak UPDATE atas kolom status — client anon di atas
-  // hanya dipakai untuk baca + verifikasi kepemilikan. restoreStock
-  // tetap lewat anon (RPC increment_stock mengecek kepemilikan via JWT).
+  // hanya dipakai untuk baca + verifikasi kepemilikan. Efek batal
+  // (stok/voucher/refund) lewat applyCancellationEffects.
   const admin = createAdminClient()
   if (!admin) {
     return { success: false, updated: 0, failed: [], error: 'Server belum dikonfigurasi (service role belum diset).' }
@@ -188,7 +209,10 @@ export async function bulkUpdateOrderStatusAction(
     }
 
     if (nextStatus === 'CANCELLED') {
-      await restoreStock(supabase, order.id)
+      await applyCancellationEffects(admin, supabase, order.id)
+    }
+    if (nextStatus === 'COMPLETED' && order.payment_method === 'COD') {
+      await settleCodInvoiceOnComplete(admin, order.id)
     }
     updated += 1
 
@@ -203,7 +227,7 @@ export async function bulkUpdateOrderStatusAction(
           buyerId: order.buyer_id,
           storeId: store.id,
           orderId: order.id,
-          invoiceNumber: '',
+          invoiceNumber: invoiceNumberByOrder.get(order.id) ?? '',
           customerName: order.customer_name,
           total: Number(order.total),
         },
@@ -250,14 +274,8 @@ export async function saveSellerNoteAction(
 }
 
 // --- Export CSV -----------------------------------------------------------
-
-function csvEscape(value: string | number | null | undefined): string {
-  const text = value === null || value === undefined ? '' : String(value)
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
+// csvEscape tinggal di lib/csv.ts (dipakai bersama export analitik) —
+// termasuk netralisasi CSV formula injection dari nama/HP pembeli.
 
 const CSV_HEADERS = [
   'Tanggal',

@@ -19,6 +19,7 @@ import {
   safeJsonLd,
 } from '@/lib/seo'
 import type { HostKind } from '@/lib/domains'
+import { MapPin, Package, PackageOpen } from 'lucide-react'
 import {
   activeFlashSaleForProduct,
   discountPercent,
@@ -260,7 +261,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
   const featuredProducts = productList.slice(0, 2)
 
   return (
-    <div className="min-h-screen bg-[#f6f1ea] pb-24 text-zinc-900">
+    <div className="min-h-screen bg-[var(--bg)] pb-24 text-zinc-900">
       {/* Fase 5 — JSON-LD Store untuk mesin pencari. */}
       <script
         type="application/ld+json"
@@ -278,7 +279,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
         }}
       />
       <div className="mx-auto max-w-4xl">
-        <section className="relative overflow-hidden bg-[#2f241f] text-white">
+        <section className="relative overflow-hidden bg-[var(--text)] text-white">
           {store.banner_url ? (
             <>
               <img
@@ -286,19 +287,19 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 alt={store.name}
                 className="absolute inset-0 h-full w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/45 to-[#2f241f]/95" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/45 to-[var(--text)]/95" />
             </>
           ) : (
             <>
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.16),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(255,210,160,0.18),_transparent_24%),linear-gradient(135deg,#4b342b_0%,#2f241f_52%,#211814_100%)]" />
-              <div className="absolute right-[-40px] top-[-10px] h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute right-[-40px] top-[-10px] h-40 w-40 rounded-full bg-[var(--surface)]/10 blur-3xl" />
               <div className="absolute bottom-[-50px] left-[-30px] h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
             </>
           )}
 
           <div className="relative px-4 pb-8 pt-6 sm:px-6">
             <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-white/80 backdrop-blur">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[var(--surface)]/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-white/80 backdrop-blur">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 Toko buka
               </div>
@@ -314,7 +315,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                   className="h-16 w-16 rounded-[22px] border border-white/15 object-cover shadow-lg"
                 />
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/15 bg-white/10 text-lg font-bold text-white shadow-lg backdrop-blur">
+                <div className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/15 bg-[var(--surface)]/10 text-lg font-bold text-white shadow-lg backdrop-blur">
                   {getInitials(store.name)}
                 </div>
               )}
@@ -331,7 +332,11 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 </p>
                 {(store.city || store.instagram) ? (
                   <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
-                    {store.city ? <span>📍 {store.city}</span> : null}
+                    {store.city ? (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5" aria-hidden /> {store.city}
+                      </span>
+                    ) : null}
                     {store.instagram ? (
                       <a
                         href={`https://instagram.com/${String(store.instagram).replace(/^@/, '')}`}
@@ -348,14 +353,14 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
             </div>
 
             <div className="mt-6 grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
+              <div className="rounded-2xl border border-white/10 bg-[var(--surface)]/10 px-3 py-3 backdrop-blur">
                 <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/55">
                   Produk
                 </p>
                 <p className="mt-1 text-lg font-bold text-white">{totalProducts}</p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
+              <div className="rounded-2xl border border-white/10 bg-[var(--surface)]/10 px-3 py-3 backdrop-blur">
                 <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/55">
                   Highlight
                 </p>
@@ -364,7 +369,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-3 backdrop-blur">
+              <div className="rounded-2xl border border-white/10 bg-[var(--surface)]/10 px-3 py-3 backdrop-blur">
                 <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/55">
                   Siap order
                 </p>
@@ -378,7 +383,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
           {/* Fase 4 — banner marketing toko (Silver/Gold) atau 1 slide
               iklan afiliasi berlabel "Iklan" (Free). */}
           {activeBanner ? (
-            <section className="mb-6 overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_30px_rgba(33,24,20,0.06)]">
+            <section className="mb-6 overflow-hidden rounded-[28px] border border-black/5 bg-[var(--surface)] shadow-[0_12px_30px_rgba(33,24,20,0.06)]">
               {activeBanner.image_url ? (
                 <img
                   src={activeBanner.image_url}
@@ -387,7 +392,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 />
               ) : null}
               <div className="p-4">
-                <p className="text-base font-bold text-[#241b17]">
+                <p className="text-base font-bold text-[var(--text)]">
                   {activeBanner.title}
                 </p>
                 {activeBanner.link_url ? (
@@ -410,10 +415,10 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
             <section className="mb-6">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8d7f73]">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
                     Pilihan
                   </p>
-                  <h2 className="mt-1 text-lg font-bold text-[#241b17]">
+                  <h2 className="mt-1 text-lg font-bold text-[var(--text)]">
                     Rekomendasi toko
                   </h2>
                 </div>
@@ -424,7 +429,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                   <Link
                     key={`featured-${product.id}`}
                     href={productHref(product.slug)}
-                    className="overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
+                    className="overflow-hidden rounded-[28px] border border-black/5 bg-[var(--surface)] shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
                   >
                     <div className="grid grid-cols-[112px_1fr]">
                       <div className="relative h-full min-h-[112px] bg-[#efe6dc]">
@@ -436,13 +441,13 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,#f3d9bf,_#e7d5c5_45%,_#dbc6b5_100%)]">
-                            <span className="text-2xl">☕</span>
+                          <div className="flex h-full w-full items-center justify-center bg-[var(--surface-soft)]">
+                            <Package className="h-8 w-8 text-[var(--text-muted)]" aria-hidden />
                           </div>
                         )}
 
                         {product.badge ? (
-                          <span className="absolute left-2 top-2 rounded-full bg-[#2f241f] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+                          <span className="absolute left-2 top-2 rounded-full bg-[var(--text)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
                             {product.badge}
                           </span>
                         ) : null}
@@ -450,10 +455,10 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
 
                       <div className="flex min-w-0 flex-col justify-between p-4">
                         <div>
-                          <p className="line-clamp-1 text-base font-bold text-[#241b17]">
+                          <p className="line-clamp-1 text-base font-bold text-[var(--text)]">
                             {product.name}
                           </p>
-                          <p className="mt-1 line-clamp-2 text-sm leading-5 text-[#7a6b5f]">
+                          <p className="mt-1 line-clamp-2 text-sm leading-5 text-[var(--text-muted)]">
                             {product.description?.trim() || 'Menu pilihan dengan rasa yang dibuat untuk dinikmati kapan saja.'}
                           </p>
                         </div>
@@ -461,11 +466,11 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                         <div className="mt-4 flex items-center justify-between gap-3">
                           <div>
                             {product.flashSale ? (
-                              <p className="text-xs font-medium text-[#8d7f73] line-through">
+                              <p className="text-xs font-medium text-[var(--text-muted)] line-through">
                                 Rp {formatRupiah(product.price)}
                               </p>
                             ) : null}
-                            <p className="text-sm font-bold text-[#5b3df5]">
+                            <p className="text-sm font-bold text-[var(--primary)]">
                               Rp {formatRupiah(product.displayPrice)}
                             </p>
                             {product.flashSale ? (
@@ -477,7 +482,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                               </p>
                             ) : null}
                           </div>
-                          <span className="inline-flex items-center justify-center rounded-full bg-[#f3efe9] px-3 py-1.5 text-xs font-semibold text-[#241b17]">
+                          <span className="inline-flex items-center justify-center rounded-full bg-[#f3efe9] px-3 py-1.5 text-xs font-semibold text-[var(--text)]">
                             Lihat
                           </span>
                         </div>
@@ -492,28 +497,28 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
           <section>
             <div className="mb-3 flex items-end justify-between gap-3">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8d7f73]">
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
                   Menu
                 </p>
-                <h2 className="mt-1 text-lg font-bold text-[#241b17]">
+                <h2 className="mt-1 text-lg font-bold text-[var(--text)]">
                   Semua produk
                 </h2>
               </div>
 
-              <p className="text-xs font-medium text-[#8d7f73]">
+              <p className="text-xs font-medium text-[var(--text-muted)]">
                 {totalProducts} item
               </p>
             </div>
 
             {productList.length === 0 ? (
-              <div className="rounded-[32px] border border-dashed border-[#d9cec3] bg-white px-6 py-10 text-center shadow-[0_10px_24px_rgba(33,24,20,0.04)]">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#f3eee8] text-2xl">
-                  🍽️
+              <div className="rounded-[32px] border border-dashed border-[var(--line)] bg-[var(--surface)] px-6 py-10 text-center shadow-[var(--shadow-sm)]">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--surface-soft)]">
+                  <PackageOpen className="h-8 w-8 text-[var(--text-muted)]" aria-hidden />
                 </div>
-                <p className="mt-4 text-base font-bold text-[#241b17]">
+                <p className="mt-4 text-base font-bold text-[var(--text)]">
                   Belum ada produk tersedia
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[#7a6b5f]">
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                   Toko ini belum menampilkan produk yang siap dipesan saat ini.
                 </p>
               </div>
@@ -523,9 +528,9 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                   <Link
                     key={product.id}
                     href={productHref(product.slug)}
-                    className="group overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
+                    className="group overflow-hidden rounded-[28px] border border-black/5 bg-[var(--surface)] shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden bg-[#efe7de]">
+                    <div className="relative aspect-[4/5] overflow-hidden bg-[var(--surface-soft)]">
                       {product.images?.[0] ? (
                         <WatermarkedImage
                           src={product.images[0]}
@@ -534,16 +539,16 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                         />
                       ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_top,#f5dfcb,_#eadacc_50%,_#dfccbb_100%)] px-4 text-center">
-                          <span className="text-3xl">☕</span>
-                          <span className="mt-3 text-xs font-medium text-[#7a6b5f]">
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-[var(--surface-soft)] px-4 text-center">
+                          <Package className="h-9 w-9 text-[var(--text-muted)]" aria-hidden />
+                          <span className="mt-3 text-xs font-medium text-[var(--text-muted)]">
                             Foto segera hadir
                           </span>
                         </div>
                       )}
 
                       {product.badge ? (
-                        <span className="absolute left-3 top-3 rounded-full bg-[#2f241f] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
+                        <span className="absolute left-3 top-3 rounded-full bg-[var(--text)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
                           {product.badge}
                         </span>
                       ) : null}
@@ -551,21 +556,21 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
 
                     <div className="p-3.5">
                       {getCategoryName(product, categoryNames) ? (
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8d7f73]">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                           {getCategoryName(product, categoryNames)}
                         </p>
                       ) : null}
-                      <p className="line-clamp-2 min-h-[2.75rem] text-sm font-bold leading-5 text-[#241b17]">
+                      <p className="line-clamp-2 min-h-[2.75rem] text-sm font-bold leading-5 text-[var(--text)]">
                         {product.name}
                       </p>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <div>
                           {product.flashSale ? (
-                            <p className="text-[11px] font-medium text-[#8d7f73] line-through">
+                            <p className="text-[11px] font-medium text-[var(--text-muted)] line-through">
                               Rp {formatRupiah(product.price)}
                             </p>
                           ) : null}
-                          <p className="text-sm font-bold text-[#5b3df5]">
+                          <p className="text-sm font-bold text-[var(--primary)]">
                             Rp {formatRupiah(product.displayPrice)}
                           </p>
                           {product.flashSale ? (

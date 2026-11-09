@@ -12,6 +12,7 @@ export type LogEventName =
   | 'qris_webhook_received'
   | 'qris_webhook_paid'
   | 'qris_webhook_rejected'
+  | 'qris_paid_for_cancelled_order'
   | 'subscription_transitions_run'
   | 'subscription_read_failed'
   | 'notify_dispatch'

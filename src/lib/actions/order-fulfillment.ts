@@ -51,7 +51,7 @@ async function getOwnedOrder(supabase: SupabaseServerClient, orderId: string) {
 
   const { data: order } = await supabase
     .from('orders')
-    .select('id, store_id, status, customer_name, customer_phone, total, buyer_id')
+    .select('id, store_id, status, customer_name, customer_phone, total, buyer_id, payment_method')
     .eq('id', orderId)
     .eq('store_id', store.id)
     .maybeSingle()
@@ -86,6 +86,87 @@ export async function restoreStock(supabase: SupabaseServerClient, orderId: stri
       p_qty: qty,
     })
   }
+}
+
+type AdminClient = NonNullable<ReturnType<typeof createAdminClient>>
+
+/**
+ * Efek samping pembatalan order — SATU implementasi untuk semua jalur
+ * batal (update tunggal, bulk, cron kedaluwarsa, konfirmasi pembeli
+ * tidak dipakai di sini). Audit 2026-11-09: sebelumnya jalur batal
+ * hanya mengembalikan stok; dua hal bocor permanen:
+ *  1. Kuota voucher order batal tidak pernah kembali (redemption
+ *     menggantung + used_count tidak turun).
+ *  2. Invoice order yang sudah dibayar tetap berstatus PAID selamanya
+ *     — status REFUNDED ada di tipe & UI tapi tidak pernah ditulis.
+ * Semua langkah best-effort: pembatalan tidak boleh gagal hanya
+ * karena efek sampingnya gagal.
+ */
+export async function applyCancellationEffects(
+  admin: AdminClient,
+  supabase: SupabaseServerClient,
+  orderId: string
+): Promise<void> {
+  await restoreStock(supabase, orderId)
+
+  // Lepas pemakaian voucher order ini (satu baris per order).
+  try {
+    const { data: redemptions } = await admin
+      .from('voucher_redemptions')
+      .select('id, voucher_id')
+      .eq('order_id', orderId)
+    for (const redemption of (redemptions ?? []) as Array<{
+      id: string
+      voucher_id: string
+    }>) {
+      await admin.from('voucher_redemptions').delete().eq('id', redemption.id)
+      const { data: voucher } = await admin
+        .from('vouchers')
+        .select('used_count')
+        .eq('id', redemption.voucher_id)
+        .maybeSingle()
+      const usedCount = Number(
+        (voucher as { used_count: number } | null)?.used_count ?? 0
+      )
+      if (usedCount > 0) {
+        // Guard CAS seperti pencatatan di checkout: hanya tulis bila
+        // used_count belum berubah sejak dibaca.
+        await admin
+          .from('vouchers')
+          .update({ used_count: usedCount - 1 })
+          .eq('id', redemption.voucher_id)
+          .eq('used_count', usedCount)
+      }
+    }
+  } catch {}
+
+  // Invoice yang sudah lunas → REFUNDED supaya pembeli tidak lagi
+  // melihat badge "Sudah dibayar" di order yang dibatalkan, dan
+  // seller punya penanda rekonsiliasi.
+  try {
+    await admin
+      .from('invoices')
+      .update({ payment_status: 'REFUNDED' })
+      .eq('order_id', orderId)
+      .eq('payment_status', 'PAID')
+  } catch {}
+}
+
+/**
+ * COD dibayar tunai saat barang diterima: order COD yang mencapai
+ * COMPLETED menandai invoice-nya lunas (audit 2026-11-09).
+ */
+export async function settleCodInvoiceOnComplete(
+  admin: AdminClient,
+  orderId: string
+): Promise<void> {
+  try {
+    await admin
+      .from('invoices')
+      .update({ payment_status: 'PAID' })
+      .eq('order_id', orderId)
+      .in('payment_status', ['PENDING_PAYMENT', 'WAITING_VERIFICATION'])
+  } catch {}
 }
 
 function statusToNotificationType(status: OrderStatus): NotificationType | null {
@@ -125,6 +206,19 @@ async function notifyOrderChange(
   if (!type) return
   try {
     const notifyClient = await createPublicInvoiceClient()
+    // Audit 2026-11-09: nomor invoice ikut dikirim — tanpa ini,
+    // pembeli tamu (buyer_id null) menerima email/WA tanpa tautan
+    // sama sekali karena fallback link memakai nomor invoice.
+    let invoiceNumber = ''
+    try {
+      const { data: invoice } = await notifyClient
+        .from('invoices')
+        .select('invoice_number')
+        .eq('order_id', order.id)
+        .maybeSingle()
+      invoiceNumber =
+        (invoice as { invoice_number: string } | null)?.invoice_number ?? ''
+    } catch {}
     void notifyOrderEvent(
       notifyClient,
       {
@@ -132,7 +226,7 @@ async function notifyOrderChange(
         buyerId: order.buyer_id,
         storeId: store.id,
         orderId: order.id,
-        invoiceNumber: '',
+        invoiceNumber,
         customerName: order.customer_name,
         total: Number(order.total),
       },
@@ -202,9 +296,18 @@ export async function updateOrderStatusAction(
     return { success: false, error: 'Status pesanan sudah berubah. Muat ulang halaman lalu coba lagi.' }
   }
 
-  // Stok sudah dikurangi saat checkout; batal = kembalikan.
+  // Stok sudah dikurangi saat checkout; batal = kembalikan stok +
+  // lepas voucher + invoice lunas menjadi REFUNDED.
   if (nextStatus === 'CANCELLED') {
-    await restoreStock(supabase, owned.order.id)
+    await applyCancellationEffects(admin, supabase, owned.order.id)
+  }
+
+  // COD: selesai berarti uang tunai diterima → invoice ikut lunas.
+  if (
+    nextStatus === 'COMPLETED' &&
+    (owned.order as { payment_method?: string }).payment_method === 'COD'
+  ) {
+    await settleCodInvoiceOnComplete(admin, owned.order.id)
   }
 
   // Fase 3: notifikasi in-app ke pemilik toko + pembeli login.
@@ -235,7 +338,16 @@ export async function saveShipmentAction(
   // belum bayar, sudah selesai, atau sudah dibatalkan tidak bisa diberi
   // resi (sebelumnya hanya CANCELLED/COMPLETED yang diblokir, sehingga
   // order PENDING_PAYMENT pun bisa "dikirim").
-  if (currentStatus !== 'PAID' && currentStatus !== 'PROCESSING') {
+  // Pengecualian COD (audit 2026-11-09): bayar di tempat memang
+  // dikirim SEBELUM dibayar — memaksa seller menjalankan
+  // confirmPayment dulu membuat invoice tercatat PAID sebelum uang
+  // tunai diterima. Invoice COD baru lunas saat order COMPLETED.
+  const isCod = (owned.order as { payment_method?: string }).payment_method === 'COD'
+  const canShip =
+    currentStatus === 'PAID' ||
+    currentStatus === 'PROCESSING' ||
+    (currentStatus === 'PENDING_PAYMENT' && isCod)
+  if (!canShip) {
     return {
       success: false,
       error: 'Pesanan harus sudah dibayar sebelum diberi resi.',
@@ -283,11 +395,11 @@ export async function saveShipmentAction(
     return { success: false, error: 'Gagal menyimpan data pengiriman.' }
   }
 
-  // Order yang sudah dibayar/diproses otomatis maju ke SHIPPED.
+  // Order yang boleh dikirim otomatis maju ke SHIPPED.
   // Tulis status lewat service_role (lihat updateOrderStatusAction);
   // insert/update shipments tetap lewat client anon karena policy
   // shipments_owner_all / shipments_staff_* masih dipertahankan.
-  if (currentStatus === 'PAID' || currentStatus === 'PROCESSING') {
+  if (canShip) {
     const { data: orderUpdated, error: orderUpdateError } = await admin
       .from('orders')
       .update({ status: 'SHIPPED' })

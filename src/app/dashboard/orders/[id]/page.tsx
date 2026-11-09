@@ -153,18 +153,18 @@ export default async function DashboardOrderDetailPage({
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-gray-500">Detail pesanan</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900">
+          <p className="text-sm font-medium text-[var(--text-muted)]">Detail pesanan</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text)]">
             Order #{order.id.slice(0, 8).toUpperCase()}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             Dibuat pada {formatDate(order.created_at)}
           </p>
         </div>
 
         <Link
           href="/dashboard/orders"
-          className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+          className="inline-flex items-center justify-center rounded-2xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface-soft)]"
         >
           ← Kembali ke pesanan
         </Link>
@@ -172,17 +172,17 @@ export default async function DashboardOrderDetailPage({
 
       {/* Stats bar */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        <div className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
             Total order
           </p>
-          <p className="mt-2 text-xl font-bold text-gray-900">
+          <p className="mt-2 text-xl font-bold text-[var(--text)]">
             Rp {formatRupiah(order.total)}
           </p>
         </div>
 
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        <div className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
             Status order
           </p>
           <span
@@ -192,8 +192,8 @@ export default async function DashboardOrderDetailPage({
           </span>
         </div>
 
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        <div className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
             Status pembayaran
           </p>
           {invoice?.payment_status ? (
@@ -203,15 +203,15 @@ export default async function DashboardOrderDetailPage({
               {getPaymentStatusLabel(invoice.payment_status)}
             </span>
           ) : (
-            <p className="mt-2 text-sm font-semibold text-gray-400">-</p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-muted)]">-</p>
           )}
         </div>
 
-        <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        <div className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
             Metode bayar
           </p>
-          <p className="mt-2 text-sm font-bold text-gray-900">
+          <p className="mt-2 text-sm font-bold text-[var(--text)]">
             {getPaymentMethodLabel(order.payment_method)}
           </p>
         </div>
@@ -232,7 +232,7 @@ export default async function DashboardOrderDetailPage({
             </div>
             <a
               href="#aksi-seller"
-              className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
+              className="inline-flex items-center justify-center rounded-2xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--primary-hover)]"
             >
               Verifikasi sekarang ↓
             </a>
@@ -243,11 +243,11 @@ export default async function DashboardOrderDetailPage({
       {/* Menunggu verifikasi banner */}
       {invoice?.payment_status === 'WAITING_VERIFICATION' &&
       !invoice?.payment_proof_url ? (
-        <section className="rounded-3xl border border-indigo-200 bg-indigo-50 p-4 md:p-5">
-          <p className="text-sm font-bold text-indigo-900">
+        <section className="rounded-3xl border border-[var(--line)] bg-[var(--primary-soft)] p-4 md:p-5">
+          <p className="text-sm font-bold text-[var(--primary)]">
             Menunggu verifikasi pembayaran
           </p>
-          <p className="mt-1 text-sm text-indigo-800">
+          <p className="mt-1 text-sm text-[var(--primary)]">
             Pembayaran sedang menunggu verifikasi dari seller.
           </p>
         </section>
@@ -258,21 +258,21 @@ export default async function DashboardOrderDetailPage({
         {/* Kolom kiri */}
         <div className="space-y-6">
           {/* Data customer */}
-          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
-            <h2 className="text-lg font-bold text-gray-900">Data customer</h2>
+          <section className="rounded-3xl border border-[var(--line)] bg-white p-5 shadow-sm md:p-6">
+            <h2 className="text-lg font-bold text-[var(--text)]">Data customer</h2>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Nama
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
+                <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                   {order.customer_name || '-'}
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   WhatsApp
                 </p>
                 {order.customer_phone ? (
@@ -280,24 +280,24 @@ export default async function DashboardOrderDetailPage({
                     href={`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 block text-sm font-semibold text-indigo-600 hover:underline"
+                    className="mt-1 block text-sm font-semibold text-[var(--primary)] hover:underline"
                   >
                     {order.customer_phone}
                   </a>
                 ) : (
-                  <p className="mt-1 text-sm font-semibold text-gray-900">-</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">-</p>
                 )}
               </div>
 
-              <div className="rounded-2xl bg-gray-50 px-4 py-3 sm:col-span-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3 sm:col-span-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Alamat lengkap
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
+                <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                   {order.address || '-'}
                 </p>
                 {(order.city || order.province) && (
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
                     {[order.city, order.province, order.postal_code]
                       .filter(Boolean)
                       .join(', ')}
@@ -305,50 +305,50 @@ export default async function DashboardOrderDetailPage({
                 )}
               </div>
 
-              <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Pengiriman
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
+                <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                   {order.shipping_method_name || '-'}
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Invoice
                 </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900">
+                <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                   {invoice?.invoice_number || '-'}
                 </p>
               </div>
 
               {order.notes ? (
-                <div className="rounded-2xl bg-gray-50 px-4 py-3 sm:col-span-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3 sm:col-span-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                     Catatan customer
                   </p>
-                  <p className="mt-1 text-sm text-gray-900">{order.notes}</p>
+                  <p className="mt-1 text-sm text-[var(--text)]">{order.notes}</p>
                 </div>
               ) : null}
             </div>
           </section>
 
           {/* Item pesanan */}
-          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+          <section className="rounded-3xl border border-[var(--line)] bg-white p-5 shadow-sm md:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Item pesanan</h2>
-                <p className="mt-1 text-sm text-gray-500">
+                <h2 className="text-lg font-bold text-[var(--text)]">Item pesanan</h2>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Daftar produk yang dipesan customer pada order ini.
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-gray-50 px-3 py-2 text-right">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-2xl bg-[var(--surface-soft)] px-3 py-2 text-right">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Jml item
                 </p>
-                <p className="mt-1 text-sm font-bold text-gray-900">
+                <p className="mt-1 text-sm font-bold text-[var(--text)]">
                   {orderItems?.length ?? 0}
                 </p>
               </div>
@@ -376,13 +376,13 @@ export default async function DashboardOrderDetailPage({
                 {(orderItems as OrderItem[]).map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-start justify-between gap-4 rounded-2xl bg-gray-50 px-4 py-4"
+                    className="flex items-start justify-between gap-4 rounded-2xl bg-[var(--surface-soft)] px-4 py-4"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-[var(--text)]">
                         {item.product_name || 'Produk tanpa nama'}
                       </p>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
                         {item.qty} x Rp {formatRupiah(item.price)}
                       </p>
                       {item.notes ? (
@@ -392,7 +392,7 @@ export default async function DashboardOrderDetailPage({
                       ) : null}
                     </div>
 
-                    <p className="shrink-0 text-sm font-bold text-gray-900">
+                    <p className="shrink-0 text-sm font-bold text-[var(--text)]">
                       Rp {formatRupiah(item.subtotal)}
                     </p>
                   </div>
@@ -402,9 +402,9 @@ export default async function DashboardOrderDetailPage({
           </section>
 
           {/* Catatan internal seller (Fase 3) */}
-          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
-            <h2 className="text-lg font-bold text-gray-900">Catatan seller</h2>
-            <p className="mt-1 text-sm text-gray-500">
+          <section className="rounded-3xl border border-[var(--line)] bg-white p-5 shadow-sm md:p-6">
+            <h2 className="text-lg font-bold text-[var(--text)]">Catatan seller</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
               Catatan internal untuk tim toko — tidak terlihat customer.
             </p>
             <div className="mt-4">
@@ -419,11 +419,11 @@ export default async function DashboardOrderDetailPage({
         {/* Kolom kanan */}
         <aside className="space-y-6">
           {/* Ringkasan biaya */}
-          <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
-            <h2 className="text-lg font-bold text-gray-900">Ringkasan biaya</h2>
+          <section className="rounded-3xl border border-[var(--line)] bg-white p-5 shadow-sm md:p-6">
+            <h2 className="text-lg font-bold text-[var(--text)]">Ringkasan biaya</h2>
 
             <div className="mt-4 space-y-3 text-sm">
-              <div className="flex items-center justify-between text-gray-600">
+              <div className="flex items-center justify-between text-[var(--text-muted)]">
                 <span>Subtotal produk</span>
                 <span>Rp {formatRupiah(order.subtotal)}</span>
               </div>
@@ -447,13 +447,13 @@ export default async function DashboardOrderDetailPage({
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between text-gray-600">
+              <div className="flex items-center justify-between text-[var(--text-muted)]">
                 <span>Ongkos kirim</span>
                 <span>Rp {formatRupiah(order.shipping_cost)}</span>
               </div>
 
               {(order as { total_weight_gram?: number | null }).total_weight_gram ? (
-                <div className="flex items-center justify-between text-gray-600">
+                <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span>Total berat</span>
                   <span>
                     {Number(
@@ -464,12 +464,12 @@ export default async function DashboardOrderDetailPage({
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between text-gray-600">
+              <div className="flex items-center justify-between text-[var(--text-muted)]">
                 <span>Kurir</span>
                 <span className="text-right">{order.shipping_method_name || '-'}</span>
               </div>
 
-              <div className="flex items-center justify-between border-t border-gray-200 pt-3 text-base font-bold text-gray-900">
+              <div className="flex items-center justify-between border-t border-[var(--line)] pt-3 text-base font-bold text-[var(--text)]">
                 <span>Total</span>
                 <span>Rp {formatRupiah(order.total)}</span>
               </div>
@@ -479,13 +479,13 @@ export default async function DashboardOrderDetailPage({
           {/* Aksi seller — pembayaran + pengiriman dalam satu tempat */}
           <section
             id="aksi-seller"
-            className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6"
+            className="rounded-3xl border border-[var(--line)] bg-white p-5 shadow-sm md:p-6"
           >
-            <h2 className="text-lg font-bold text-gray-900">Aksi seller</h2>
+            <h2 className="text-lg font-bold text-[var(--text)]">Aksi seller</h2>
 
             {invoice ? (
               <div className="mt-4 space-y-3">
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-sm font-semibold text-[var(--text)]">
                   1. Pembayaran —{' '}
                   {getPaymentStatusLabel(invoice.payment_status)}
                 </p>
@@ -506,12 +506,12 @@ export default async function DashboardOrderDetailPage({
                     />
                     {order.payment_method === 'COD' &&
                     !invoice.payment_proof_url ? (
-                      <p className="text-xs leading-5 text-gray-500">
+                      <p className="text-xs leading-5 text-[var(--text-muted)]">
                         COD: tidak perlu bukti transfer — tekan tombol di atas
                         saat uang sudah diterima dari customer.
                       </p>
                     ) : !invoice.payment_proof_url ? (
-                      <p className="text-xs leading-5 text-gray-500">
+                      <p className="text-xs leading-5 text-[var(--text-muted)]">
                         Tombol aktif setelah customer mengupload bukti
                         transfer. Gambar bukti tampil di bagian Info invoice
                         di bawah.
@@ -521,13 +521,13 @@ export default async function DashboardOrderDetailPage({
                 )}
               </div>
             ) : (
-              <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-500">
+              <div className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--surface-soft)] px-4 py-4 text-sm text-[var(--text-muted)]">
                 Invoice untuk order ini belum tersedia.
               </div>
             )}
 
-            <div className="mt-5 border-t border-gray-100 pt-4">
-              <p className="mb-3 text-sm font-semibold text-gray-900">
+            <div className="mt-5 border-t border-[var(--line)] pt-4">
+              <p className="mb-3 text-sm font-semibold text-[var(--text)]">
                 2. Pengiriman &amp; status order
               </p>
               <OrderFulfillment
@@ -539,16 +539,16 @@ export default async function DashboardOrderDetailPage({
             </div>
 
             {invoice ? (
-              <div className="mt-4 border-t border-gray-100 pt-4">
+              <div className="mt-4 border-t border-[var(--line)] pt-4">
                 <Link
                   href={`/invoice/${invoice.invoice_number}${tokenQuery(invoiceToken)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 text-center text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                  className="block w-full rounded-2xl border border-[var(--line)] bg-white px-5 py-3 text-center text-sm font-semibold text-[var(--text)] hover:bg-[var(--surface-soft)]"
                 >
                   Lihat halaman pembeli ↗
                 </Link>
-                <p className="mt-2 text-xs leading-5 text-gray-500">
+                <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                   Halaman yang sama dengan yang diterima customer (invoice,
                   status, dan resi dalam satu halaman).
                 </p>
@@ -558,26 +558,26 @@ export default async function DashboardOrderDetailPage({
 
           {/* Info invoice */}
           {invoice ? (
-            <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
-              <h2 className="text-base font-bold text-gray-900">Info invoice</h2>
+            <section className="rounded-3xl border border-[var(--line)] bg-white p-5 shadow-sm md:p-6">
+              <h2 className="text-base font-bold text-[var(--text)]">Info invoice</h2>
 
               <div className="mt-3 space-y-3 text-sm">
-                <div className="flex items-center justify-between text-gray-600">
-                  <span className="text-gray-500">Nomor invoice</span>
-                  <span className="font-semibold text-gray-900">
+                <div className="flex items-center justify-between text-[var(--text-muted)]">
+                  <span className="text-[var(--text-muted)]">Nomor invoice</span>
+                  <span className="font-semibold text-[var(--text)]">
                     {invoice.invoice_number}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-gray-600">
-                  <span className="text-gray-500">Dibuat</span>
-                  <span className="font-semibold text-gray-900">
+                <div className="flex items-center justify-between text-[var(--text-muted)]">
+                  <span className="text-[var(--text-muted)]">Dibuat</span>
+                  <span className="font-semibold text-[var(--text)]">
                     {formatDate(invoice.created_at)}
                   </span>
                 </div>
 
-                <div className="flex items-start justify-between gap-2 text-gray-600">
-                  <span className="shrink-0 text-gray-500">Status bayar</span>
+                <div className="flex items-start justify-between gap-2 text-[var(--text-muted)]">
+                  <span className="shrink-0 text-[var(--text-muted)]">Status bayar</span>
                   <span
                     className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getPaymentStatusStyle(invoice.payment_status)}`}
                   >
@@ -587,14 +587,14 @@ export default async function DashboardOrderDetailPage({
 
                 {proofUrl ? (
                   <div className="pt-1">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                       Bukti transfer
                     </p>
                     <a
                       href={proofUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-2xl border border-gray-100"
+                      className="block overflow-hidden rounded-2xl border border-[var(--line)]"
                     >
                       <img
                         src={proofUrl}

@@ -215,7 +215,7 @@ export default async function DashboardPage() {
         {visibleActions.length === 0 ? (
           <div className="mt-4 rounded-[24px] border border-dashed border-[var(--line)] bg-[var(--surface-soft)] px-4 py-6 text-center">
             <p className="text-sm font-semibold text-[var(--text)]">
-              Semua beres 🎉
+              Semua beres
             </p>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Tidak ada pembayaran yang perlu diverifikasi dan tidak ada

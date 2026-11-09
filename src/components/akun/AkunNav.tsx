@@ -16,14 +16,14 @@ export default function AkunNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="mx-auto flex max-w-6xl items-center gap-1 px-4 pb-3">
+    <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {items.map((item) => {
         const active = pathname.startsWith(item.href)
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
               active
                 ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
                 : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text)]'

@@ -9,6 +9,7 @@ import {
   allowedCheckoutMethods,
   getStoreSubscription,
 } from '@/lib/subscriptions'
+import { effectiveTier } from '@/lib/subscription-tiers'
 import { normalizeVoucherCode } from '@/lib/vouchers'
 import {
   loadVoucherForCheckout,
@@ -277,12 +278,21 @@ export async function createOrderAction(input: CheckoutFormInput) {
       qty: item.qty,
     }))
   )
+  // Audit 2026-11-09: tarif per-kg adalah fitur paket berbayar —
+  // toko Free hanya memakai harga dasar (halaman pengiriman juga
+  // mengunci field ini untuk Free, tapi penegakan yang mengikat
+  // harus di server karena halaman menulis lewat browser client).
+  const storeTier = effectiveTier(subscription).tier
   const shippingCost = calcShippingCost(
     {
       basePrice: Number(shippingMethod.price),
-      perKgPrice: Number(
-        (shippingMethod as { per_kg_price?: number | null }).per_kg_price ?? 0
-      ),
+      perKgPrice:
+        storeTier === 'free'
+          ? 0
+          : Number(
+              (shippingMethod as { per_kg_price?: number | null })
+                .per_kg_price ?? 0
+            ),
       baseWeightGram: Number(
         (shippingMethod as { base_weight_gram?: number | null }).base_weight_gram ?? 1000
       ),
@@ -291,9 +301,12 @@ export async function createOrderAction(input: CheckoutFormInput) {
   )
 
   // Fase 3 — voucher: kode divalidasi ulang di server (aktif, masa
-  // berlaku, minimum order, kuota). Kode salah / tidak valid = checkout
-  // lanjut TANPA diskon (preview di halaman sudah memberi tahu pembeli).
-  // Kuota dicatat atomik setelah invoice jadi (lihat di bawah).
+  // berlaku, minimum order, kuota). Kuota dicatat atomik setelah
+  // invoice jadi (lihat di bawah).
+  // Audit 2026-11-09: kode yang DIISI pembeli tapi tidak valid di
+  // server sekarang MENOLAK checkout dengan pesan jelas — perilaku
+  // lama (lanjut diam-diam dengan diskon 0) membuat pembeli membayar
+  // penuh padahal preview checkout menampilkan diskon.
   let voucherDiscount = 0
   let appliedVoucher: { id: string; code: string; used_count: number } | null = null
   const voucherCode = normalizeVoucherCode(input.voucherCode ?? '')
@@ -304,13 +317,16 @@ export async function createOrderAction(input: CheckoutFormInput) {
       voucherCode,
       subtotal
     )
-    if (found) {
-      voucherDiscount = found.discount
-      appliedVoucher = {
-        id: found.voucher.id,
-        code: found.voucher.code,
-        used_count: found.voucher.used_count,
-      }
+    if (!found) {
+      throw new Error(
+        'Kode voucher tidak valid atau sudah tidak berlaku. Hapus kode untuk melanjutkan tanpa diskon.'
+      )
+    }
+    voucherDiscount = found.discount
+    appliedVoucher = {
+      id: found.voucher.id,
+      code: found.voucher.code,
+      used_count: found.voucher.used_count,
     }
   }
 

@@ -93,6 +93,64 @@ describe('effectiveTier (Bab 4 — siklus hidup)', () => {
     )
     expect(after).toEqual({ tier: 'free', premiumLocked: true })
   })
+
+  it('lazy expiry: TRIALING lewat trial_ends_at langsung Free walau status belum diubah cron', () => {
+    const r = effectiveTier(
+      row({
+        tier: 'silver',
+        status: 'TRIALING',
+        trial_ends_at: end('2026-11-01T12:00:00Z'),
+      }),
+      now
+    )
+    expect(r).toEqual({ tier: 'free', premiumLocked: true })
+  })
+
+  it('lazy expiry: TRIALING yang belum berakhir tetap tier trial', () => {
+    const r = effectiveTier(
+      row({
+        tier: 'silver',
+        status: 'TRIALING',
+        trial_ends_at: end('2026-11-20T12:00:00Z'),
+      }),
+      now
+    )
+    expect(r).toEqual({ tier: 'silver', premiumLocked: false })
+  })
+
+  it('lazy expiry: ACTIVE berbayar lewat current_period_end terkunci (masa tenggang), lalu Free', () => {
+    const inGrace = effectiveTier(
+      row({
+        tier: 'gold',
+        current_period_end: end('2026-11-05T12:00:00Z'),
+        grace_ends_at: end('2026-11-12T12:00:00Z'),
+      }),
+      now
+    )
+    expect(inGrace).toEqual({ tier: 'gold', premiumLocked: true })
+
+    const pastGrace = effectiveTier(
+      row({
+        tier: 'gold',
+        current_period_end: end('2026-10-20T12:00:00Z'),
+        grace_ends_at: end('2026-10-27T12:00:00Z'),
+      }),
+      now
+    )
+    expect(pastGrace).toEqual({ tier: 'free', premiumLocked: true })
+  })
+
+  it('lazy expiry: PAST_DUE lewat grace_ends_at langsung Free', () => {
+    const r = effectiveTier(
+      row({
+        tier: 'silver',
+        status: 'PAST_DUE',
+        grace_ends_at: end('2026-11-02T12:00:00Z'),
+      }),
+      now
+    )
+    expect(r).toEqual({ tier: 'free', premiumLocked: true })
+  })
 })
 
 describe('limitsFor', () => {

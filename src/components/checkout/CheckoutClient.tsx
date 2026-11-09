@@ -49,7 +49,7 @@ const PAYMENT_OPTIONS: {
 ]
 
 const inputClassName =
-  'w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none ring-0 placeholder:text-neutral-400 focus:border-neutral-400'
+  'w-full rounded-2xl border border-[var(--line)] px-4 py-3 text-sm outline-none ring-0 placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]'
 
 export default function CheckoutClient() {
   const router = useRouter()
@@ -94,6 +94,12 @@ export default function CheckoutClient() {
 
   // Fase 4 — harga promo flash sale aktif per produk (tampilan saja).
   const [flashPrices, setFlashPrices] = useState<Map<string, number>>(new Map())
+  // Audit 2026-11-09: harga normal TERKINI dari DB per produk. Basis
+  // preview harus sama dengan basis server — snapshot harga di
+  // keranjang bisa basi (mis. sisa harga promo flash sale yang sudah
+  // berakhir), dan preview yang lebih murah dari tagihan server adalah
+  // pemicu sengketa harga.
+  const [freshPrices, setFreshPrices] = useState<Map<string, number>>(new Map())
   const [errorMessage, setErrorMessage] = useState('')
   const [isPending, startTransition] = useTransition()
 
@@ -107,15 +113,16 @@ export default function CheckoutClient() {
 
   const subtotalValue = useMemo(() => {
     // Fase 4 — preview harga flash sale: harga promo aktif menggantikan
-    // harga tersimpan di keranjang (tampilan saja; harga yang mengikat
-    // dihitung server dari database di createOrderAction).
+    // harga normal TERKINI dari DB (bukan snapshot keranjang; lihat
+    // freshPrices). Harga yang mengikat dihitung server dari database
+    // di createOrderAction — preview ini sekarang memakai basis sama.
     return items.reduce((sum, item) => {
-      const base = Number(item.product.price)
+      const base = freshPrices.get(item.product.id) ?? Number(item.product.price)
       const promo = flashPrices.get(item.product.id)
       const price = promo !== undefined && promo > 0 && promo < base ? promo : base
       return sum + price * item.qty
     }, 0)
-  }, [items, flashPrices])
+  }, [items, flashPrices, freshPrices])
   // Fase 3: total berat keranjang + ongkir berbasis berat (harga dasar +
   // per kg di atas berat dasar). Harga yang mengikat tetap dihitung
   // server dari database — ini hanya preview.
@@ -253,6 +260,36 @@ export default function CheckoutClient() {
     }
     fetchFlashSales()
   }, [storeId])
+
+  // Audit 2026-11-09: muat harga normal terkini produk di keranjang
+  // dari DB (basis preview yang sama dengan server).
+  useEffect(() => {
+    async function fetchFreshPrices() {
+      if (!storeId || items.length === 0) return
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, price')
+          .eq('store_id', storeId)
+          .in(
+            'id',
+            items.map((item) => item.product.id)
+          )
+        if (error || !data) return
+        const map = new Map<string, number>()
+        for (const row of data as Array<{ id: string; price: number }>) {
+          map.set(row.id, Number(row.price))
+        }
+        setFreshPrices(map)
+      } catch {
+        // Gagal memuat = preview memakai snapshot keranjang (perilaku lama).
+      }
+    }
+    fetchFreshPrices()
+    // Sengaja hanya bergantung pada storeId + daftar id produk.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, items.map((item) => item.product.id).join(',')])
 
   // Fase 2: pembeli login — muat buku alamat; alamat utama mengisi
   // form secara otomatis bila form masih kosong.
@@ -432,15 +469,15 @@ export default function CheckoutClient() {
 
   if (!items.length) {
     return (
-      <div className="min-h-screen bg-neutral-50 px-4 py-10">
-        <div className="mx-auto max-w-xl rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-bold text-neutral-900">Checkout</h1>
-          <p className="mt-2 text-sm text-neutral-600">
+      <div className="min-h-screen bg-[var(--bg)] px-4 py-10">
+        <div className="mx-auto max-w-xl rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
+          <h1 className="text-2xl font-bold text-[var(--text)]">Checkout</h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
             Cart kamu masih kosong. Tambahkan produk dulu sebelum checkout.
           </p>
           <button
             onClick={() => router.push('/cart')}
-            className="mt-6 rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-semibold text-white"
+            className="mt-6 rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white"
           >
             Kembali ke Cart
           </button>
@@ -450,12 +487,12 @@ export default function CheckoutClient() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-[var(--bg)] px-4 py-6 md:px-6">
       <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
+        <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-neutral-900">Checkout</h1>
-            <p className="mt-1 text-sm text-neutral-600">
+            <h1 className="text-2xl font-bold text-[var(--text)]">Checkout</h1>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
               Tiga langkah singkat: data &amp; alamat, pengiriman, lalu pembayaran.
             </p>
           </div>
@@ -473,19 +510,19 @@ export default function CheckoutClient() {
                     onClick={() => isDone && goToStep(s.key)}
                     className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                       isActive
-                        ? 'bg-neutral-900 text-white'
+                        ? 'bg-[var(--primary)] text-white'
                         : isDone
                           ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-neutral-100 text-neutral-500'
+                          : 'bg-[var(--surface-soft)] text-[var(--text-muted)]'
                     }`}
                   >
                     <span
                       className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
                         isActive
-                          ? 'bg-white text-neutral-900'
+                          ? 'bg-[var(--surface)] text-[var(--text)]'
                           : isDone
                             ? 'bg-emerald-500 text-white'
-                            : 'bg-neutral-300 text-white'
+                            : 'bg-[var(--stone)] text-white'
                       }`}
                     >
                       {isDone ? '✓' : s.key}
@@ -493,7 +530,7 @@ export default function CheckoutClient() {
                     <span className="hidden sm:inline">{s.label}</span>
                   </button>
                   {index < CHECKOUT_STEPS.length - 1 ? (
-                    <span aria-hidden className="h-px flex-1 bg-neutral-200" />
+                    <span aria-hidden className="h-px flex-1 bg-[var(--line)]" />
                   ) : null}
                 </li>
               )
@@ -508,14 +545,14 @@ export default function CheckoutClient() {
 
           {step === 1 ? (
             <section className="space-y-4">
-              <h2 className="text-base font-semibold text-neutral-900">
+              <h2 className="text-base font-semibold text-[var(--text)]">
                 Langkah 1 — Data &amp; alamat pengiriman
               </h2>
 
               {savedAddresses.length > 0 ? (
-                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3">
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-neutral-700">
+                    <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                       Pakai alamat tersimpan
                     </span>
                     <select
@@ -533,7 +570,7 @@ export default function CheckoutClient() {
                   </label>
                   <Link
                     href="/akun/alamat"
-                    className="mt-2 inline-block text-xs font-semibold text-neutral-700 underline"
+                    className="mt-2 inline-block text-xs font-semibold text-[var(--text)] underline"
                   >
                     Kelola buku alamat
                   </Link>
@@ -542,7 +579,7 @@ export default function CheckoutClient() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-neutral-700">
+                  <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                     Nama lengkap
                   </span>
                   <input
@@ -554,7 +591,7 @@ export default function CheckoutClient() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-neutral-700">
+                  <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                     No WhatsApp
                   </span>
                   <input
@@ -567,7 +604,7 @@ export default function CheckoutClient() {
               </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-neutral-700">
+                <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                   Alamat lengkap
                 </span>
                 <textarea
@@ -581,7 +618,7 @@ export default function CheckoutClient() {
 
               <div className="grid gap-4 md:grid-cols-3">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-neutral-700">
+                  <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                     Provinsi
                   </span>
                   <input
@@ -593,7 +630,7 @@ export default function CheckoutClient() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-neutral-700">
+                  <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                     Kota
                   </span>
                   <input
@@ -605,7 +642,7 @@ export default function CheckoutClient() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-neutral-700">
+                  <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                     Kode pos
                   </span>
                   <input
@@ -618,7 +655,7 @@ export default function CheckoutClient() {
               </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-neutral-700">
+                <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                   Catatan (opsional)
                 </span>
                 <textarea
@@ -633,7 +670,7 @@ export default function CheckoutClient() {
               <button
                 type="button"
                 onClick={() => goToStep(2)}
-                className="w-full rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800"
+                className="w-full rounded-2xl bg-[var(--primary)] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)]"
               >
                 Lanjut ke pengiriman
               </button>
@@ -642,12 +679,12 @@ export default function CheckoutClient() {
 
           {step === 2 ? (
             <section className="space-y-4">
-              <h2 className="text-base font-semibold text-neutral-900">
+              <h2 className="text-base font-semibold text-[var(--text)]">
                 Langkah 2 — Metode pengiriman
               </h2>
 
               {loadingShipping ? (
-                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--text-muted)]">
                   Memuat metode pengiriman...
                 </div>
               ) : shippingMethods.length === 0 ? (
@@ -661,8 +698,8 @@ export default function CheckoutClient() {
                       key={method.id}
                       className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${
                         shippingMethodId === method.id
-                          ? 'border-neutral-900 bg-neutral-50'
-                          : 'border-neutral-200 bg-white'
+                          ? 'border-[var(--primary)] bg-[var(--surface-soft)]'
+                          : 'border-[var(--line)] bg-[var(--surface)]'
                       }`}
                     >
                       <input
@@ -676,22 +713,22 @@ export default function CheckoutClient() {
                       <div className="flex-1">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-neutral-900">
+                            <p className="text-sm font-semibold text-[var(--text)]">
                               {method.name}
                             </p>
-                            <p className="text-xs text-neutral-500">
+                            <p className="text-xs text-[var(--text-muted)]">
                               Estimasi {method.estimated_days || '-'}
                               {method.courier_code ? ` • ${method.courier_code}` : ''}
                             </p>
                             {Number(method.per_kg_price ?? 0) > 0 ? (
-                              <p className="text-xs text-neutral-500">
+                              <p className="text-xs text-[var(--text-muted)]">
                                 Termasuk {formatWeight(Number(method.base_weight_gram ?? 1000))} pertama,
                                 lalu + Rp{' '}
                                 {Number(method.per_kg_price).toLocaleString('id-ID')}/kg
                               </p>
                             ) : null}
                           </div>
-                          <p className="text-sm font-semibold text-neutral-900">
+                          <p className="text-sm font-semibold text-[var(--text)]">
                             Rp {Number(method.price).toLocaleString('id-ID')}
                           </p>
                         </div>
@@ -705,7 +742,7 @@ export default function CheckoutClient() {
                 <button
                   type="button"
                   onClick={() => goToStep(1)}
-                  className="rounded-2xl border border-neutral-200 bg-white px-5 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
+                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-5 py-3.5 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
                 >
                   Kembali
                 </button>
@@ -713,7 +750,7 @@ export default function CheckoutClient() {
                   type="button"
                   onClick={() => goToStep(3)}
                   disabled={loadingShipping || !shippingMethodId}
-                  className="flex-1 rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-[var(--primary)] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Lanjut ke pembayaran
                 </button>
@@ -723,14 +760,14 @@ export default function CheckoutClient() {
 
           {step === 3 ? (
             <section className="space-y-4">
-              <h2 className="text-base font-semibold text-neutral-900">
+              <h2 className="text-base font-semibold text-[var(--text)]">
                 Langkah 3 — Metode pembayaran
               </h2>
 
               {/* Voucher (Fase 3) */}
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+              <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-3">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-neutral-700">
+                  <span className="mb-2 block text-sm font-medium text-[var(--text)]">
                     Kode voucher (opsional)
                   </span>
                   {appliedVoucher ? (
@@ -759,7 +796,7 @@ export default function CheckoutClient() {
                         type="button"
                         onClick={applyVoucher}
                         disabled={checkingVoucher}
-                        className="shrink-0 rounded-2xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                        className="shrink-0 rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
                       >
                         {checkingVoucher ? 'Memeriksa...' : 'Pakai'}
                       </button>
@@ -783,8 +820,8 @@ export default function CheckoutClient() {
                     key={option.value}
                     className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${
                       paymentMethod === option.value
-                        ? 'border-neutral-900 bg-neutral-50'
-                        : 'border-neutral-200 bg-white'
+                        ? 'border-[var(--primary)] bg-[var(--surface-soft)]'
+                        : 'border-[var(--line)] bg-[var(--surface)]'
                     }`}
                   >
                     <input
@@ -796,10 +833,10 @@ export default function CheckoutClient() {
                       className="mt-1"
                     />
                     <span>
-                      <span className="block text-sm font-semibold text-neutral-900">
+                      <span className="block text-sm font-semibold text-[var(--text)]">
                         {option.label}
                       </span>
-                      <span className="mt-0.5 block text-xs leading-5 text-neutral-500">
+                      <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">
                         {option.hint}
                       </span>
                     </span>
@@ -807,7 +844,7 @@ export default function CheckoutClient() {
                 ))}
               </div>
 
-              <div className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm leading-6 text-neutral-600">
+              <div className="rounded-2xl bg-[var(--surface-soft)] px-4 py-3 text-sm leading-6 text-[var(--text-muted)]">
                 Setelah pesanan dibuat, kamu langsung masuk ke halaman invoice:
                 di sana ada ringkasan pesanan, status, dan tempat upload bukti
                 pembayaran. Simpan link halaman itu — itu kunci pesananmu.
@@ -817,7 +854,7 @@ export default function CheckoutClient() {
                 <button
                   type="button"
                   onClick={() => goToStep(2)}
-                  className="rounded-2xl border border-neutral-200 bg-white px-5 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
+                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-5 py-3.5 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
                 >
                   Kembali
                 </button>
@@ -825,7 +862,7 @@ export default function CheckoutClient() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={isPending}
-                  className="flex-1 rounded-2xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-[var(--primary)] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isPending
                     ? 'Memproses pesanan...'
@@ -836,13 +873,14 @@ export default function CheckoutClient() {
           ) : null}
         </div>
 
-        <aside className="h-fit rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6 lg:sticky lg:top-6">
-          <h2 className="text-lg font-bold text-neutral-900">Ringkasan pesanan</h2>
+        <aside className="h-fit rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6 lg:sticky lg:top-6">
+          <h2 className="text-lg font-bold text-[var(--text)]">Ringkasan pesanan</h2>
 
           <div className="mt-5 space-y-4">
             <div className="space-y-3">
               {items.map((item) => {
-                const base = Number(item.product.price)
+                const base =
+                  freshPrices.get(item.product.id) ?? Number(item.product.price)
                 const promo = flashPrices.get(item.product.id)
                 const effective =
                   promo !== undefined && promo > 0 && promo < base ? promo : base
@@ -850,13 +888,13 @@ export default function CheckoutClient() {
                 return (
                   <div
                     key={item.product.id}
-                    className="flex items-start justify-between gap-3 rounded-2xl bg-neutral-50 px-4 py-3"
+                    className="flex items-start justify-between gap-3 rounded-2xl bg-[var(--surface-soft)] px-4 py-3"
                   >
                     <div className="min-w-0">
-                      <p className="line-clamp-2 text-sm font-semibold text-neutral-900">
+                      <p className="line-clamp-2 text-sm font-semibold text-[var(--text)]">
                         {item.product.name}
                       </p>
-                      <p className="mt-1 text-xs text-neutral-500">
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
                         {item.qty} x{' '}
                         {onFlash ? (
                           <>
@@ -875,7 +913,7 @@ export default function CheckoutClient() {
                         )}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-neutral-900">
+                    <p className="shrink-0 text-sm font-semibold text-[var(--text)]">
                       Rp {(effective * item.qty).toLocaleString('id-ID')}
                     </p>
                   </div>
@@ -883,8 +921,8 @@ export default function CheckoutClient() {
               })}
             </div>
 
-            <div className="space-y-3 border-t border-neutral-200 pt-4 text-sm">
-              <div className="flex items-center justify-between text-neutral-600">
+            <div className="space-y-3 border-t border-[var(--line)] pt-4 text-sm">
+              <div className="flex items-center justify-between text-[var(--text-muted)]">
                 <span>Subtotal</span>
                 <span>Rp {subtotalValue.toLocaleString('id-ID')}</span>
               </div>
@@ -896,7 +934,7 @@ export default function CheckoutClient() {
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between text-neutral-600">
+              <div className="flex items-center justify-between text-[var(--text-muted)]">
                 <span>
                   Ongkir
                   {selectedShipping ? ` (${selectedShipping.name})` : ''}
@@ -908,18 +946,18 @@ export default function CheckoutClient() {
                 </span>
               </div>
 
-              <div className="flex items-center justify-between text-neutral-600">
+              <div className="flex items-center justify-between text-[var(--text-muted)]">
                 <span>Total berat</span>
                 <span>{formatWeight(totalWeightGram)}</span>
               </div>
 
-              <div className="flex items-center justify-between border-t border-neutral-200 pt-3 text-base font-bold text-neutral-900">
+              <div className="flex items-center justify-between border-t border-[var(--line)] pt-3 text-base font-bold text-[var(--text)]">
                 <span>Total</span>
                 <span>Rp {total.toLocaleString('id-ID')}</span>
               </div>
             </div>
 
-            <p className="text-xs leading-5 text-neutral-500">
+            <p className="text-xs leading-5 text-[var(--text-muted)]">
               Langkah {step} dari 3 — {CHECKOUT_STEPS[step - 1].label}. Harga
               final selalu dihitung ulang oleh server dari database.
             </p>

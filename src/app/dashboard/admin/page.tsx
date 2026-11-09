@@ -1,10 +1,21 @@
-// Panel admin platform (Fase 2): statistik dasar + daftar semua toko
+// Panel admin platform (Fase 2): statistik dasar + toko terbaru
 // + tautan ke verifikasi langganan. Hanya admin (is_admin()).
+// Redesign 2026-11-10: daftar toko di sini dipangkas jadi 5 terbaru —
+// daftar lengkap + pencarian + pagination pindah ke
+// /dashboard/admin/stores (sebelumnya dua-duanya menumpuk maks 100
+// toko yang sama); total toko sekarang dari hitungan persis, bukan
+// panjang array yang terpotong limit.
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminUser } from '@/lib/admin-access'
+import { STATUS_LABELS, TIER_LABELS } from '@/lib/subscriptions'
+import {
+  subscriptionStatusPillClass,
+  tierPillClass,
+} from '@/lib/admin-ui'
+import { Banknote, Layers, ShoppingBag, Store } from 'lucide-react'
 
 // Awal hari WIB dalam UTC (WIB = UTC+7).
 function wibDayStartUtc(): Date {
@@ -64,13 +75,13 @@ export default async function AdminIndexPage() {
 
   const dayStart = wibDayStartUtc()
 
-  const [{ data: storesData }, { data: subsData }, { data: ordersToday }, { count: pendingPayments }] =
+  const [{ data: storesData }, { data: subsData }, { data: ordersToday }, { count: pendingPayments }, { count: totalStores }] =
     await Promise.all([
       admin
         .from('stores')
         .select('id, name, slug, owner_id, created_at')
         .order('created_at', { ascending: false })
-        .limit(100),
+        .limit(5),
       admin.from('subscriptions').select('store_id, tier, status'),
       admin
         .from('orders')
@@ -80,6 +91,7 @@ export default async function AdminIndexPage() {
         .from('subscription_payments')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'PENDING_VERIFICATION'),
+      admin.from('stores').select('id', { count: 'exact', head: true }),
     ])
 
   const stores = (storesData ?? []) as Array<{
@@ -129,33 +141,45 @@ export default async function AdminIndexPage() {
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+            <Store className="h-4.5 w-4.5" aria-hidden />
+          </span>
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             Total toko
           </p>
-          <p className="mt-2 text-3xl font-bold text-[var(--text)]">{stores.length}</p>
+          <p className="mt-1 text-3xl font-bold text-[var(--text)]">{totalStores ?? 0}</p>
         </div>
         <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+            <Layers className="h-4.5 w-4.5" aria-hidden />
+          </span>
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             Aktif per tier
           </p>
-          <p className="mt-2 text-sm font-bold text-[var(--text)]">
+          <p className="mt-1 text-sm font-bold leading-6 text-[var(--text)]">
             Free {activeByTier.free} • Silver {activeByTier.silver} • Gold{' '}
             {activeByTier.gold}
           </p>
         </div>
         <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+            <ShoppingBag className="h-4.5 w-4.5" aria-hidden />
+          </span>
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             Order hari ini
           </p>
-          <p className="mt-2 text-3xl font-bold text-[var(--text)]">
+          <p className="mt-1 text-3xl font-bold text-[var(--text)]">
             {todayValid.length}
           </p>
         </div>
         <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+            <Banknote className="h-4.5 w-4.5" aria-hidden />
+          </span>
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             GMV hari ini
           </p>
-          <p className="mt-2 text-xl font-bold text-[var(--text)]">
+          <p className="mt-1 text-xl font-bold text-[var(--text)]">
             Rp {todayGmv.toLocaleString('id-ID')}
           </p>
         </div>
@@ -184,7 +208,15 @@ export default async function AdminIndexPage() {
       </div>
 
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]">
-        <h2 className="text-base font-bold text-[var(--text)]">Semua toko</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-bold text-[var(--text)]">Toko terbaru</h2>
+          <Link
+            href="/dashboard/admin/stores"
+            className="shrink-0 text-sm font-semibold text-[var(--primary)]"
+          >
+            Lihat semua toko →
+          </Link>
+        </div>
         {stores.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--text-muted)]">
             Belum ada toko terdaftar.
@@ -204,13 +236,32 @@ export default async function AdminIndexPage() {
                         {store.name}
                       </p>
                       <p className="truncate text-xs text-[var(--text-muted)]">
+                        /{store.slug} •{' '}
                         {emailByUserId.get(store.owner_id) ?? store.owner_id} •{' '}
                         {formatDate(store.created_at)}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--text)]">
-                      {sub ? `${sub.tier} • ${sub.status}` : 'tanpa langganan'}
-                    </span>
+                    {sub ? (
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tierPillClass(sub.tier)}`}
+                        >
+                          {TIER_LABELS[sub.tier as keyof typeof TIER_LABELS] ??
+                            sub.tier}
+                        </span>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${subscriptionStatusPillClass(sub.status)}`}
+                        >
+                          {STATUS_LABELS[
+                            sub.status as keyof typeof STATUS_LABELS
+                          ] ?? sub.status}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
+                        Tanpa langganan
+                      </span>
+                    )}
                   </Link>
                 </li>
               )

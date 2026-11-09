@@ -315,7 +315,8 @@ export async function createOrderAction(input: CheckoutFormInput) {
       supabase,
       input.storeId,
       voucherCode,
-      subtotal
+      subtotal,
+      buyerId
     )
     if (!found) {
       throw new Error(

@@ -1,11 +1,16 @@
 // Halaman log audit (Fase 4) — HANYA admin platform.
-// Filter aksi + toko. Menampilkan 100 baris terbaru.
+// Filter aksi + toko. Pagination server-side 50/halaman (redesign
+// admin 2026-11-10; sebelumnya datar 100 baris terbaru).
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdminUser } from '@/lib/admin-access'
 import { listAuditLogAction } from '@/lib/actions/audit'
 import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS } from '@/lib/audit'
+import { paginate } from '@/lib/admin-ui'
+import AdminPagination from '@/components/admin/AdminPagination'
+
+const AUDIT_PAGE_SIZE = 50
 
 function formatDateTime(value: string) {
   const date = new Date(value)
@@ -44,18 +49,23 @@ function detailsText(details: Record<string, unknown>): string {
 export default async function AdminAuditPage({
   searchParams,
 }: {
-  searchParams: Promise<{ action?: string; storeId?: string }>
+  searchParams: Promise<{ action?: string; storeId?: string; page?: string }>
 }) {
-  const { action, storeId } = await searchParams
+  const { action, storeId, page: rawPage } = await searchParams
   const supabase = await createClient()
   const adminCheck = await requireAdminUser(supabase)
   if ('error' in adminCheck) redirect('/login')
 
+  const requestedPage = Math.max(1, Math.floor(Number(rawPage)) || 1)
   const result = await listAuditLogAction({
     action: action || undefined,
     storeId: storeId || undefined,
+    page: requestedPage,
+    pageSize: AUDIT_PAGE_SIZE,
   })
   const rows = 'rows' in result ? result.rows : []
+  const total = 'total' in result ? result.total : 0
+  const pageInfo = paginate(total, requestedPage, AUDIT_PAGE_SIZE)
   const loadError = 'error' in result ? result.error : null
 
   return (
@@ -67,7 +77,7 @@ export default async function AdminAuditPage({
         </h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
           Jejak aksi penting: langganan, pembekuan toko, staff, verifikasi
-          pembayaran, dan perubahan harga. 100 baris terbaru.
+          pembayaran, dan perubahan harga. {total} log tercatat.
         </p>
       </div>
 
@@ -143,6 +153,20 @@ export default async function AdminAuditPage({
           ))}
         </ul>
       )}
+
+      {!loadError ? (
+        <AdminPagination
+          basePath="/dashboard/admin/audit"
+          page={pageInfo.page}
+          pageCount={pageInfo.pageCount}
+          total={pageInfo.total}
+          params={{
+            action: action || undefined,
+            storeId: storeId || undefined,
+          }}
+          unitLabel="log"
+        />
+      ) : null}
     </div>
   )
 }

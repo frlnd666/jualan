@@ -1,11 +1,21 @@
 // Daftar semua toko untuk admin platform: melengkapi detail toko di
 // /dashboard/admin/stores/[id]. Sebelumnya route ini tidak ada (hanya
 // halaman detail), sehingga menu "Toko" di navbar admin mengarah ke 404.
+// Redesign 2026-11-10: pencarian nama/slug + pagination server-side
+// (sebelumnya daftar datar maks 100 tanpa pencarian) dan pill
+// tier/status berlabel Bahasa Indonesia.
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminUser } from '@/lib/admin-access'
+import { STATUS_LABELS, TIER_LABELS } from '@/lib/subscriptions'
+import {
+  paginate,
+  subscriptionStatusPillClass,
+  tierPillClass,
+} from '@/lib/admin-ui'
+import AdminPagination from '@/components/admin/AdminPagination'
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('id-ID', {
@@ -16,7 +26,13 @@ function formatDate(value: string) {
   })
 }
 
-export default async function AdminStoresPage() {
+export default async function AdminStoresPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>
+}) {
+  const { q: rawQ, page: rawPage } = await searchParams
+  const q = (rawQ ?? '').trim().replace(/[%_,]/g, ' ').slice(0, 60)
   const supabase = await createClient()
   const {
     data: { user },
@@ -55,12 +71,23 @@ export default async function AdminStoresPage() {
     )
   }
 
+  // Total dulu (untuk pagination), baru ambil halaman yang diminta.
+  let countQuery = admin
+    .from('stores')
+    .select('id', { count: 'exact', head: true })
+  if (q) countQuery = countQuery.or(`name.ilike.%${q}%,slug.ilike.%${q}%`)
+  const { count: totalStores } = await countQuery
+  const pageInfo = paginate(totalStores ?? 0, rawPage)
+
+  let storesQuery = admin
+    .from('stores')
+    .select('id, name, slug, owner_id, created_at')
+    .order('created_at', { ascending: false })
+    .range(pageInfo.from, pageInfo.to)
+  if (q) storesQuery = storesQuery.or(`name.ilike.%${q}%,slug.ilike.%${q}%`)
+
   const [{ data: storesData }, { data: subsData }] = await Promise.all([
-    admin
-      .from('stores')
-      .select('id, name, slug, owner_id, created_at')
-      .order('created_at', { ascending: false })
-      .limit(100),
+    storesQuery,
     admin.from('subscriptions').select('store_id, tier, status'),
   ])
 
@@ -97,14 +124,43 @@ export default async function AdminStoresPage() {
           Toko
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          {stores.length} toko terdaftar
+          {pageInfo.total} toko terdaftar
+          {q ? ` untuk pencarian “${q}”` : ''}
         </p>
       </div>
+
+      <form
+        method="get"
+        className="flex flex-wrap items-center gap-2 rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-3 shadow-[var(--shadow-sm)]"
+      >
+        <input
+          name="q"
+          defaultValue={q}
+          placeholder="Cari nama toko atau slug…"
+          className="min-w-0 flex-1 rounded-2xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
+        />
+        <button
+          type="submit"
+          className="rounded-2xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white"
+        >
+          Cari
+        </button>
+        {q ? (
+          <Link
+            href="/dashboard/admin/stores"
+            className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text)]"
+          >
+            Reset
+          </Link>
+        ) : null}
+      </form>
 
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]">
         {stores.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">
-            Belum ada toko terdaftar.
+            {q
+              ? `Tidak ada toko yang cocok dengan “${q}”.`
+              : 'Belum ada toko terdaftar.'}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -121,19 +177,46 @@ export default async function AdminStoresPage() {
                         {store.name}
                       </p>
                       <p className="truncate text-xs text-[var(--text-muted)]">
+                        /{store.slug} •{' '}
                         {emailByUserId.get(store.owner_id) ?? store.owner_id} •{' '}
                         {formatDate(store.created_at)}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--text)]">
-                      {sub ? `${sub.tier} • ${sub.status}` : 'tanpa langganan'}
-                    </span>
+                    {sub ? (
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tierPillClass(sub.tier)}`}
+                        >
+                          {TIER_LABELS[sub.tier as keyof typeof TIER_LABELS] ??
+                            sub.tier}
+                        </span>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${subscriptionStatusPillClass(sub.status)}`}
+                        >
+                          {STATUS_LABELS[
+                            sub.status as keyof typeof STATUS_LABELS
+                          ] ?? sub.status}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
+                        Tanpa langganan
+                      </span>
+                    )}
                   </Link>
                 </li>
               )
             })}
           </ul>
         )}
+        <AdminPagination
+          basePath="/dashboard/admin/stores"
+          page={pageInfo.page}
+          pageCount={pageInfo.pageCount}
+          total={pageInfo.total}
+          params={{ q: q || undefined }}
+          unitLabel="toko"
+        />
       </section>
     </div>
   )

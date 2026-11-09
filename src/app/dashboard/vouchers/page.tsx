@@ -116,6 +116,9 @@ export default async function VouchersPage() {
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
                       Dipakai {v.used_count}
                       {v.max_uses !== null ? ` / ${v.max_uses}` : ' kali'}
+                      {v.max_uses_per_buyer !== null
+                        ? ` • maks ${v.max_uses_per_buyer}× per pembeli`
+                        : ''}
                       {v.starts_at || v.ends_at
                         ? ` • ${formatDate(v.starts_at)} – ${formatDate(v.ends_at)}`
                         : ''}

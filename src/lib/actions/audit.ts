@@ -1,6 +1,6 @@
 // Audit log — SERVER ACTIONS (Fase 4).
 // - listAuditLogAction: HANYA admin platform (requireAdminUser).
-//   Filter: aksi + toko (slug/id) + batas 100 baris terbaru.
+//   Filter: aksi + toko (slug/id) + pagination (default 50/halaman).
 // - logAuditAction: dipanggil dari halaman client (edit produk) setelah
 //   perubahan harga berhasil — server memverifikasi pemanggil memang
 //   pemilik/staff toko itu sebelum mencatat; best-effort, tidak pernah
@@ -30,22 +30,30 @@ export interface AuditLogRow {
 export async function listAuditLogAction(input: {
   action?: string
   storeId?: string
-}): Promise<{ rows: AuditLogRow[] } | { error: string }> {
+  /** Pagination server-side (redesign admin 2026-11-10). */
+  page?: number
+  pageSize?: number
+}): Promise<{ rows: AuditLogRow[]; total: number } | { error: string }> {
   const supabase = await createClient()
   const adminCheck = await requireAdminUser(supabase)
   if ('error' in adminCheck) return { error: adminCheck.error }
 
+  const pageSize = Math.min(100, Math.max(1, Math.floor(input.pageSize ?? 50)))
+  const page = Math.max(1, Math.floor(input.page ?? 1))
+  const from = (page - 1) * pageSize
+
   let query = supabase
     .from('audit_log')
     .select(
-      'id, actor_id, actor_role, store_id, action, entity_type, entity_id, details, created_at'
+      'id, actor_id, actor_role, store_id, action, entity_type, entity_id, details, created_at',
+      { count: 'exact' }
     )
     .order('created_at', { ascending: false })
-    .limit(100)
+    .range(from, from + pageSize - 1)
   if (input.action) query = query.eq('action', input.action)
   if (input.storeId) query = query.eq('store_id', input.storeId)
 
-  const { data, error } = await query
+  const { data, error, count } = await query
   if (error) {
     return { error: 'Log audit belum tersedia — jalankan migrasi Fase 4 dulu.' }
   }
@@ -64,6 +72,7 @@ export async function listAuditLogAction(input: {
   }
 
   return {
+    total: count ?? rows.length,
     rows: rows.map((r) => ({
       ...r,
       details: (r.details ?? {}) as Record<string, unknown>,

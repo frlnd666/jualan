@@ -18,6 +18,8 @@ export interface VoucherLike {
   discount_value: number
   min_order: number
   max_uses: number | null
+  /** Batas pakai per pembeli (dari voucher_redemptions); null = tanpa batas. */
+  max_uses_per_buyer: number | null
   used_count: number
   starts_at: string | null
   ends_at: string | null
@@ -55,13 +57,19 @@ export type VoucherValidation =
 /**
  * Validasi voucher terhadap subtotal pada saat `now`.
  * Urutan cek: aktif → masa berlaku → minimum order → kuota pakai →
- * besaran diskon. Mengembalikan pesan error Bahasa Indonesia yang bisa
- * langsung ditampilkan ke pembeli.
+ * batas per pembeli → besaran diskon. Mengembalikan pesan error Bahasa
+ * Indonesia yang bisa langsung ditampilkan ke pembeli.
+ *
+ * `buyerUses` = jumlah pemakaian voucher ini oleh pembeli yang sama
+ * yang masih berlaku (baris voucher_redemptions; redemption order
+ * batal terhapus). Hanya dicek bila voucher menyetel
+ * max_uses_per_buyer.
  */
 export function validateVoucher(
   voucher: VoucherLike,
   subtotal: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  buyerUses: number = 0
 ): VoucherValidation {
   if (!voucher.is_active) {
     return { ok: false, error: 'Voucher ini sudah tidak aktif.' }
@@ -74,6 +82,16 @@ export function validateVoucher(
   }
   if (voucher.max_uses !== null && voucher.used_count >= voucher.max_uses) {
     return { ok: false, error: 'Kuota pemakaian voucher ini sudah habis.' }
+  }
+  if (
+    voucher.max_uses_per_buyer !== null &&
+    voucher.max_uses_per_buyer !== undefined &&
+    buyerUses >= voucher.max_uses_per_buyer
+  ) {
+    return {
+      ok: false,
+      error: `Kamu sudah memakai voucher ini ${voucher.max_uses_per_buyer} kali (batas per pembeli).`,
+    }
   }
   const minOrder = Math.max(0, Number(voucher.min_order) || 0)
   if (subtotal < minOrder) {

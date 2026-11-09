@@ -8,11 +8,15 @@ import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { normalizeStoreSlug, validateStoreSlug } from '@/lib/store-slug'
 import { ensureStoreSubscription } from '@/lib/actions/subscriptions'
+import {
+  getStorePaymentAction,
+  saveStorePaymentAction,
+} from '@/lib/actions/store-payment'
 import ShopeePaySettingsForm from '@/components/dashboard/ShopeePaySettingsForm'
 import { clearStoredPlan, readStoredPlan } from '@/lib/register-plan'
 import { useRouter } from 'next/navigation'
 
-type SectionKey = 'profil' | 'kontak' | 'tampilan'
+type SectionKey = 'profil' | 'kontak' | 'tampilan' | 'pembayaran'
 
 const inputClassName =
   'w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]'
@@ -109,6 +113,18 @@ export default function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
 
+  // K-05 — bagian Pembayaran (sama seperti langkah 2 wizard onboarding).
+  // paymentReady menandakan prefill dari server action sudah berhasil:
+  // tombol simpan diblokir sampai data termuat, supaya simpan dengan
+  // form kosong tidak menghapus rekening yang sudah tersimpan.
+  const [bankName, setBankName] = useState('')
+  const [bankAccountName, setBankAccountName] = useState('')
+  const [bankAccountNumber, setBankAccountNumber] = useState('')
+  const [qrisImageUrl, setQrisImageUrl] = useState('')
+  const [codEnabled, setCodEnabled] = useState(true)
+  const [paymentReady, setPaymentReady] = useState(false)
+  const [paymentError, setPaymentError] = useState('')
+
   const [savingSection, setSavingSection] = useState<SectionKey | null>(null)
   const [savedSection, setSavedSection] = useState<SectionKey | null>(null)
   const [sectionError, setSectionError] = useState<{
@@ -168,6 +184,23 @@ export default function SettingsPage() {
         // jadi seller. Idempotent — toko yang sudah punya baris tidak
         // disentuh.
         void ensureStoreSubscription(store.id, 'free')
+
+        // K-05 — muat rekening lewat server action: client anon tidak
+        // bisa membaca kolom rekening sejak K-03, jadi prefill bagian
+        // Pembayaran harus lewat service_role (action memverifikasi
+        // pemilik dulu). Gagal muat = form kosong + simpan diblokir
+        // (lihat savePembayaran), bukan diam-diam menimpa data lama.
+        const pay = await getStorePaymentAction()
+        if ('payment' in pay && pay.payment) {
+          setBankName(pay.payment.bank_name ?? '')
+          setBankAccountName(pay.payment.bank_account_name ?? '')
+          setBankAccountNumber(pay.payment.bank_account_number ?? '')
+          setQrisImageUrl(pay.payment.qris_image_url ?? '')
+          setCodEnabled(pay.payment.cod_enabled ?? true)
+          setPaymentReady(true)
+        } else if ('error' in pay) {
+          setPaymentError(pay.error)
+        }
       }
       setLoading(false)
     }
@@ -305,6 +338,36 @@ export default function SettingsPage() {
       logo_url: logoUrl,
       banner_url: bannerUrl,
     })
+  }
+
+  // K-05 — simpan bagian Pembayaran lewat server action (bukan tulis
+  // langsung seperti bagian lain): validasi server-side + tulis
+  // rekening ada di sana. Diblokir sampai prefill berhasil dimuat.
+  async function savePembayaran() {
+    if (!paymentReady) {
+      setSectionError({
+        section: 'pembayaran',
+        message: 'Data pembayaran belum termuat. Muat ulang halaman lalu coba lagi.',
+      })
+      return
+    }
+    setSavingSection('pembayaran')
+    setSavedSection(null)
+    setSectionError(null)
+    const result = await saveStorePaymentAction({
+      bankName,
+      bankAccountName,
+      bankAccountNumber,
+      qrisImageUrl,
+      codEnabled,
+    })
+    setSavingSection(null)
+    if ('error' in result) {
+      setSectionError({ section: 'pembayaran', message: result.error })
+      return
+    }
+    setSavedSection('pembayaran')
+    router.refresh()
   }
 
   if (loading)
@@ -487,6 +550,87 @@ export default function SettingsPage() {
           ) : null}
         </Field>
       </SectionCard>
+
+      {/* K-05 — bagian Pembayaran: rekening + QRIS + COD, sama seperti
+          langkah 2 wizard onboarding. Hanya tampil bila toko sudah ada
+          (server action butuh toko milik pemilik); toko baru dibuat dulu
+          lewat bagian Profil di atas. */}
+      {storeId ? (
+        <SectionCard
+          title="Pembayaran"
+          description="Rekening bank, QRIS, dan COD — tujuan pembayaran yang tampil di halaman invoice pembeli. Isi salah satu: rekening bank untuk transfer, URL gambar QRIS, atau aktifkan COD."
+          onSave={savePembayaran}
+          saving={savingSection === 'pembayaran'}
+          saved={savedSection === 'pembayaran'}
+          error={
+            sectionError?.section === 'pembayaran' ? sectionError.message : ''
+          }
+        >
+          {paymentError ? (
+            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Data pembayaran tidak bisa dimuat: {paymentError} Periksa lagi
+              nanti — simpan dinonaktifkan sampai data termuat.
+            </p>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Nama bank">
+              <input
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                className={inputClassName}
+                placeholder="BCA / BRI / GoPay"
+              />
+            </Field>
+            <Field label="Nama pemilik rekening">
+              <input
+                value={bankAccountName}
+                onChange={(e) => setBankAccountName(e.target.value)}
+                className={inputClassName}
+                placeholder="Nama di rekening"
+              />
+            </Field>
+          </div>
+          <Field
+            label="Nomor rekening"
+            hint="Hanya angka, spasi, dan tanda hubung. Ketiga kolom rekening harus diisi bersamaan atau dikosongkan bersamaan."
+          >
+            <input
+              value={bankAccountNumber}
+              onChange={(e) => setBankAccountNumber(e.target.value)}
+              className={inputClassName}
+              inputMode="numeric"
+              placeholder="1234567890"
+            />
+          </Field>
+          <Field
+            label="URL gambar QRIS (opsional)"
+            hint="Gambar QRIS statis tokomu — tampil di invoice bila pembeli memilih QRIS manual."
+          >
+            <input
+              value={qrisImageUrl}
+              onChange={(e) => setQrisImageUrl(e.target.value)}
+              className={inputClassName}
+              inputMode="url"
+              placeholder="https://.../qris.jpg"
+            />
+          </Field>
+          {qrisImageUrl ? (
+            <img
+              src={qrisImageUrl}
+              alt="QRIS toko"
+              className="h-32 rounded-xl border border-[var(--line)] object-contain"
+            />
+          ) : null}
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
+            <input
+              type="checkbox"
+              checked={codEnabled}
+              onChange={(e) => setCodEnabled(e.target.checked)}
+            />
+            Terima COD (bayar di tempat)
+          </label>
+        </SectionCard>
+      ) : null}
 
       {/* Fase 3: kredensial ShopeePay Partner per toko (QRIS dinamis). */}
       <ShopeePaySettingsForm />

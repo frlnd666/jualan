@@ -10,10 +10,25 @@ export default function CopyTextButton({ text }: { text: string }) {
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
-      window.setTimeout(() => setCopied(false), 2000)
     } catch {
-      setCopied(false)
+      // Fallback untuk browser/konteks tanpa akses Clipboard API
+      // (mis. halaman non-HTTPS): salin lewat textarea sementara.
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        setCopied(true)
+      } catch {
+        setCopied(false)
+        return
+      }
     }
+    window.setTimeout(() => setCopied(false), 2000)
   }
 
   return (

@@ -20,6 +20,7 @@ import {
 } from '@/lib/order-status'
 import UploadPaymentProofForm from '@/components/invoice/UploadPaymentProofForm'
 import DynamicQrisPanel from '@/components/invoice/DynamicQrisPanel'
+import PaymentDestination from '@/components/invoice/PaymentDestination'
 import { getQrisPaymentForInvoiceAction } from '@/lib/actions/qris'
 import PublicConfigNotice from '@/components/PublicConfigNotice'
 import OrderTimeline from '@/components/order/OrderTimeline'
@@ -150,6 +151,24 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
     notFound()
   }
 
+  // K-05 — tujuan pembayaran toko (rekening + QRIS statis) untuk alur
+  // manual. Dibaca lewat query TERPISAH dari select toko di atas, supaya
+  // halaman tidak 404 bila client jatuh ke anon (tanpa service_role):
+  // kolom rekening dicabut dari anon/authenticated sejak K-03, jadi
+  // query ini gagal di mode itu — dan itu ditangani sebagai "toko belum
+  // mengisi tujuan pembayaran", bukan error halaman.
+  const { data: paymentRow } = await supabase
+    .from('stores')
+    .select('bank_name, bank_account_name, bank_account_number, qris_image_url')
+    .eq('id', order.store_id)
+    .maybeSingle()
+  const paymentDetails = (paymentRow ?? null) as {
+    bank_name?: string | null
+    bank_account_name?: string | null
+    bank_account_number?: string | null
+    qris_image_url?: string | null
+  } | null
+
   const { data: orderItems, error: itemsError } = await supabase
     .from('order_items')
     .select(`
@@ -197,6 +216,19 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
   const existingQris = showDynamicQris
     ? await getQrisPaymentForInvoiceAction(invoice.invoice_number, t ?? null)
     : null
+
+  // K-05 — blok tujuan bayar manual tampil HANYA bila invoice masih
+  // menunggu pembayaran, bukan COD, dan bukan QRIS yang QR dinamisnya
+  // sudah aktif (existingQris terisi = checkout/panel sudah berhasil
+  // membuat QR dinamis — pembeli membayar lewat QR itu, bukan manual).
+  // QRIS manual (toko tanpa QRIS dinamis) tetap tampil: panel dinamisnya
+  // mengembalikan null dan alur manual-lah yang jalan. PAID /
+  // WAITING_VERIFICATION / FAILED / REFUNDED dan pesanan batal tidak
+  // menampilkan blok ini (status bukan PENDING_PAYMENT / cabang batal).
+  const showPaymentDestination =
+    invoice.payment_status === 'PENDING_PAYMENT' &&
+    !isCod &&
+    !(invoice.payment_method === 'QRIS' && Boolean(existingQris?.qrContent))
 
   return (
     <div className="min-h-screen bg-neutral-50 px-4 pb-28 pt-6 md:px-6 md:pb-6">
@@ -295,17 +327,30 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
                       1
                     </span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-amber-900">
                         Bayar {formatRupiah(invoice.total)} via{' '}
                         {getPaymentMethodLabel(invoice.payment_method)}
                       </p>
-                      <p className="mt-1 text-sm leading-6 text-amber-800">
-                        Gunakan detail tujuan (nomor rekening / kode QR) yang
-                        diberikan penjual — tanyakan lewat tombol Chat penjual
-                        bila belum menerimanya. Bayar persis sampai digit
-                        terakhir agar mudah diverifikasi.
-                      </p>
+                      {showPaymentDestination ? (
+                        <PaymentDestination
+                          bankName={paymentDetails?.bank_name ?? null}
+                          bankAccountName={
+                            paymentDetails?.bank_account_name ?? null
+                          }
+                          bankAccountNumber={
+                            paymentDetails?.bank_account_number ?? null
+                          }
+                          qrisImageUrl={paymentDetails?.qris_image_url ?? null}
+                        />
+                      ) : (
+                        <p className="mt-1 text-sm leading-6 text-amber-800">
+                          Gunakan detail tujuan (nomor rekening / kode QR) yang
+                          diberikan penjual — tanyakan lewat tombol Chat penjual
+                          bila belum menerimanya. Bayar persis sampai digit
+                          terakhir agar mudah diverifikasi.
+                        </p>
+                      )}
                     </div>
                   </li>
 

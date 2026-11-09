@@ -44,7 +44,7 @@ const stores: DemoStore[] = [
   {
     name: "Roti Bahagia",
     category: "Bakery & pastry",
-    desc: "Contoh tampilan untuk toko roti dengan tema Default (Indigo).",
+    desc: "Contoh tampilan untuk toko roti dengan tema Default (Zamrud).",
     photo: LANDING_PHOTOS.bakery,
     photoAlt: "Foto roti dan pastry di etalase bakery",
     badge: "Contoh · Tema Default",

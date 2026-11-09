@@ -39,7 +39,7 @@ const features = [
   {
     icon: Palette,
     title: "Tiga tema toko",
-    desc: "Pilih tampilan Default (Indigo), Warm (Amber), atau Minimal (Slate), lengkap dengan logo dan banner tokomu. Ganti kapan saja tanpa mengubah isi katalog.",
+    desc: "Pilih tampilan Default (Zamrud), Warm (Amber), atau Minimal (Slate), lengkap dengan logo dan banner tokomu. Ganti kapan saja tanpa mengubah isi katalog.",
   },
 ];
 

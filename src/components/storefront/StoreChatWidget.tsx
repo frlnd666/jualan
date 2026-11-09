@@ -152,7 +152,7 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
 
       {open ? (
         <div className="fixed bottom-20 right-4 z-40 flex h-[480px] w-[min(92vw,360px)] flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-[0_24px_48px_rgba(33,24,20,0.25)] sm:right-6">
-          <div className="bg-[#2f241f] px-4 py-3 text-white">
+          <div className="bg-[var(--primary-deep)] px-4 py-3 text-white">
             <p className="text-sm font-bold">{storeName}</p>
             <p className="text-xs text-white/70">
               {session ? `Chat sebagai ${session.buyerName}` : 'Mulai chat dengan penjual'}
@@ -161,7 +161,7 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
 
           {!session ? (
             <form onSubmit={handleStart} className="flex flex-1 flex-col gap-3 p-4">
-              <p className="text-sm text-[#7a6b5f]">
+              <p className="text-sm text-[var(--text-muted)]">
                 Tulis nama kamu, lalu mulai bertanya soal produk, stok, atau pengiriman.
               </p>
               <input
@@ -190,9 +190,9 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
             </form>
           ) : (
             <>
-              <div className="flex-1 space-y-2 overflow-y-auto bg-[#faf7f3] p-3">
+              <div className="flex-1 space-y-2 overflow-y-auto bg-[var(--surface-soft)] p-3">
                 {messages.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-[#8d7f73]">
+                  <p className="py-6 text-center text-xs text-[var(--text-muted)]">
                     Belum ada pesan. Sapa penjual untuk mulai.
                   </p>
                 ) : (
@@ -202,7 +202,7 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
                       className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-5 ${
                         msg.sender === 'buyer'
                           ? 'ml-auto bg-[var(--primary)] text-white'
-                          : 'mr-auto border border-black/5 bg-white text-[#241b17]'
+                          : 'mr-auto border border-black/5 bg-white text-[var(--text)]'
                       }`}
                     >
                       {msg.body}
@@ -227,7 +227,7 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
                   <button
                     type="submit"
                     disabled={busy || !draft.trim()}
-                    className="shrink-0 rounded-xl bg-[#2f241f] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                    className="shrink-0 rounded-xl bg-[var(--primary-deep)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
                     Kirim
                   </button>

@@ -52,7 +52,8 @@ const inputClassName =
 
 export default function CheckoutClient() {
   const router = useRouter()
-  const { items, clearCart, storeId: cartStoreId } = useCart()
+  const { items, clearCart, loadItems, storeSlug, storeId: cartStoreId } =
+    useCart()
 
   const [step, setStep] = useState(1)
 
@@ -148,44 +149,48 @@ export default function CheckoutClient() {
       setLoadingShipping(true)
       setErrorMessage('')
 
-      const supabase = createClient()
+      try {
+        const supabase = createClient()
 
-      // Fase 3: kolom tarif per-kg dibaca bila ada; bila migrasi f3 belum
-      // dijalankan, ulangi dengan kolom lama (ongkir = harga dasar).
-      const full = await supabase
-        .from('shipping_methods')
-        .select('id, store_id, name, price, estimated_days, is_active, created_at, courier_code, per_kg_price, base_weight_gram')
-        .eq('store_id', storeId)
-        .eq('is_active', true)
-        .order('price', { ascending: true })
-
-      let data: ShippingMethod[] | null = full.data as ShippingMethod[] | null
-      let error = full.error
-      if (error && /per_kg_price|courier_code|base_weight_gram/.test(error.message || '')) {
-        const legacy = await supabase
+        // Fase 3: kolom tarif per-kg dibaca bila ada; bila migrasi f3 belum
+        // dijalankan, ulangi dengan kolom lama (ongkir = harga dasar).
+        const full = await supabase
           .from('shipping_methods')
-          .select('id, store_id, name, price, estimated_days, is_active, created_at')
+          .select('id, store_id, name, price, estimated_days, is_active, created_at, courier_code, per_kg_price, base_weight_gram')
           .eq('store_id', storeId)
           .eq('is_active', true)
           .order('price', { ascending: true })
-        data = legacy.data as ShippingMethod[] | null
-        error = legacy.error
-      }
 
-      if (error) {
+        let data: ShippingMethod[] | null = full.data as ShippingMethod[] | null
+        let error = full.error
+        if (error && /per_kg_price|courier_code|base_weight_gram/.test(error.message || '')) {
+          const legacy = await supabase
+            .from('shipping_methods')
+            .select('id, store_id, name, price, estimated_days, is_active, created_at')
+            .eq('store_id', storeId)
+            .eq('is_active', true)
+            .order('price', { ascending: true })
+          data = legacy.data as ShippingMethod[] | null
+          error = legacy.error
+        }
+
+        if (error) {
+          setErrorMessage('Gagal memuat metode pengiriman.')
+          return
+        }
+
+        const methods = (data || []) as ShippingMethod[]
+        setShippingMethods(methods)
+
+        if (methods.length > 0) {
+          setShippingMethodId(methods[0].id)
+        }
+      } catch {
+        // P1-05: supabase-js melempar saat fetch jaringan gagal — jangan nyangkut di jalur checkout.
         setErrorMessage('Gagal memuat metode pengiriman.')
+      } finally {
         setLoadingShipping(false)
-        return
       }
-
-      const methods = (data || []) as ShippingMethod[]
-      setShippingMethods(methods)
-
-      if (methods.length > 0) {
-        setShippingMethodId(methods[0].id)
-      }
-
-      setLoadingShipping(false)
     }
 
     async function fetchAllowedMethods() {
@@ -381,6 +386,14 @@ export default function CheckoutClient() {
 
     setErrorMessage('')
 
+    // P1-28: clearCart() setelah await tidak pernah jalan — redirect()
+    // di akhir createOrderAction meng-abort eksekusi, jadi keranjang
+    // lokal tidak terhapus dan pembeli bisa checkout ganda. Bersihkan
+    // dulu, lalu kembalikan isinya bila checkout gagal (validasi/stok)
+    // supaya pembeli tidak kehilangan keranjangnya karena error.
+    const cartSnapshot = { items, storeSlug, storeId: cartStoreId }
+    clearCart()
+
     startTransition(async () => {
       try {
         await createOrderAction({
@@ -403,9 +416,12 @@ export default function CheckoutClient() {
             notes: null,
           })),
         })
-
-        clearCart()
       } catch (error) {
+        loadItems(
+          cartSnapshot.items,
+          cartSnapshot.storeSlug,
+          cartSnapshot.storeId
+        )
         const message =
           error instanceof Error ? error.message : 'Terjadi kesalahan saat checkout.'
         setErrorMessage(message)

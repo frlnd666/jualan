@@ -38,11 +38,20 @@ export async function listNotificationsAction(): Promise<{
     .order('created_at', { ascending: false })
     .limit(50)
 
+  // P2-05: hitung belum-dibaca dengan query count terpisah — daftar di
+  // atas dibatasi 50, jadi menghitung dari `items` mentok di 50 bila
+  // unread lebih dari itu.
+  const { count: unreadTotal } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('is_read', false)
+
   const items = ((data ?? []) as NotificationRow[]).map((n) => ({
     ...n,
     body: n.body ?? '',
   }))
-  return { items, unreadCount: items.filter((n) => !n.is_read).length }
+  return { items, unreadCount: unreadTotal ?? 0 }
 }
 
 export async function getUnreadNotificationCountAction(): Promise<number> {

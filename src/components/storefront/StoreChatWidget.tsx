@@ -68,29 +68,34 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
     setBusy(true)
     setError('')
 
-    const result = await startChatSession({
-      storeId,
-      buyerName: name,
-      buyerPhone: phone || undefined,
-    })
-
-    setBusy(false)
-
-    if (!result.success || !result.sessionId || !result.accessToken) {
-      setError(result.error || 'Chat belum bisa dimulai.')
-      return
-    }
-
-    const stored: StoredSession = {
-      sessionId: result.sessionId,
-      accessToken: result.accessToken,
-      buyerName: name.trim(),
-    }
-    setSession(stored)
     try {
-      localStorage.setItem(storageKey, JSON.stringify(stored))
+      const result = await startChatSession({
+        storeId,
+        buyerName: name,
+        buyerPhone: phone || undefined,
+      })
+
+      if (!result.success || !result.sessionId || !result.accessToken) {
+        setError(result.error || 'Chat belum bisa dimulai.')
+        return
+      }
+
+      const stored: StoredSession = {
+        sessionId: result.sessionId,
+        accessToken: result.accessToken,
+        buyerName: name.trim(),
+      }
+      setSession(stored)
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(stored))
+      } catch {
+        // Abaikan: sesi tetap aktif selama halaman terbuka.
+      }
     } catch {
-      // Abaikan: sesi tetap aktif selama halaman terbuka.
+      // P1-05: action melempar — tombol tidak boleh nyangkut "Memulai...".
+      setError('Gagal memulai chat. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -100,17 +105,28 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
     setBusy(true)
     setError('')
 
-    const result = await sendChatMessage(session.sessionId, session.accessToken, draft)
-    setBusy(false)
+    try {
+      const result = await sendChatMessage(session.sessionId, session.accessToken, draft)
 
-    if (!result.success) {
-      setError(result.error || 'Pesan gagal dikirim.')
-      return
+      if (!result.success) {
+        setError(result.error || 'Pesan gagal dikirim.')
+        return
+      }
+
+      setDraft('')
+      try {
+        const refreshed = await getChatMessages(session.sessionId, session.accessToken)
+        if (refreshed.success && refreshed.messages) setMessages(refreshed.messages)
+      } catch {
+        // P1-05: pesan sudah terkirim — refresh daftar gagal tidak boleh menampilkan error kirim.
+        console.error('Gagal memuat ulang pesan chat.')
+      }
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut disabled.
+      setError('Gagal mengirim pesan. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setBusy(false)
     }
-
-    setDraft('')
-    const refreshed = await getChatMessages(session.sessionId, session.accessToken)
-    if (refreshed.success && refreshed.messages) setMessages(refreshed.messages)
   }
 
   return (

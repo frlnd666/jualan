@@ -8,10 +8,12 @@
 export type LogEventName =
   | 'order_created'
   | 'payment_confirmed'
+  | 'payment_confirm_half_applied'
   | 'qris_webhook_received'
   | 'qris_webhook_paid'
   | 'qris_webhook_rejected'
   | 'subscription_transitions_run'
+  | 'subscription_read_failed'
   | 'notify_dispatch'
 
 export interface LogEventRecord {

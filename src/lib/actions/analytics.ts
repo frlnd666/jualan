@@ -80,7 +80,13 @@ export async function getSellerAnalyticsAction(
   if (!access) return { error: 'Toko tidak ditemukan untuk akun ini.' }
   const store = access.store
 
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const limits = limitsFor(subscription)
   const canExport = canExportAnalytics(
     limits.analyticsExport,
@@ -109,7 +115,16 @@ export async function exportAnalyticsCsvAction(
   const store = access.store
 
   // Export HANYA Gold — ditegakkan di server, bukan hanya di UI.
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    return {
+      success: false,
+      error: 'Gagal memeriksa langganan toko. Coba lagi.',
+    }
+  }
   const limits = limitsFor(subscription)
   if (
     !canExportAnalytics(

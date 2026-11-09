@@ -5,7 +5,13 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getOwnerStore } from '@/lib/dashboard-access'
-import { getStoreSubscription, limitsFor, TIER_LABELS } from '@/lib/subscriptions'
+import { logEvent } from '@/lib/observability'
+import {
+  FREE_SUBSCRIPTION,
+  getStoreSubscription,
+  limitsFor,
+  TIER_LABELS,
+} from '@/lib/subscriptions'
 import { listStoreBannersAction } from '@/lib/actions/store-banners'
 import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 import BannerForm from '@/components/dashboard/BannerForm'
@@ -23,7 +29,14 @@ export default async function BannersPage() {
     return <StaffDeniedCard title="Banner Toko" />
   }
 
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: tampilan fallback ke tier paling ketat (Free) bila langganan
+  // gagal dibaca, tapi kegagalan TERCATAT lewat logEvent (bukan diam-diam).
+  let subscription = FREE_SUBSCRIPTION
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    logEvent('subscription_read_failed', { storeId: store.id })
+  }
   const limits = limitsFor(subscription)
   const bannerAllowed =
     limits.flashSales && subscription.status !== 'PAST_DUE'

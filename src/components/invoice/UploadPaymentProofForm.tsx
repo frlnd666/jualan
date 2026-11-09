@@ -72,12 +72,18 @@ export default function UploadPaymentProofForm({
         action={(formData) => {
           setMessage(null)
           startTransition(async () => {
-            const rawFile = formData.get('file')
-            if (rawFile instanceof File && rawFile.size > 0) {
-              formData.set('file', await compressImageIfNeeded(rawFile))
+            try {
+              const rawFile = formData.get('file')
+              if (rawFile instanceof File && rawFile.size > 0) {
+                formData.set('file', await compressImageIfNeeded(rawFile))
+              }
+              const result = await uploadPaymentProof(formData)
+              setMessage(result.error || result.success || null)
+            } catch {
+              // P2-13: action melempar (mis. jaringan putus) — jangan
+              // biarkan error naik ke error boundary; tampilkan inline.
+              setMessage('Gagal mengupload bukti. Periksa koneksi lalu coba lagi.')
             }
-            const result = await uploadPaymentProof(formData)
-            setMessage(result.error || result.success || null)
           })
         }}
         className="space-y-3"

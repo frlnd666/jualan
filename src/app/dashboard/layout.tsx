@@ -7,7 +7,7 @@ import DesktopNav from '@/components/dashboard/DesktopNav'
 import LogoutButton from '@/components/dashboard/LogoutButton'
 import NotificationBell from '@/components/dashboard/NotificationBell'
 import { getUnreadNotificationCountAction } from '@/lib/actions/notifications'
-import { getDashboardAccess } from '@/lib/dashboard-access'
+import { getDashboardAccess, type DashboardAccess } from '@/lib/dashboard-access'
 
 export default async function DashboardLayout({
   children,
@@ -37,7 +37,19 @@ export default async function DashboardLayout({
 
   // Fase 2: staff masuk dashboard toko tempatnya bekerja (bukan toko
   // miliknya) — header menampilkan nama toko itu, nav difilter.
-  const access = await getDashboardAccess(supabase, user.id)
+  // R-07 (2026-11-09): throw di sini mematikan SEMUA halaman dashboard,
+  // jadi bungkus try/catch — gagal memuat akses toko menampilkan banner
+  // peringatan, bukan halaman mati. Halaman anak tetap dirender; yang
+  // butuh akses toko menangani kegagalannya sendiri (atau ditangkap
+  // error.tsx dashboard).
+  let access: DashboardAccess = null
+  let accessFailed = false
+  try {
+    access = await getDashboardAccess(supabase, user.id)
+  } catch (err) {
+    console.error('[dashboard/layout] getDashboardAccess gagal:', err)
+    accessFailed = true
+  }
   const store = access?.store ?? null
   const isStaff = access?.role === 'staff'
   // Fase 3: lonceng notifikasi di header (best-effort — tabel belum ada
@@ -79,6 +91,16 @@ export default async function DashboardLayout({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-[calc(88px+env(safe-area-inset-bottom))] pt-4 md:pb-6">
+        {accessFailed && (
+          <div
+            role="alert"
+            className="mb-4 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-relaxed text-[var(--text)]"
+          >
+            Data toko gagal dimuat — periksa koneksimu lalu muat ulang
+            halaman. Beberapa menu mungkin tidak tampil sampai data
+            berhasil dimuat.
+          </div>
+        )}
         {children}
       </main>
 

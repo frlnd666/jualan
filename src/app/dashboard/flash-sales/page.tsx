@@ -6,7 +6,13 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getOwnerStore } from '@/lib/dashboard-access'
-import { getStoreSubscription, limitsFor, TIER_LABELS } from '@/lib/subscriptions'
+import { logEvent } from '@/lib/observability'
+import {
+  FREE_SUBSCRIPTION,
+  getStoreSubscription,
+  limitsFor,
+  TIER_LABELS,
+} from '@/lib/subscriptions'
 import {
   listFlashSalesAction,
   listStoreProductsForFlashSaleAction,
@@ -42,7 +48,14 @@ export default async function FlashSalesPage() {
     return <StaffDeniedCard title="Flash Sale" />
   }
 
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: tampilan fallback ke tier paling ketat (Free) bila langganan
+  // gagal dibaca, tapi kegagalan TERCATAT lewat logEvent (bukan diam-diam).
+  let subscription = FREE_SUBSCRIPTION
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    logEvent('subscription_read_failed', { storeId: store.id })
+  }
   const limits = limitsFor(subscription)
   const flashAllowed =
     limits.flashSales && subscription.status !== 'PAST_DUE'

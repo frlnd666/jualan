@@ -99,6 +99,15 @@ export async function getActiveQrisPayment(
       .update({ status: 'EXPIRED', updated_at: new Date().toISOString() })
       .eq('id', row.id)
       .eq('status', 'PENDING')
+    // P2-07: sinkronkan juga invoices.expires_at — sebelumnya hanya
+    // qris_payments yang ditandai, padahal komentar di atas mengklaim
+    // invoice ikut kedaluwarsa. Guard payment_status supaya invoice
+    // yang sudah dibayar tidak tersentuh.
+    await supabase
+      .from('invoices')
+      .update({ expires_at: row.expires_at })
+      .eq('id', invoiceId)
+      .eq('payment_status', 'PENDING_PAYMENT')
     return null
   }
   return row

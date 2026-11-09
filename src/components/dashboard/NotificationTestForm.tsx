@@ -26,12 +26,18 @@ export default function NotificationTestForm() {
     const formData = new FormData()
     formData.set('phone', phone)
     startTransition(async () => {
-      const res = await sendNotificationTestAction(formData)
-      if ('error' in res) {
-        setMessage(res.error)
-        return
+      try {
+        const res = await sendNotificationTestAction(formData)
+        if ('error' in res) {
+          setMessage(res.error)
+          return
+        }
+        setResult({ email: res.email, whatsapp: res.whatsapp })
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal mengirim tes. Periksa koneksi lalu coba lagi.')
       }
-      setResult({ email: res.email, whatsapp: res.whatsapp })
     })
   }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import { notifyOrderEvent } from '@/lib/notify'
@@ -168,15 +169,31 @@ export async function updateOrderStatusAction(
     }
   }
 
-  const { error: updateError } = await supabase
+  // Tulis status orders HANYA lewat service_role: setelah migrasi
+  // lockdown (20261109_p0_order_write_lockdown.sql) peran authenticated
+  // tidak lagi punya hak UPDATE atas kolom status — client anon di atas
+  // hanya dipakai untuk baca + verifikasi kepemilikan.
+  const admin = createAdminClient()
+  if (!admin) {
+    return { success: false, error: 'Server belum dikonfigurasi (service role belum diset).' }
+  }
+
+  // Guard atomik: hanya baris yang masih berstatus lama yang berubah.
+  // Bila tidak ada baris yang cocok, status sudah diubah proses lain
+  // di antara baca dan tulis — jangan lanjut ke efek samping.
+  const { data: updated, error: updateError } = await admin
     .from('orders')
     .update({ status: nextStatus })
     .eq('id', owned.order.id)
     .eq('store_id', owned.order.store_id)
     .eq('status', currentStatus)
+    .select('id')
 
   if (updateError) {
     return { success: false, error: 'Gagal mengubah status pesanan.' }
+  }
+  if (!updated || updated.length === 0) {
+    return { success: false, error: 'Status pesanan sudah berubah. Muat ulang halaman lalu coba lagi.' }
   }
 
   // Stok sudah dikurangi saat checkout; batal = kembalikan.
@@ -208,11 +225,24 @@ export async function saveShipmentAction(
   if ('error' in owned) return { success: false, error: owned.error }
 
   const currentStatus = owned.order.status as OrderStatus
-  if (currentStatus === 'CANCELLED' || currentStatus === 'COMPLETED') {
+  // Resi hanya bermakna untuk pesanan yang sudah dibayar: order yang
+  // belum bayar, sudah selesai, atau sudah dibatalkan tidak bisa diberi
+  // resi (sebelumnya hanya CANCELLED/COMPLETED yang diblokir, sehingga
+  // order PENDING_PAYMENT pun bisa "dikirim").
+  if (currentStatus !== 'PAID' && currentStatus !== 'PROCESSING') {
     return {
       success: false,
-      error: 'Pesanan yang sudah selesai/dibatalkan tidak bisa diberi resi.',
+      error: 'Pesanan harus sudah dibayar sebelum diberi resi.',
     }
+  }
+
+  // Admin dibuat SEBELUM resi disimpan: bila service role belum diset,
+  // gagal di sini (fail-fast) supaya tidak ada resi tersimpan sementara
+  // status order gagal maju — pesan error di bawah mengasumsikan resi
+  // sudah tersimpan.
+  const admin = createAdminClient()
+  if (!admin) {
+    return { success: false, error: 'Server belum dikonfigurasi (service role belum diset).' }
   }
 
   const { data: existing } = await supabase
@@ -248,13 +278,26 @@ export async function saveShipmentAction(
   }
 
   // Order yang sudah dibayar/diproses otomatis maju ke SHIPPED.
+  // Tulis status lewat service_role (lihat updateOrderStatusAction);
+  // insert/update shipments tetap lewat client anon karena policy
+  // shipments_owner_all / shipments_staff_* masih dipertahankan.
   if (currentStatus === 'PAID' || currentStatus === 'PROCESSING') {
-    await supabase
+    const { data: orderUpdated, error: orderUpdateError } = await admin
       .from('orders')
       .update({ status: 'SHIPPED' })
       .eq('id', owned.order.id)
       .eq('store_id', owned.order.store_id)
       .eq('status', currentStatus)
+      .select('id')
+    if (orderUpdateError) {
+      return { success: false, error: 'Resi tersimpan, tapi status order gagal berubah. Muat ulang halaman lalu coba lagi.' }
+    }
+    if (!orderUpdated || orderUpdated.length === 0) {
+      // Resi sudah tersimpan di atas, jadi percobaan ulang akan mengulang
+      // jalur update yang sama — jangan kirim notifikasi SHIPPED seolah
+      // order sudah berubah status.
+      return { success: false, error: 'Resi tersimpan, tapi status order gagal berubah (order mungkin sudah berubah). Muat ulang halaman lalu coba lagi.' }
+    }
   }
 
   // Fase 3: resi tersimpan = pesanan dikirim — beri tahu pembeli

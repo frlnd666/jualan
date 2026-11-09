@@ -34,27 +34,39 @@ export default function StaffManager({
     setError('')
     setNotice('')
     startTransition(async () => {
-      const result = await addStaffAction(email)
-      if ('error' in result) {
-        setError(result.error)
-        return
+      try {
+        const result = await addStaffAction(email)
+        if ('error' in result) {
+          setError(result.error)
+          return
+        }
+        setNotice('Staff berhasil ditambahkan.')
+        setEmail('')
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setError('Gagal menambah staff. Periksa koneksi lalu coba lagi.')
       }
-      setNotice('Staff berhasil ditambahkan.')
-      setEmail('')
-      router.refresh()
     })
   }
 
   function remove(userId: string, label: string) {
     if (!window.confirm(`Hapus ${label} dari staff toko ini?`)) return
     startTransition(async () => {
-      const result = await removeStaffAction(userId)
-      if ('error' in result) {
-        setError(result.error)
-        return
+      try {
+        const result = await removeStaffAction(userId)
+        if ('error' in result) {
+          setError(result.error)
+          return
+        }
+        setNotice('Staff dihapus — akunnya kembali menjadi pembeli.')
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setError('Gagal menghapus staff. Periksa koneksi lalu coba lagi.')
       }
-      setNotice('Staff dihapus — akunnya kembali menjadi pembeli.')
-      router.refresh()
     })
   }
 

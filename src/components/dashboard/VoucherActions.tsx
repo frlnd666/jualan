@@ -22,10 +22,16 @@ export default function VoucherActions({
   async function toggle() {
     setBusy(true)
     setErrorMessage('')
-    const result = await toggleVoucherAction(voucherId, !isActive)
-    setBusy(false)
-    if (result.error) setErrorMessage(result.error)
-    else router.refresh()
+    try {
+      const result = await toggleVoucherAction(voucherId, !isActive)
+      if (result.error) setErrorMessage(result.error)
+      else router.refresh()
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut disabled.
+      setErrorMessage('Gagal mengubah voucher. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function remove() {
@@ -34,10 +40,16 @@ export default function VoucherActions({
     }
     setBusy(true)
     setErrorMessage('')
-    const result = await deleteVoucherAction(voucherId)
-    setBusy(false)
-    if (result.error) setErrorMessage(result.error)
-    else router.refresh()
+    try {
+      const result = await deleteVoucherAction(voucherId)
+      if (result.error) setErrorMessage(result.error)
+      else router.refresh()
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut disabled.
+      setErrorMessage('Gagal menghapus voucher. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

@@ -98,44 +98,56 @@ export default function OrdersListClient({
     }
     setBusy(true)
     setMessage('')
-    const formData = new FormData()
-    formData.set('orderIds', JSON.stringify([...selected]))
-    formData.set('status', bulkStatus)
-    const result = await bulkUpdateOrderStatusAction(formData)
-    setBusy(false)
-    if (result.updated > 0) {
-      setMessage(
-        `${result.updated} pesanan diubah.` +
-          (result.failed.length > 0
-            ? ` ${result.failed.length} gagal (${result.failed[0].error}).`
-            : '')
-      )
-      setSelected(new Set())
-      setBulkMode(false)
-      router.refresh()
-    } else {
-      setMessage(
-        result.error ?? result.failed[0]?.error ?? 'Tidak ada pesanan yang berubah.'
-      )
+    try {
+      const formData = new FormData()
+      formData.set('orderIds', JSON.stringify([...selected]))
+      formData.set('status', bulkStatus)
+      const result = await bulkUpdateOrderStatusAction(formData)
+      if (result.updated > 0) {
+        setMessage(
+          `${result.updated} pesanan diubah.` +
+            (result.failed.length > 0
+              ? ` ${result.failed.length} gagal (${result.failed[0].error}).`
+              : '')
+        )
+        setSelected(new Set())
+        setBulkMode(false)
+        router.refresh()
+      } else {
+        setMessage(
+          result.error ?? result.failed[0]?.error ?? 'Tidak ada pesanan yang berubah.'
+        )
+      }
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut "Memproses...".
+      setMessage('Gagal mengubah pesanan. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setBusy(false)
     }
   }
 
   async function exportCsv() {
     setExporting(true)
     setMessage('')
-    const result = await exportOrdersCsvAction({ tab: activeTab })
-    setExporting(false)
-    if (!result.success) {
-      setMessage(result.error)
-      return
+    try {
+      const result = await exportOrdersCsvAction({ tab: activeTab })
+      if (!result.success) {
+        setMessage(result.error)
+        return
+      }
+      const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = result.filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut "Menyiapkan CSV...".
+      setMessage('Gagal mengekspor CSV. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setExporting(false)
     }
-    const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = result.filename
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   return (

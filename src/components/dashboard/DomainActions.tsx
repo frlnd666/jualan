@@ -20,16 +20,23 @@ export default function DomainActions({ domain }: { domain: string }) {
   ) {
     setBusy(true)
     setMessage('')
-    const result = await action(domain)
-    setBusy(false)
-    if (result.error) {
+    try {
+      const result = await action(domain)
+      if (result.error) {
+        setIsError(true)
+        setMessage(result.error)
+        return
+      }
+      setIsError(false)
+      setMessage(result.success ?? 'Berhasil.')
+      router.refresh()
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut disabled.
       setIsError(true)
-      setMessage(result.error)
-      return
+      setMessage('Gagal. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setBusy(false)
     }
-    setIsError(false)
-    setMessage(result.success ?? 'Berhasil.')
-    router.refresh()
   }
 
   return (

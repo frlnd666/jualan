@@ -30,26 +30,43 @@ export default function ShopeePaySettingsForm() {
 
   async function load() {
     setLoading(true)
-    const result = await getShopeePayStatusAction()
-    if ('error' in result) {
-      setErrorMessage(result.error)
-    } else {
-      setStatus(result)
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    getShopeePayStatusAction().then((result) => {
-      if (cancelled) return
+    try {
+      const result = await getShopeePayStatusAction()
       if ('error' in result) {
         setErrorMessage(result.error)
       } else {
         setStatus(result)
       }
+    } catch {
+      // P1-05: status gagal dimuat — jangan nyangkut "Memuat status ShopeePay...".
+      setErrorMessage(
+        'Gagal memuat status ShopeePay. Muat ulang halaman lalu coba lagi.'
+      )
+    } finally {
       setLoading(false)
-    })
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    getShopeePayStatusAction()
+      .then((result) => {
+        if (cancelled) return
+        if ('error' in result) {
+          setErrorMessage(result.error)
+        } else {
+          setStatus(result)
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        // P1-05: tanpa .catch(), reject membuat halaman nyangkut "Memuat status ShopeePay...".
+        if (cancelled) return
+        setErrorMessage(
+          'Gagal memuat status ShopeePay. Muat ulang halaman lalu coba lagi.'
+        )
+        setLoading(false)
+      })
     return () => {
       cancelled = true
     }
@@ -59,23 +76,31 @@ export default function ShopeePaySettingsForm() {
     setErrorMessage('')
     setSuccessMessage('')
     setSaving(true)
-    const formData = new FormData()
-    formData.set('clientId', clientId)
-    formData.set('clientSecret', clientSecret)
-    formData.set('privateKey', privateKey)
-    formData.set('merchantId', merchantId)
-    const result = await saveShopeePayCredentialsAction(formData)
-    setSaving(false)
-    if (result.error) {
-      setErrorMessage(result.error)
-      return
+    try {
+      const formData = new FormData()
+      formData.set('clientId', clientId)
+      formData.set('clientSecret', clientSecret)
+      formData.set('privateKey', privateKey)
+      formData.set('merchantId', merchantId)
+      const result = await saveShopeePayCredentialsAction(formData)
+      if (result.error) {
+        setErrorMessage(result.error)
+        return
+      }
+      setSuccessMessage(result.success ?? 'Tersimpan.')
+      setClientId('')
+      setClientSecret('')
+      setPrivateKey('')
+      setMerchantId('')
+      await load()
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut "Menyimpan...".
+      setErrorMessage(
+        'Gagal menyimpan kredensial. Periksa koneksi lalu coba lagi.'
+      )
+    } finally {
+      setSaving(false)
     }
-    setSuccessMessage(result.success ?? 'Tersimpan.')
-    setClientId('')
-    setClientSecret('')
-    setPrivateKey('')
-    setMerchantId('')
-    await load()
   }
 
   async function handleToggle(next: boolean) {

@@ -19,21 +19,27 @@ export default function AnalyticsExportClient({
   function handleExport() {
     setMessage(null)
     startTransition(async () => {
-      const result = await exportAnalyticsCsvAction(range)
-      if (!result.success) {
-        setMessage(result.error)
-        return
+      try {
+        const result = await exportAnalyticsCsvAction(range)
+        if (!result.success) {
+          setMessage(result.error)
+          return
+        }
+        const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = result.filename
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+        setMessage('File CSV terunduh.')
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal menyiapkan file CSV. Periksa koneksi lalu coba lagi.')
       }
-      const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = result.filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      setMessage('File CSV terunduh.')
     })
   }
 

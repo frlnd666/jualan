@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import { notifyOrderEvent } from '@/lib/notify'
@@ -49,7 +50,7 @@ export async function confirmPayment(formData: FormData) {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('id, store_id, payment_method, customer_name, customer_phone, total, buyer_id')
+    .select('id, store_id, status, payment_method, customer_name, customer_phone, total, buyer_id')
     .eq('id', orderId)
     .maybeSingle()
 
@@ -65,6 +66,43 @@ export async function confirmPayment(formData: FormData) {
   }
   const ownedStore = access.store
 
+  // Tulis status orders/invoices HANYA lewat service_role: setelah migrasi
+  // lockdown (20261109_p0_order_write_lockdown.sql) peran authenticated
+  // tidak lagi punya hak UPDATE atas kedua tabel ini, jadi client anon
+  // di atas hanya dipakai untuk baca + verifikasi kepemilikan.
+  const admin = createAdminClient()
+  if (!admin) {
+    return { error: 'Server belum dikonfigurasi (service role belum diset).' }
+  }
+
+  if (invoice.payment_status === 'PAID') {
+    // Cabang ini di atas cek bukti & cek status order: invoice yang sudah
+    // PAID lewat webhook QRIS tidak punya payment_proof_url, jadi cek bukti
+    // di bawah akan menolaknya mentah — padahal yang dibutuhkan di sini
+    // hanyalah sinkronisasi order (P1-25). Gagal-separuh dari alur lama:
+    // invoice sudah PAID tapi order masih PENDING_PAYMENT (update order
+    // sempat gagal). Perbaiki dulu lewat admin — best-effort, hasilnya
+    // tidak mengubah penolakan di bawah — supaya order tidak selamanya
+    // menggantung belum dibayar.
+    if (order.status === 'PENDING_PAYMENT') {
+      await admin
+        .from('orders')
+        .update({ status: 'PROCESSING' })
+        .eq('id', orderId)
+        .eq('store_id', ownedStore.id)
+        .eq('status', 'PENDING_PAYMENT')
+        .select('id')
+    }
+    return { error: 'Pembayaran ini sudah dikonfirmasi sebelumnya.' }
+  }
+
+  // Order yang sudah maju dari PENDING_PAYMENT (diproses, dikirim,
+  // selesai, batal) tidak bisa lagi dikonfirmasi pembayarannya — status
+  // bayar mengikuti invoice, bukan sebaliknya.
+  if (order.status !== 'PENDING_PAYMENT') {
+    return { error: `Order ini sudah berstatus ${order.status} sehingga pembayaran tidak bisa dikonfirmasi.` }
+  }
+
   // Fase 1 (Bab 5 rencana SaaS): COD tidak punya bukti transfer — penjual
   // menandai pembayaran COD sebagai diterima tanpa unggahan bukti. Syarat
   // bukti HANYA berlaku untuk BANK_TRANSFER / QRIS, yang memang dibayar
@@ -74,31 +112,47 @@ export async function confirmPayment(formData: FormData) {
     return { error: 'Bukti transfer belum diupload customer.' }
   }
 
-  if (invoice.payment_status === 'PAID') {
-    return { error: 'Pembayaran ini sudah dikonfirmasi sebelumnya.' }
-  }
-
-  const { error: invoiceUpdateError } = await supabase
+  // Guard atomik: hanya invoice yang masih menunggu (belum dibayar /
+  // menunggu verifikasi) yang boleh ditandai lunas. Bila tidak ada baris
+  // yang cocok, invoice sudah diproses proses lain di antaranya.
+  const { data: invoiceUpdated, error: invoiceUpdateError } = await admin
     .from('invoices')
     .update({
       payment_status: 'PAID',
     })
     .eq('id', invoiceId)
+    .in('payment_status', ['PENDING_PAYMENT', 'WAITING_VERIFICATION'])
+    .select('id')
 
   if (invoiceUpdateError) {
     return { error: 'Gagal mengubah status invoice.' }
   }
+  if (!invoiceUpdated || invoiceUpdated.length === 0) {
+    return { error: 'Pembayaran ini sudah diproses atau statusnya berubah. Coba muat ulang halaman.' }
+  }
 
-  const { error: orderUpdateError } = await supabase
+  // Guard atomik yang sama untuk order: hanya order yang masih
+  // PENDING_PAYMENT yang boleh maju ke PROCESSING.
+  const { data: orderUpdated, error: orderUpdateError } = await admin
     .from('orders')
     .update({
       status: 'PROCESSING',
     })
     .eq('id', orderId)
     .eq('store_id', ownedStore.id)
+    .eq('status', 'PENDING_PAYMENT')
+    .select('id')
 
   if (orderUpdateError) {
     return { error: 'Invoice berhasil diubah, tapi status order gagal diperbarui.' }
+  }
+  if (!orderUpdated || orderUpdated.length === 0) {
+    // Gagal-separuh: invoice sudah PAID tapi order tidak berubah (status
+    // order berubah di antara baca dan tulis). Jujur ke seller, jangan
+    // kirim notifikasi/audit seolah konfirmasi berhasil penuh, dan catat
+    // supaya terlihat di observability untuk diperbaiki manual.
+    logEvent('payment_confirm_half_applied', { orderId, invoiceNumber })
+    return { error: 'Order sudah berubah status sehingga pembayaran tidak bisa dikonfirmasi. Invoice sudah ditandai lunas — hubungi admin platform.' }
   }
 
   // Pembayaran terkonfirmasi → beri tahu pembeli (login/tamu) + pemilik

@@ -25,11 +25,30 @@ export async function suspendStoreAction(
   const admin = createAdminClient()
   if (!admin) return { error: 'Konfigurasi server belum lengkap.' }
 
-  const { error } = await admin
+  // P1-08: baca dulu + guard status — suspend buta bisa menimpa
+  // perubahan lain (mis. admin lain sudah membuka pembekuan) dan
+  // menulis audit ganda untuk status yang tidak berubah.
+  const { data: row } = await admin
+    .from('subscriptions')
+    .select('status')
+    .eq('store_id', storeId)
+    .maybeSingle()
+  const sub = row as { status: string } | null
+  if (!sub) return { error: 'Langganan toko tidak ditemukan.' }
+  if (sub.status === 'SUSPENDED') {
+    return { error: 'Toko ini sudah dibekukan.' }
+  }
+
+  const { data: updated, error } = await admin
     .from('subscriptions')
     .update({ status: 'SUSPENDED' })
     .eq('store_id', storeId)
+    .eq('status', sub.status)
+    .select('id')
   if (error) return { error: 'Gagal membekukan toko.' }
+  if (!updated || updated.length === 0) {
+    return { error: 'Status langganan sudah berubah. Muat ulang halaman.' }
+  }
 
   // Fase 4 — audit log (best-effort).
   await logAudit({
@@ -79,11 +98,18 @@ export async function unsuspendStoreAction(
         ? 'TRIALING'
         : 'ACTIVE'
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from('subscriptions')
     .update({ status: restoreTo })
     .eq('store_id', storeId)
+    .eq('status', 'SUSPENDED')
+    .select('id')
   if (error) return { error: 'Gagal membuka pembekuan toko.' }
+  if (!updated || updated.length === 0) {
+    // P1-08: kalah race dengan admin lain / cron — jangan tulis audit
+    // seolah pembekuan berhasil dibuka.
+    return { error: 'Status langganan sudah berubah. Muat ulang halaman.' }
+  }
 
   // Fase 4 — audit log (best-effort).
   await logAudit({

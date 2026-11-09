@@ -49,17 +49,30 @@ export default function BuyerAddressesPage() {
   const [isPending, startTransition] = useTransition()
 
   async function refresh() {
-    setAddresses(await listBuyerAddressesAction())
-    setLoaded(true)
+    try {
+      setAddresses(await listBuyerAddressesAction())
+    } catch {
+      // P1-05: daftar gagal dimuat — tampilkan pesan, jangan nyangkut "Memuat alamat...".
+      setError('Gagal memuat alamat. Muat ulang halaman lalu coba lagi.')
+    } finally {
+      setLoaded(true)
+    }
   }
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const data = await listBuyerAddressesAction()
-      if (cancelled) return
-      setAddresses(data)
-      setLoaded(true)
+      try {
+        const data = await listBuyerAddressesAction()
+        if (cancelled) return
+        setAddresses(data)
+      } catch {
+        // P1-05: daftar gagal dimuat — tampilkan pesan, jangan nyangkut "Memuat alamat...".
+        if (cancelled) return
+        setError('Gagal memuat alamat. Muat ulang halaman lalu coba lagi.')
+      } finally {
+        if (!cancelled) setLoaded(true)
+      }
     })()
     return () => {
       cancelled = true

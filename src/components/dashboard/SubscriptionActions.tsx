@@ -26,29 +26,35 @@ export function RunTransitionsButton() {
   function run() {
     setMessage('')
     startTransition(async () => {
-      const result = await runSubscriptionTransitionsAction()
-      if ('error' in result) {
-        setMessage(result.error)
-        return
+      try {
+        const result = await runSubscriptionTransitionsAction()
+        if ('error' in result) {
+          setMessage(result.error)
+          return
+        }
+        const s = result.summary
+        const changed =
+          s.transitions['trial-ended'] +
+          s.transitions['past-due'] +
+          s.transitions.expired +
+          s.transitions['cancelled-ended']
+        const reminded = s.reminders.trial + s.reminders.period
+        setMessage(
+          `Selesai: ${s.processed} langganan diproses, ${changed} transisi ` +
+            `(trial berakhir ${s.transitions['trial-ended']}, telat bayar ${s.transitions['past-due']}, ` +
+            `berakhir ${s.transitions.expired}, batal berakhir ${s.transitions['cancelled-ended']}), ` +
+            `${reminded} pengingat dikirim` +
+            (s.remindersSkippedDuplicate > 0
+              ? `, ${s.remindersSkippedDuplicate} pengingat dilewati (sudah dikirim hari ini)`
+              : '') +
+            (s.errors.length > 0 ? `. ${s.errors.length} error — cek log server.` : '.')
+        )
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal menjalankan transisi. Periksa koneksi lalu coba lagi.')
       }
-      const s = result.summary
-      const changed =
-        s.transitions['trial-ended'] +
-        s.transitions['past-due'] +
-        s.transitions.expired +
-        s.transitions['cancelled-ended']
-      const reminded = s.reminders.trial + s.reminders.period
-      setMessage(
-        `Selesai: ${s.processed} langganan diproses, ${changed} transisi ` +
-          `(trial berakhir ${s.transitions['trial-ended']}, telat bayar ${s.transitions['past-due']}, ` +
-          `berakhir ${s.transitions.expired}, batal berakhir ${s.transitions['cancelled-ended']}), ` +
-          `${reminded} pengingat dikirim` +
-          (s.remindersSkippedDuplicate > 0
-            ? `, ${s.remindersSkippedDuplicate} pengingat dilewati (sudah dikirim hari ini)`
-            : '') +
-          (s.errors.length > 0 ? `. ${s.errors.length} error — cek log server.` : '.')
-      )
-      router.refresh()
     })
   }
 
@@ -75,12 +81,18 @@ export function VerifyPaymentButtons({ paymentId }: { paymentId: string }) {
   function decide(decision: 'verify' | 'reject') {
     setMessage('')
     startTransition(async () => {
-      const result = await verifySubscriptionPayment(paymentId, decision)
-      if (result.error) {
-        setMessage(result.error)
-        return
+      try {
+        const result = await verifySubscriptionPayment(paymentId, decision)
+        if (result.error) {
+          setMessage(result.error)
+          return
+        }
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal memproses pembayaran. Periksa koneksi lalu coba lagi.')
       }
-      router.refresh()
     })
   }
 
@@ -118,13 +130,19 @@ export function CancelSubscriptionButton() {
   function cancel() {
     setMessage('')
     startTransition(async () => {
-      const result = await cancelSubscription()
-      if (result.error) {
-        setMessage(result.error)
-        return
+      try {
+        const result = await cancelSubscription()
+        if (result.error) {
+          setMessage(result.error)
+          return
+        }
+        setConfirming(false)
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal membatalkan langganan. Periksa koneksi lalu coba lagi.')
       }
-      setConfirming(false)
-      router.refresh()
     })
   }
 
@@ -176,12 +194,18 @@ export function ActivateFreeButton({ storeId }: { storeId: string }) {
   function activate() {
     setMessage('')
     startTransition(async () => {
-      const result = await ensureStoreSubscription(storeId, 'free')
-      if (result.error) {
-        setMessage(result.error)
-        return
+      try {
+        const result = await ensureStoreSubscription(storeId, 'free')
+        if (result.error) {
+          setMessage(result.error)
+          return
+        }
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal mengaktifkan paket Free. Periksa koneksi lalu coba lagi.')
       }
-      router.refresh()
     })
   }
 

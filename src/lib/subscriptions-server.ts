@@ -7,6 +7,7 @@
 // toko dianggap Free (batas paling ketat) supaya tidak ada fitur
 // berbayar yang bocor ke publik.
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logEvent } from '@/lib/observability'
 import {
   FREE_SUBSCRIPTION,
   getStoreSubscription,
@@ -18,5 +19,14 @@ export async function getPublicStoreSubscription(
 ): Promise<SubscriptionRow> {
   const admin = createAdminClient()
   if (!admin) return FREE_SUBSCRIPTION
-  return getStoreSubscription(admin, storeId)
+  try {
+    return await getStoreSubscription(admin, storeId)
+  } catch {
+    // R-03: tampilan publik fallback ke tier paling ketat (tidak ada
+    // fitur berbayar yang bocor), tapi kegagalan TERCATAT (bukan
+    // diam-diam). Jalur uang (checkout) dilindungi terpisah dengan
+    // menolak bila langganan tidak bisa dipastikan.
+    logEvent('subscription_read_failed', { storeId })
+    return FREE_SUBSCRIPTION
+  }
 }

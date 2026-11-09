@@ -13,6 +13,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import { restoreStock } from '@/lib/actions/order-fulfillment'
@@ -127,6 +128,17 @@ export async function bulkUpdateOrderStatusAction(
   }
 
   const notifyClient = await createPublicInvoiceClient()
+
+  // Tulis status orders HANYA lewat service_role: setelah migrasi
+  // lockdown (20261109_p0_order_write_lockdown.sql) peran authenticated
+  // tidak lagi punya hak UPDATE atas kolom status — client anon di atas
+  // hanya dipakai untuk baca + verifikasi kepemilikan. restoreStock
+  // tetap lewat anon (RPC increment_stock mengecek kepemilikan via JWT).
+  const admin = createAdminClient()
+  if (!admin) {
+    return { success: false, updated: 0, failed: [], error: 'Server belum dikonfigurasi (service role belum diset).' }
+  }
+
   const failed: Array<{ orderId: string; error: string }> = []
   let updated = 0
 
@@ -148,15 +160,23 @@ export async function bulkUpdateOrderStatusAction(
       continue
     }
 
-    const { error } = await supabase
+    // Guard atomik: hanya baris yang masih berstatus lama yang berubah.
+    // Bila tidak ada baris yang cocok, status sudah diubah proses lain
+    // di antara baca dan tulis — lewati efek samping (stok/notifikasi).
+    const { data: updatedRows, error } = await admin
       .from('orders')
       .update({ status: nextStatus })
       .eq('id', order.id)
       .eq('store_id', store.id)
       .eq('status', order.status)
+      .select('id')
 
     if (error) {
       failed.push({ orderId, error: 'Gagal mengubah status.' })
+      continue
+    }
+    if (!updatedRows || updatedRows.length === 0) {
+      failed.push({ orderId, error: 'Status pesanan sudah berubah.' })
       continue
     }
 

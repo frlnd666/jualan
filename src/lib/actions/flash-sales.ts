@@ -104,7 +104,13 @@ export async function createFlashSaleAction(
 
   // Tier gate: Free tidak boleh membuat flash sale; PAST_DUE mengunci
   // fitur premium baru (termasuk flash sale baru).
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const limits = limitsFor(subscription)
   if (
     !canCreateFlashSale(

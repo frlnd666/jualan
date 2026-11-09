@@ -8,7 +8,8 @@
 // - URL gambar QRIS, bila diisi, harus URL http(s) penuh — invoice
 //   merendernya sebagai <img> absolut, URL relatif akan 404.
 // - Semuanya boleh kosong (toko COD saja / QRIS dinamis saja).
-// Wizard onboarding tidak memakai validator ini (tidak diubah di K-05).
+// Dipakai Pengaturan (saveStorePaymentAction) dan wizard onboarding
+// langkah 2 (saveOnboardingPaymentAction, sejak P1-24).
 
 export type StorePaymentInput = {
   bankName: string

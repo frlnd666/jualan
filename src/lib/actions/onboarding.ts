@@ -13,6 +13,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureStoreSubscription } from '@/lib/actions/subscriptions'
+import { normalizeStoreSlug, validateStoreSlug } from '@/lib/store-slug'
+import { validateStorePayment } from '@/lib/store-payment'
 
 export type OnboardingStore = {
   id: string
@@ -59,10 +61,16 @@ async function requireOwnerStore(): Promise<
   // bisa dibaca peran anon/authenticated, sedangkan wizard butuh prefill
   // kolom itu. Kepemilikan tetap ditegakkan di query (.eq owner_id =
   // user), jadi service_role di sini hanya membaca toko milik pemanggil.
-  // Bila service role belum diset (lingkungan lama), fallback ke client
-  // anon seperti sebelumnya — migrasi K-03 memang harus jalan SETELAH
-  // deploy kode ini.
-  const storeReadClient = createAdminClient() ?? supabase
+  // P1-20: JANGAN fallback ke client anon bila service role belum diset
+  // — anon tidak bisa membaca kolom bank_* sejak K-03, jadi prefill
+  // rekening kembali kosong dan simpan langkah 2 akan menimpa rekening
+  // yang sudah tersimpan menjadi null. Gagal cepat dengan pesan jelas.
+  const storeReadClient = createAdminClient()
+  if (!storeReadClient) {
+    return {
+      error: 'Server belum dikonfigurasi (service role belum diset). Hubungi admin platform.',
+    }
+  }
 
   const { data: store } = await storeReadClient
     .from('stores')
@@ -91,15 +99,6 @@ export async function getOnboardingStateAction(): Promise<
   return { store: owner.store }
 }
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-}
-
 // Langkah 1 — info toko (buat toko bila belum ada, atau perbarui).
 export async function saveOnboardingStoreAction(input: {
   name: string
@@ -114,9 +113,14 @@ export async function saveOnboardingStoreAction(input: {
   const { supabase, userId } = owner
 
   const name = input.name.trim()
-  const slug = slugify(input.slug || input.name)
+  // P1-24: pakai validator yang sama seperti Settings — slugify sendiri
+  // tidak memeriksa daftar reserved (login/api/dashboard/...) maupun
+  // panjang minimum, sehingga toko bisa lahir dengan slug yang
+  // bertabrakan dengan route aplikasi.
+  const slug = normalizeStoreSlug(input.slug || input.name)
   if (!name) return { error: 'Nama toko wajib diisi.' }
-  if (!slug) return { error: 'Slug toko wajib diisi.' }
+  const slugError = validateStoreSlug(slug)
+  if (slugError) return { error: slugError }
 
   const payload = {
     name,
@@ -172,6 +176,18 @@ export async function saveOnboardingPaymentAction(input: {
   const owner = await requireOwnerStore()
   if ('error' in owner) return { error: owner.error }
   if (!owner.store) return { error: 'Buat info toko dulu (langkah 1).' }
+
+  // P1-24: pakai validator yang sama seperti Pengaturan — rekening
+  // setengah terisi, nomor berhuruf, dan URL QRIS bukan http(s) harus
+  // ditolak di sini, bukan lolos lalu tampil rusak di invoice.
+  const paymentError = validateStorePayment({
+    bankName: input.bankName,
+    bankAccountName: input.bankAccountName,
+    bankAccountNumber: input.bankAccountNumber,
+    qrisImageUrl: input.qrisImageUrl,
+    codEnabled: input.codEnabled,
+  })
+  if (paymentError) return { error: paymentError }
 
   const { error } = await owner.supabase
     .from('stores')

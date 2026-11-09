@@ -22,15 +22,21 @@ export default function VoucherForm({ disabled }: { disabled: boolean }) {
     setErrorMessage('')
     setSuccessMessage('')
     setSaving(true)
-    const result = await createVoucherAction(new FormData(e.currentTarget))
-    setSaving(false)
-    if (result.error) {
-      setErrorMessage(result.error)
-      return
+    try {
+      const result = await createVoucherAction(new FormData(e.currentTarget))
+      if (result.error) {
+        setErrorMessage(result.error)
+        return
+      }
+      setSuccessMessage(result.success ?? 'Voucher dibuat.')
+      e.currentTarget.reset()
+      router.refresh()
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut "Menyimpan...".
+      setErrorMessage('Gagal membuat voucher. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setSaving(false)
     }
-    setSuccessMessage(result.success ?? 'Voucher dibuat.')
-    e.currentTarget.reset()
-    router.refresh()
   }
 
   return (

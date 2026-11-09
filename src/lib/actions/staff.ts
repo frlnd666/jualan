@@ -88,7 +88,13 @@ export async function listStaffAction(): Promise<
     staff.push({ userId: row.id, email, createdAt: row.created_at })
   }
 
-  const subscription = await getStoreSubscription(admin, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(admin, store.id)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const { tier } = effectiveTier(subscription)
   const slotsLeft = Math.max(0, TIER_LIMITS[tier].maxStaff - staff.length)
   return { staff, slotsLeft, tierName: tier }
@@ -110,7 +116,13 @@ export async function addStaffAction(
   if (!admin) return { error: 'Konfigurasi server belum lengkap.' }
 
   // Batas tier ditegakkan dulu, sebelum mencari akun target.
-  const subscription = await getStoreSubscription(admin, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(admin, store.id)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const { tier } = effectiveTier(subscription)
   const { count } = await admin
     .from('profiles')

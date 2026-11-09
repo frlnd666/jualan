@@ -12,12 +12,18 @@ export default function BannerForm({ disabled }: { disabled: boolean }) {
   async function handleSubmit(formData: FormData) {
     setMessage(null)
     startTransition(async () => {
-      const result = await createStoreBannerAction(formData)
-      if (result.error) {
-        setMessage(result.error)
-        return
+      try {
+        const result = await createStoreBannerAction(formData)
+        if (result.error) {
+          setMessage(result.error)
+          return
+        }
+        setMessage(result.success ?? 'Banner dibuat.')
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal membuat banner. Periksa koneksi lalu coba lagi.')
       }
-      setMessage(result.success ?? 'Banner dibuat.')
     })
   }
 

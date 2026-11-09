@@ -109,7 +109,16 @@ export async function createOrderAction(input: CheckoutFormInput) {
   // Fase 1 (Bab 3): toko Free hanya boleh COD; toko yang dibekukan admin
   // (SUSPENDED) tidak menerima pesanan sama sekali. Cek ini di server —
   // pilihan di halaman checkout hanya cerminan, bukan penegak.
-  const subscription = await getStoreSubscription(supabase, input.storeId)
+  // R-03: langganan tidak bisa dipastikan = checkout MENOLAK (fail-closed)
+  // supaya toko SUSPENDED tidak bisa lolos saat baca langganan gagal.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, input.storeId)
+  } catch {
+    throw new Error(
+      'Gagal memeriksa status langganan toko. Coba lagi sebentar lagi.'
+    )
+  }
   if (subscription.status === 'SUSPENDED') {
     throw new Error('Toko ini sedang dibekukan dan tidak menerima pesanan.')
   }

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { removeProductImageObject } from '@/lib/product-image'
 import { getProductForEditAction } from '@/lib/actions/dashboard-store'
+import { updateProductAction } from '@/lib/actions/subscriptions'
 import { logPriceChangedAction } from '@/lib/actions/audit'
 
 type EditProductPageProps = {
@@ -234,23 +235,25 @@ export default function EditProductPage({ params }: EditProductPageProps) {
     try {
       setSubmitting(true)
 
-      const { error } = await supabase
-        .from('products')
-        .update({
-          name: name.trim(),
-          slug: slug.trim(),
-          price: Number(price),
-          stock: Number(stock || 0),
-          description: description.trim(),
-          available,
-          images: imageUrl ? [imageUrl] : [],
-          weight_gram:
-            Number(weightGram || 0) > 0 ? Number(weightGram) : null,
-        })
-        .eq('id', productId)
-        .eq('store_id', storeId)
+      // R-04: tulis produk lewat server action (validasi tier + batas
+      // foto + slug duplikat ditegakkan di server) — bukan update
+      // langsung dari browser. Baca + upload foto tetap dari halaman.
+      const result = await updateProductAction({
+        productId,
+        name: name.trim(),
+        slug: slug.trim(),
+        price: Number(price),
+        stock: Number(stock || 0),
+        description: description.trim(),
+        images: imageUrl ? [imageUrl] : [],
+        weightGram: Number(weightGram || 0) > 0 ? Number(weightGram) : null,
+        available,
+      })
 
-      if (error) throw error
+      if ('error' in result) {
+        setErrorMessage(result.error)
+        return
+      }
 
       // Fase 4 — audit log bila harga berubah (best-effort; kegagalan
       // pencatatan tidak menggagalkan penyimpanan produk).

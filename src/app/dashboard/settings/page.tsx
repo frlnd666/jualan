@@ -135,74 +135,79 @@ export default function SettingsPage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) return
 
-      // Fase 2: pengaturan hanya untuk pemilik toko — staff ditolak di
-      // sini (dan di RLS: policy stores owner-only).
-      const { data: settingsProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
-      if ((settingsProfile as { role?: string } | null)?.role === 'staff') {
-        setDenied(true)
-        setLoading(false)
-        return
-      }
-
-      const { data: store } = await supabase
-        .from('stores')
-        // Daftar kolom eksplisit, BUKAN '*' (K-03): '*' di PostgREST
-        // bisa mengembang ke kolom yang sudah dicabut hak SELECT-nya
-        // (cache skema basi) sehingga baca toko gagal total.
-        .select(
-          'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url, onboarding_step'
-        )
-        .eq('owner_id', user.id)
-        .single()
-
-      if (store) {
-        setStoreId(store.id)
-        setOnboardingStep(
-          typeof store.onboarding_step === 'number' ? store.onboarding_step : 5
-        )
-        setName(store.name)
-        setSlug(store.slug)
-        setDescription(store.description ?? '')
-        setWhatsapp(store.whatsapp ?? '')
-        setCity(store.city ?? '')
-        setAddress(store.address ?? '')
-        setInstagram(store.instagram ?? '')
-        setTheme(store.theme)
-        setLogoUrl(store.logo_url ?? '')
-        setBannerUrl(store.banner_url ?? '')
-        // Toko lama (dari sebelum Fase 1) belum punya baris langganan:
-        // buatkan Free/ACTIVE sekali secara diam-diam + naikkan peran
-        // jadi seller. Idempotent — toko yang sudah punya baris tidak
-        // disentuh.
-        void ensureStoreSubscription(store.id, 'free')
-
-        // K-05 — muat rekening lewat server action: client anon tidak
-        // bisa membaca kolom rekening sejak K-03, jadi prefill bagian
-        // Pembayaran harus lewat service_role (action memverifikasi
-        // pemilik dulu). Gagal muat = form kosong + simpan diblokir
-        // (lihat savePembayaran), bukan diam-diam menimpa data lama.
-        const pay = await getStorePaymentAction()
-        if ('payment' in pay && pay.payment) {
-          setBankName(pay.payment.bank_name ?? '')
-          setBankAccountName(pay.payment.bank_account_name ?? '')
-          setBankAccountNumber(pay.payment.bank_account_number ?? '')
-          setQrisImageUrl(pay.payment.qris_image_url ?? '')
-          setCodEnabled(pay.payment.cod_enabled ?? true)
-          setPaymentReady(true)
-        } else if ('error' in pay) {
-          setPaymentError(pay.error)
+        // Fase 2: pengaturan hanya untuk pemilik toko — staff ditolak di
+        // sini (dan di RLS: policy stores owner-only).
+        const { data: settingsProfile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
+        if ((settingsProfile as { role?: string } | null)?.role === 'staff') {
+          setDenied(true)
+          return
         }
+
+        const { data: store } = await supabase
+          .from('stores')
+          // Daftar kolom eksplisit, BUKAN '*' (K-03): '*' di PostgREST
+          // bisa mengembang ke kolom yang sudah dicabut hak SELECT-nya
+          // (cache skema basi) sehingga baca toko gagal total.
+          .select(
+            'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url, onboarding_step'
+          )
+          .eq('owner_id', user.id)
+          .single()
+
+        if (store) {
+          setStoreId(store.id)
+          setOnboardingStep(
+            typeof store.onboarding_step === 'number' ? store.onboarding_step : 5
+          )
+          setName(store.name)
+          setSlug(store.slug)
+          setDescription(store.description ?? '')
+          setWhatsapp(store.whatsapp ?? '')
+          setCity(store.city ?? '')
+          setAddress(store.address ?? '')
+          setInstagram(store.instagram ?? '')
+          setTheme(store.theme)
+          setLogoUrl(store.logo_url ?? '')
+          setBannerUrl(store.banner_url ?? '')
+          // Toko lama (dari sebelum Fase 1) belum punya baris langganan:
+          // buatkan Free/ACTIVE sekali secara diam-diam + naikkan peran
+          // jadi seller. Idempotent — toko yang sudah punya baris tidak
+          // disentuh.
+          void ensureStoreSubscription(store.id, 'free')
+
+          // K-05 — muat rekening lewat server action: client anon tidak
+          // bisa membaca kolom rekening sejak K-03, jadi prefill bagian
+          // Pembayaran harus lewat service_role (action memverifikasi
+          // pemilik dulu). Gagal muat = form kosong + simpan diblokir
+          // (lihat savePembayaran), bukan diam-diam menimpa data lama.
+          const pay = await getStorePaymentAction()
+          if ('payment' in pay && pay.payment) {
+            setBankName(pay.payment.bank_name ?? '')
+            setBankAccountName(pay.payment.bank_account_name ?? '')
+            setBankAccountNumber(pay.payment.bank_account_number ?? '')
+            setQrisImageUrl(pay.payment.qris_image_url ?? '')
+            setCodEnabled(pay.payment.cod_enabled ?? true)
+            setPaymentReady(true)
+          } else if ('error' in pay) {
+            setPaymentError(pay.error)
+          }
+        }
+      } catch (e) {
+        // P1-05: load gagal (mis. jaringan putus) — jangan nyangkut "Memuat...".
+        console.error('Gagal memuat pengaturan toko:', e)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -243,69 +248,75 @@ export default function SettingsPage() {
     setSavedSection(null)
     setSectionError(null)
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      setSectionError({
-        section,
-        message: 'Sesi login tidak ditemukan. Silakan login ulang.',
-      })
-      setSavingSection(null)
-      return
-    }
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setSectionError({
+          section,
+          message: 'Sesi login tidak ditemukan. Silakan login ulang.',
+        })
+        return
+      }
 
-    let saveError: { code?: string; message: string } | null = null
+      let saveError: { code?: string; message: string } | null = null
 
-    if (storeId) {
-      const { error } = await supabase
-        .from('stores')
-        .update(partial)
-        .eq('id', storeId)
-        .eq('owner_id', user.id)
-      saveError = error
-    } else {
-      const { data, error } = await supabase
-        .from('stores')
-        .insert(fullPayload(user.id))
-        .select('id')
-        .single()
-      saveError = error
-      if (data) {
-        setStoreId(data.id)
-        // Toko baru: buat baris langganan sesuai paket yang dipilih
-        // saat register + naikkan peran jadi seller (server action).
-        // Paket dibaca sekali lalu dihapus supaya tidak terpakai ulang.
-        const plan = readStoredPlan()
-        clearStoredPlan()
-        const sub = await ensureStoreSubscription(data.id, plan)
-        if (sub.error) {
-          setSavingSection(null)
-          setSectionError({
-            section,
-            message: `Toko tersimpan, tapi langganan gagal dibuat: ${sub.error} — buka halaman Langganan untuk mengulang.`,
-          })
-          return
+      if (storeId) {
+        const { error } = await supabase
+          .from('stores')
+          .update(partial)
+          .eq('id', storeId)
+          .eq('owner_id', user.id)
+        saveError = error
+      } else {
+        const { data, error } = await supabase
+          .from('stores')
+          .insert(fullPayload(user.id))
+          .select('id')
+          .single()
+        saveError = error
+        if (data) {
+          setStoreId(data.id)
+          // Toko baru: buat baris langganan sesuai paket yang dipilih
+          // saat register + naikkan peran jadi seller (server action).
+          // Paket dibaca sekali lalu dihapus supaya tidak terpakai ulang.
+          const plan = readStoredPlan()
+          clearStoredPlan()
+          const sub = await ensureStoreSubscription(data.id, plan)
+          if (sub.error) {
+            setSectionError({
+              section,
+              message: `Toko tersimpan, tapi langganan gagal dibuat: ${sub.error} — buka halaman Langganan untuk mengulang.`,
+            })
+            return
+          }
         }
       }
-    }
 
-    setSavingSection(null)
+      if (saveError) {
+        // Jangan pernah mengklaim sukses saat database menolak.
+        setSectionError({
+          section,
+          message:
+            saveError.code === '23505'
+              ? 'Slug toko sudah dipakai toko lain. Gunakan slug yang berbeda.'
+              : `Gagal menyimpan: ${saveError.message}`,
+        })
+        return
+      }
 
-    if (saveError) {
-      // Jangan pernah mengklaim sukses saat database menolak.
+      setSavedSection(section)
+      router.refresh()
+    } catch {
+      // P1-05: supabase/action melempar — tombol tidak boleh nyangkut "Menyimpan...".
       setSectionError({
         section,
-        message:
-          saveError.code === '23505'
-            ? 'Slug toko sudah dipakai toko lain. Gunakan slug yang berbeda.'
-            : `Gagal menyimpan: ${saveError.message}`,
+        message: 'Gagal menyimpan. Periksa koneksi lalu coba lagi.',
       })
-      return
+    } finally {
+      setSavingSection(null)
     }
-
-    setSavedSection(section)
-    router.refresh()
   }
 
   function saveProfil() {
@@ -354,20 +365,29 @@ export default function SettingsPage() {
     setSavingSection('pembayaran')
     setSavedSection(null)
     setSectionError(null)
-    const result = await saveStorePaymentAction({
-      bankName,
-      bankAccountName,
-      bankAccountNumber,
-      qrisImageUrl,
-      codEnabled,
-    })
-    setSavingSection(null)
-    if ('error' in result) {
-      setSectionError({ section: 'pembayaran', message: result.error })
-      return
+    try {
+      const result = await saveStorePaymentAction({
+        bankName,
+        bankAccountName,
+        bankAccountNumber,
+        qrisImageUrl,
+        codEnabled,
+      })
+      if ('error' in result) {
+        setSectionError({ section: 'pembayaran', message: result.error })
+        return
+      }
+      setSavedSection('pembayaran')
+      router.refresh()
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut "Menyimpan...".
+      setSectionError({
+        section: 'pembayaran',
+        message: 'Gagal menyimpan pembayaran. Periksa koneksi lalu coba lagi.',
+      })
+    } finally {
+      setSavingSection(null)
     }
-    setSavedSection('pembayaran')
-    router.refresh()
   }
 
   if (loading)

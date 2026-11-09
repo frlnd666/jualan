@@ -25,8 +25,14 @@ export default function ConfirmPaymentButton({
         action={(formData) => {
           setMessage(null)
           startTransition(async () => {
-            const result = await confirmPayment(formData)
-            setMessage(result.error || result.success || null)
+            try {
+              const result = await confirmPayment(formData)
+              setMessage(result.error || result.success || null)
+            } catch {
+              // P2-13: action melempar (mis. jaringan putus) — jangan
+              // biarkan error naik ke error boundary; tampilkan inline.
+              setMessage('Gagal mengonfirmasi pembayaran. Periksa koneksi lalu coba lagi.')
+            }
           })
         }}
       >

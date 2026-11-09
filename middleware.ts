@@ -86,6 +86,21 @@ async function resolveStorefrontHost(
 }
 
 export async function middleware(request: NextRequest) {
+  // R-05 (2026-11-09): satu throw di middleware mematikan SEMUA route —
+  // termasuk webhook ShopeePay dan cron — dengan 500 mentah. Fail-open:
+  // bila middleware gagal (env hilang, Supabase down), request tetap
+  // diteruskan; penjagaan auth tiap route/layout/handler tetap berlaku
+  // (dashboard layout redirect ke /login, webhook/cron cek secret
+  // sendiri). Kegagalan dicatat supaya terlihat di log server.
+  try {
+    return await runMiddleware(request)
+  } catch (err) {
+    console.error('[middleware] gagal, lanjut tanpa middleware:', err)
+    return NextResponse.next()
+  }
+}
+
+async function runMiddleware(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(

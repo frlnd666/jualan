@@ -26,8 +26,14 @@ export default function NotificationPreferencesForm({
     if (whatsappEnabled) formData.set('whatsappEnabled', 'on')
     formData.set('whatsappNumber', whatsappNumber)
     startTransition(async () => {
-      const result = await saveNotificationPreferencesAction(formData)
-      setMessage(result.error ?? 'Pengaturan tersimpan.')
+      try {
+        const result = await saveNotificationPreferencesAction(formData)
+        setMessage(result.error ?? 'Pengaturan tersimpan.')
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal menyimpan pengaturan. Periksa koneksi lalu coba lagi.')
+      }
     })
   }
 

@@ -98,6 +98,30 @@ export async function logPriceChangedAction(input: {
     return { success: true }
   }
 
+  // P2-01: jangan percaya productId/nama/harga dari client — baca produk
+  // dari DB dan pastikan milik toko pemanggil. Harga baru diambil dari DB
+  // (aksi ini dipanggil SETELAH updateProductAction berhasil, jadi harga
+  // di DB sudah harga baru). Harga lama tidak bisa diverifikasi ulang
+  // dari DB karena sudah tertimpa — yang dipastikan di sini adalah
+  // perubahannya nyata (harga DB sudah berbeda dari yang diklaim lama)
+  // dan produknya memang milik toko ini.
+  const { data: product } = await supabase
+    .from('products')
+    .select('id, name, price')
+    .eq('id', input.productId)
+    .eq('store_id', access.store.id)
+    .maybeSingle()
+  const owned = product as { id: string; name: string; price: number } | null
+  if (!owned) {
+    return { error: 'Produk tidak ditemukan di tokomu.' }
+  }
+  const dbPrice = Math.floor(Number(owned.price))
+  if (dbPrice === Math.floor(input.oldPrice)) {
+    // Harga di DB masih harga lama — update tidak terjadi, jangan catat
+    // perubahan yang tidak ada.
+    return { success: true }
+  }
+
   await logAudit({
     actorId: user.id,
     actorRole: access.role === 'staff' ? 'staff' : 'seller',
@@ -106,9 +130,9 @@ export async function logPriceChangedAction(input: {
     entityType: 'product',
     entityId: input.productId,
     details: {
-      product_name: input.productName,
+      product_name: owned.name,
       old_price: Math.floor(input.oldPrice),
-      new_price: Math.floor(input.newPrice),
+      new_price: dbPrice,
     },
   })
   return { success: true }

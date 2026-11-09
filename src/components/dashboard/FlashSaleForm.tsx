@@ -26,12 +26,18 @@ export default function FlashSaleForm({
   async function handleSubmit(formData: FormData) {
     setMessage(null)
     startTransition(async () => {
-      const result = await createFlashSaleAction(formData)
-      if (result.error) {
-        setMessage(result.error)
-        return
+      try {
+        const result = await createFlashSaleAction(formData)
+        if (result.error) {
+          setMessage(result.error)
+          return
+        }
+        setMessage(result.success ?? 'Flash sale dibuat.')
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal membuat flash sale. Periksa koneksi lalu coba lagi.')
       }
-      setMessage(result.success ?? 'Flash sale dibuat.')
     })
   }
 

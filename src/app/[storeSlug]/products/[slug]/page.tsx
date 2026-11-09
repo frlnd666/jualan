@@ -95,7 +95,15 @@ export default async function ProductDetailPage({
 
   const { data: product, error: productError } = await supabase
     .from('products')
-    .select('*')
+    // Daftar kolom eksplisit, BUKAN '*' (P2-12): '*' di PostgREST bisa
+    // mengembang ke kolom yang suatu hari dicabut hak SELECT-nya
+    // (pelajaran K-03 di stores) sehingga halaman detail 404 total.
+    // Kolom di sini = semua yang dipakai halaman + ProductDetailClient
+    // (id, store_id, name, slug, description, price, stock, available,
+    // images, badge, weight_gram).
+    .select(
+      'id, store_id, name, slug, description, price, stock, available, images, badge, weight_gram'
+    )
     .eq('store_id', store.id)
     .eq('slug', slug)
     .maybeSingle()

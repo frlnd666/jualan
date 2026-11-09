@@ -152,6 +152,12 @@ export default async function AdminSubscriptionsPage() {
                     >
                       Lihat bukti
                     </a>
+                  ) : p.proof_url ? (
+                    // P2-19: bukti ada tapi signed URL gagal dibuat —
+                    // jangan tulis "Tanpa bukti" yang menyesatkan.
+                    <span className="shrink-0 text-xs font-medium text-amber-700">
+                      Bukti tidak bisa dimuat
+                    </span>
                   ) : (
                     <span className="shrink-0 text-xs text-[var(--text-muted)]">
                       Tanpa bukti

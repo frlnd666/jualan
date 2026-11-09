@@ -29,13 +29,19 @@ export default function AdminStoreActions({
     setError('')
     setNotice('')
     startTransition(async () => {
-      const result = await suspendStoreAction(storeId)
-      if ('error' in result) {
-        setError(result.error)
-        return
+      try {
+        const result = await suspendStoreAction(storeId)
+        if ('error' in result) {
+          setError(result.error)
+          return
+        }
+        setNotice('Toko dibekukan.')
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setError('Gagal membekukan toko. Periksa koneksi lalu coba lagi.')
       }
-      setNotice('Toko dibekukan.')
-      router.refresh()
     })
   }
 
@@ -43,13 +49,19 @@ export default function AdminStoreActions({
     setError('')
     setNotice('')
     startTransition(async () => {
-      const result = await unsuspendStoreAction(storeId)
-      if ('error' in result) {
-        setError(result.error)
-        return
+      try {
+        const result = await unsuspendStoreAction(storeId)
+        if ('error' in result) {
+          setError(result.error)
+          return
+        }
+        setNotice('Pembekuan dibuka — toko aktif lagi.')
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setError('Gagal membuka pembekuan. Periksa koneksi lalu coba lagi.')
       }
-      setNotice('Pembekuan dibuka — toko aktif lagi.')
-      router.refresh()
     })
   }
 

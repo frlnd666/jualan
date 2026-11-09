@@ -22,15 +22,21 @@ export default function DomainForm({ disabled }: { disabled: boolean }) {
     setErrorMessage('')
     setSuccessMessage('')
     setSaving(true)
-    const result = await addDomainAction(new FormData(e.currentTarget))
-    setSaving(false)
-    if (result.error) {
-      setErrorMessage(result.error)
-      return
+    try {
+      const result = await addDomainAction(new FormData(e.currentTarget))
+      if (result.error) {
+        setErrorMessage(result.error)
+        return
+      }
+      setSuccessMessage(result.success ?? 'Domain ditambahkan.')
+      e.currentTarget.reset()
+      router.refresh()
+    } catch {
+      // P1-05: action melempar — tombol tidak boleh nyangkut "Menyimpan...".
+      setErrorMessage('Gagal menambah domain. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setSaving(false)
     }
-    setSuccessMessage(result.success ?? 'Domain ditambahkan.')
-    e.currentTarget.reset()
-    router.refresh()
   }
 
   return (

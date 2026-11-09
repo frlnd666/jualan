@@ -69,7 +69,13 @@ export async function createStoreBannerAction(
   if ('error' in owner) return { error: owner.error }
   const { supabase, store } = owner
 
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const limits = limitsFor(subscription)
   if (
     !canCreateBanner(limits.flashSales, subscription.status === 'PAST_DUE')

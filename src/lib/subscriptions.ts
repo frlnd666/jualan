@@ -56,8 +56,12 @@ export const FREE_SUBSCRIPTION: SubscriptionRow = {
 /**
  * Baca langganan sebuah toko. `client` boleh client user (pemilik bisa
  * membaca subscriptions-nya sendiri lewat RLS) atau service_role.
- * Mengembalikan FREE_SUBSCRIPTION bila belum ada baris — toko lama
- * dari sebelum Fase 1 tetap jalan sebagai Free.
+ * - `error` dari database → THROW (bukan fallback diam-diam): pemanggil
+ *   harus memutuskan sendiri — jalur uang menolak, tampilan fallback
+ *   ke Free sambil mencatat kegagalan. Pesan DB hanya masuk log,
+ *   bukan pesan ke user.
+ * - `!data` (tidak ada baris) → FREE_SUBSCRIPTION: toko lama dari
+ *   sebelum Fase 1 tetap jalan sebagai Free.
  */
 export async function getStoreSubscription(
   client: SupabaseClient,
@@ -69,7 +73,14 @@ export async function getStoreSubscription(
     .eq('store_id', storeId)
     .maybeSingle()
 
-  if (error || !data) return FREE_SUBSCRIPTION
+  if (error) {
+    console.error(
+      '[getStoreSubscription] Gagal membaca langganan toko:',
+      error.message
+    )
+    throw new Error('Gagal membaca langganan toko. Coba lagi.')
+  }
+  if (!data) return FREE_SUBSCRIPTION
   return {
     tier: (data as { tier: Tier }).tier,
     status: (data as { status: SubscriptionStatus }).status,

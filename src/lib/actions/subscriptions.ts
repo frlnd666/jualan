@@ -193,7 +193,14 @@ export async function createProductAction(input: {
     return { error: 'Harga produk harus lebih dari 0.' }
   }
 
-  const subscription = await getStoreSubscription(supabase, storeId)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller
+  // (bukan fallback diam-diam ke Free yang bisa membocorkan fitur).
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, storeId)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const limits = limitsFor(subscription)
   const { premiumLocked } = effectiveTier(subscription)
 
@@ -247,6 +254,111 @@ export async function createProductAction(input: {
 
   revalidatePath('/dashboard/products')
   revalidatePath('/dashboard')
+  return { success: true }
+}
+
+/**
+ * Penegakan batas tier DI SERVER untuk edit produk (R-04) — pasangan
+ * createProductAction dengan validasi yang sama (login, akses
+ * owner/staff, name/slug wajib, harga > 0, kunci premium, batas foto
+ * per produk, slug duplikat). Bedanya: produk harus milik toko ini
+ * dulu, dan batas maxProducts TIDAK dicek (edit tidak menambah jumlah
+ * produk). Halaman /dashboard/products/[id] memanggil action ini,
+ * bukan update langsung dari browser.
+ */
+export async function updateProductAction(input: {
+  productId: string
+  name: string
+  slug: string
+  price: number
+  stock: number
+  description: string
+  images: string[]
+  /** Berat per unit (gram, Fase 3) — sama seperti create. */
+  weightGram?: number | null
+  /** Status aktif produk (checkbox di halaman edit). */
+  available?: boolean
+}): Promise<{ success: true } | { error: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Kamu harus login untuk mengubah produk.' }
+
+  const access = await getDashboardAccess(supabase, user.id)
+  const storeId = access?.store.id
+  if (!storeId) return { error: 'Toko tidak ditemukan untuk akun ini.' }
+
+  const name = input.name.trim()
+  const slug = input.slug.trim().toLowerCase()
+  if (!name) return { error: 'Nama produk wajib diisi.' }
+  if (!slug) return { error: 'Slug produk wajib diisi.' }
+  if (!Number.isFinite(input.price) || input.price <= 0) {
+    return { error: 'Harga produk harus lebih dari 0.' }
+  }
+
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, storeId)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
+  const limits = limitsFor(subscription)
+  const { premiumLocked } = effectiveTier(subscription)
+
+  if (premiumLocked && subscription.tier !== 'free') {
+    return {
+      error:
+        'Langgananmu sedang telat bayar — ubah produk dikunci sampai pembayaran diperpanjang.',
+    }
+  }
+  if (input.images.length > limits.maxPhotosPerProduct) {
+    return {
+      error: `Paketmu hanya mengizinkan ${limits.maxPhotosPerProduct} foto per produk. Upgrade paket untuk menambah foto.`,
+    }
+  }
+
+  // Verifikasi produk milik toko ini dulu — edit produk toko lain
+  // ditolak, sama seperti create yang terikat storeId dari akses.
+  const { data: existing } = await supabase
+    .from('products')
+    .select('id')
+    .eq('id', input.productId)
+    .eq('store_id', storeId)
+    .maybeSingle()
+  if (!existing) return { error: 'Produk tidak ditemukan.' }
+
+  const { error } = await supabase
+    .from('products')
+    .update({
+      name,
+      slug,
+      price: input.price,
+      stock: Math.max(0, Math.floor(input.stock) || 0),
+      description: input.description.trim(),
+      images: input.images.slice(0, limits.maxPhotosPerProduct),
+      ...(input.available !== undefined
+        ? { available: input.available }
+        : {}),
+      weight_gram:
+        input.weightGram && Number.isFinite(input.weightGram) && input.weightGram > 0
+          ? Math.floor(input.weightGram)
+          : null,
+    })
+    .eq('id', input.productId)
+    .eq('store_id', storeId)
+
+  if (error) {
+    if (error.message?.toLowerCase().includes('duplicate')) {
+      return { error: 'Slug produk sudah dipakai. Gunakan slug lain.' }
+    }
+    return { error: `Gagal menyimpan produk: ${error.message}` }
+  }
+
+  revalidatePath('/dashboard/products')
+  revalidatePath('/dashboard')
+  revalidatePath(`/dashboard/products/${input.productId}`)
   return { success: true }
 }
 
@@ -393,7 +505,11 @@ export async function verifySubscriptionPayment(
   }
 
   const now = new Date()
-  const { error: updatePaymentError } = await admin
+  // R-10: guard race verify-vs-reject — update hanya cocok bila payment
+  // masih PENDING_VERIFICATION. Dua admin yang memproses bersamaan:
+  // hanya satu yang cocok; yang lain mendapat "sudah diproses" dan
+  // batal SEBELUM update subscription, audit, atau notifikasi.
+  const { data: updatedPayment, error: updatePaymentError } = await admin
     .from('subscription_payments')
     .update({
       status: decision === 'verify' ? 'VERIFIED' : 'REJECTED',
@@ -410,8 +526,13 @@ export async function verifySubscriptionPayment(
         : {}),
     })
     .eq('id', paymentId)
+    .eq('status', 'PENDING_VERIFICATION')
+    .select('id')
   if (updatePaymentError) {
     return { error: `Gagal memproses pembayaran: ${updatePaymentError.message}` }
+  }
+  if (!updatedPayment || updatedPayment.length === 0) {
+    return { error: 'Pembayaran ini sudah diproses sebelumnya.' }
   }
 
   if (decision === 'verify') {
@@ -562,6 +683,13 @@ export async function cancelSubscription() {
 export async function getAllowedPaymentMethodsAction(storeId: string) {
   if (!storeId) return [] as Array<'BANK_TRANSFER' | 'QRIS' | 'COD'>
   const supabase = await createPublicInvoiceClient()
-  const subscription = await getStoreSubscription(supabase, storeId)
-  return allowedCheckoutMethods(subscription)
+  // R-03: fungsi ini mengembalikan array (bukan { error }) — gagal baca
+  // langganan = kembalikan [] (fail-closed: tidak ada metode yang
+  // ditawarkan) mengikuti pola fallback yang sudah ada di atas.
+  try {
+    const subscription = await getStoreSubscription(supabase, storeId)
+    return allowedCheckoutMethods(subscription)
+  } catch {
+    return [] as Array<'BANK_TRANSFER' | 'QRIS' | 'COD'>
+  }
 }

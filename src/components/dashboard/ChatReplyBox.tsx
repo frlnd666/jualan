@@ -20,13 +20,19 @@ export default function ChatReplyBox({ sessionId }: { sessionId: string }) {
     e.preventDefault()
     setError('')
     startTransition(async () => {
-      const result = await sendSellerMessage(sessionId, draft)
-      if (!result.success) {
-        setError(result.error || 'Pesan gagal dikirim.')
-        return
+      try {
+        const result = await sendSellerMessage(sessionId, draft)
+        if (!result.success) {
+          setError(result.error || 'Pesan gagal dikirim.')
+          return
+        }
+        setDraft('')
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setError('Gagal mengirim pesan. Periksa koneksi lalu coba lagi.')
       }
-      setDraft('')
-      router.refresh()
     })
   }
 

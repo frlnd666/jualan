@@ -24,15 +24,22 @@ export async function GET() {
   }
 
   const env = requiredEnvStatus()
-  const envOk =
-    env.supabaseUrl && env.supabaseServiceRole && env.shopeepayEncryptionKey
-  const status = database === 'ok' && envOk ? 'ok' : 'degraded'
+  // P2-10: readiness hanya bergantung pada yang wajib (Supabase +
+  // service role). ShopeePay dan rekening platform adalah fitur
+  // opsional — tidak boleh membuat status jadi 'degraded'.
+  const readinessOk =
+    database === 'ok' && env.supabaseUrl && env.supabaseServiceRole
+  const status = readinessOk ? 'ok' : 'degraded'
 
   return NextResponse.json({
     status,
     checks: {
       database,
       env,
+      features: {
+        shopeepay: env.shopeepayEncryptionKey,
+        platformBank: env.platformBank,
+      },
     },
     uptimeMs: Date.now() - startedAt,
     timestamp: new Date().toISOString(),

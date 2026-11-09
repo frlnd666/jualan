@@ -604,6 +604,15 @@ export default async function DashboardOrderDetailPage({
                       />
                     </a>
                   </div>
+                ) : invoice?.payment_proof_url ? (
+                  // P2-19: bukti ada tapi signed URL gagal dibuat — jangan
+                  // diam-diam menyembunyikan; beri tahu seller.
+                  <div className="pt-1">
+                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      Bukti transfer tidak bisa dimuat — hubungi admin
+                      platform.
+                    </p>
+                  </div>
                 ) : null}
               </div>
             </section>

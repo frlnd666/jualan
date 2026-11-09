@@ -35,7 +35,13 @@ export async function getProductQuotaAction(): Promise<
 
   const admin = createAdminClient()
   if (!admin) return { error: 'Konfigurasi server belum lengkap.' }
-  const subscription = await getStoreSubscription(admin, access.store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(admin, access.store.id)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const { tier } = effectiveTier(subscription)
   const tierLabel = tier === 'free' ? 'Free' : tier === 'silver' ? 'Silver' : 'Gold'
 

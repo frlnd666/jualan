@@ -44,9 +44,15 @@ export default function NotificationsList({
 
   async function markAll() {
     setMarkingAll(true)
-    await markAllNotificationsReadAction()
-    setMarkingAll(false)
-    router.refresh()
+    try {
+      await markAllNotificationsReadAction()
+      router.refresh()
+    } catch (e) {
+      // P1-05: komponen ini tidak punya state pesan — cukup reset loading + log.
+      console.error('Gagal menandai semua notifikasi dibaca:', e)
+    } finally {
+      setMarkingAll(false)
+    }
   }
 
   const unread = items.filter((n) => !n.is_read && !readIds.has(n.id)).length

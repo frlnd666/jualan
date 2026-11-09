@@ -76,32 +76,37 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     async function load() {
-      const result = await getOnboardingStateAction()
-      if ('error' in result) {
-        setError(result.error)
+      try {
+        const result = await getOnboardingStateAction()
+        if ('error' in result) {
+          setError(result.error)
+          return
+        }
+        const s = result.store
+        setStore(s)
+        if (s) {
+          setName(s.name)
+          setSlug(s.slug)
+          setSlugTouched(true)
+          setDescription(s.description ?? '')
+          setWhatsapp(s.whatsapp ?? '')
+          setCity(s.city ?? '')
+          setAddress(s.address ?? '')
+          setBankName(s.bank_name ?? '')
+          setBankAccountName(s.bank_account_name ?? '')
+          setBankAccountNumber(s.bank_account_number ?? '')
+          setQrisImageUrl(s.qris_image_url ?? '')
+          setCodEnabled(s.cod_enabled ?? true)
+          setOrigin(s.origin ?? '')
+          const saved = Math.min(Math.max(s.onboarding_step, 0), 5)
+          setStep(saved >= 5 ? 5 : saved + 1)
+        }
+      } catch {
+        // P1-05: state gagal dimuat — jangan nyangkut "Memuat wizard...".
+        setError('Gagal memuat wizard. Muat ulang halaman lalu coba lagi.')
+      } finally {
         setLoading(false)
-        return
       }
-      const s = result.store
-      setStore(s)
-      if (s) {
-        setName(s.name)
-        setSlug(s.slug)
-        setSlugTouched(true)
-        setDescription(s.description ?? '')
-        setWhatsapp(s.whatsapp ?? '')
-        setCity(s.city ?? '')
-        setAddress(s.address ?? '')
-        setBankName(s.bank_name ?? '')
-        setBankAccountName(s.bank_account_name ?? '')
-        setBankAccountNumber(s.bank_account_number ?? '')
-        setQrisImageUrl(s.qris_image_url ?? '')
-        setCodEnabled(s.cod_enabled ?? true)
-        setOrigin(s.origin ?? '')
-        const saved = Math.min(Math.max(s.onboarding_step, 0), 5)
-        setStep(saved >= 5 ? 5 : saved + 1)
-      }
-      setLoading(false)
     }
     load()
   }, [])

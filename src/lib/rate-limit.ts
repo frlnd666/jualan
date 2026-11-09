@@ -24,7 +24,13 @@ export function checkRateLimit(
   const state = buckets.get(key)
 
   if (!state || now - state.windowStart >= windowMs) {
-    if (buckets.size >= MAX_BUCKETS) buckets.clear()
+    if (buckets.size >= MAX_BUCKETS) {
+      // P2-02: JANGAN clear-all — penyerang bisa membanjiri dengan
+      // 10.000 key berbeda untuk me-reset limit semua orang. Buang
+      // satu entri tertua saja (Map menjaga urutan sisip).
+      const oldestKey = buckets.keys().next().value
+      if (oldestKey !== undefined) buckets.delete(oldestKey)
+    }
     buckets.set(key, { count: 1, windowStart: now })
     return { allowed: true, retryAfterSeconds: 0 }
   }

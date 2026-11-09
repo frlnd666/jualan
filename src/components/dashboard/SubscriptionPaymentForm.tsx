@@ -42,25 +42,31 @@ export default function SubscriptionPaymentForm({
       return
     }
     startTransition(async () => {
-      const formData = new FormData()
-      formData.set('file', file)
-      const upload = await uploadSubscriptionProof(formData)
-      if (upload.error || !upload.proofUrl) {
-        setMessage(upload.error || 'Gagal upload bukti.')
-        return
+      try {
+        const formData = new FormData()
+        formData.set('file', file)
+        const upload = await uploadSubscriptionProof(formData)
+        if (upload.error || !upload.proofUrl) {
+          setMessage(upload.error || 'Gagal upload bukti.')
+          return
+        }
+        const result = await submitSubscriptionPayment({
+          tier,
+          method,
+          proofUrl: upload.proofUrl,
+        })
+        if (result.error) {
+          setMessage(result.error)
+          return
+        }
+        setMessage('Pengajuan terkirim. Admin akan memverifikasi pembayaranmu.')
+        setFile(null)
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — jangan biarkan
+        // error naik ke error boundary; tampilkan inline.
+        setMessage('Gagal mengirim pengajuan. Periksa koneksi lalu coba lagi.')
       }
-      const result = await submitSubscriptionPayment({
-        tier,
-        method,
-        proofUrl: upload.proofUrl,
-      })
-      if (result.error) {
-        setMessage(result.error)
-        return
-      }
-      setMessage('Pengajuan terkirim. Admin akan memverifikasi pembayaranmu.')
-      setFile(null)
-      router.refresh()
     })
   }
 

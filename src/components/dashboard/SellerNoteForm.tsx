@@ -24,14 +24,20 @@ export default function SellerNoteForm({
     const formData = new FormData()
     formData.set('orderId', orderId)
     formData.set('note', note)
-    const result = await saveSellerNoteAction(formData)
-    setSaving(false)
-    if (!result.success) {
-      setMessage(result.error ?? 'Gagal menyimpan catatan.')
-      return
+    try {
+      const result = await saveSellerNoteAction(formData)
+      if (!result.success) {
+        setMessage(result.error ?? 'Gagal menyimpan catatan.')
+        return
+      }
+      setMessage('Catatan tersimpan ✓')
+      router.refresh()
+    } catch {
+      // P1-05: action melempar (mis. jaringan putus) — tombol tidak boleh nyangkut "Menyimpan...".
+      setMessage('Gagal menyimpan catatan. Periksa koneksi lalu coba lagi.')
+    } finally {
+      setSaving(false)
     }
-    setMessage('Catatan tersimpan ✓')
-    router.refresh()
   }
 
   return (

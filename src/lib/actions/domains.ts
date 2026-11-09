@@ -110,7 +110,18 @@ export async function getDomainsPageDataAction(): Promise<DomainsPageData> {
   if ('error' in owner) return empty
   const { supabase, store } = owner
 
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller lewat
+  // loadError (fungsi ini mengembalikan DomainsPageData, bukan { error }).
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    return {
+      ...empty,
+      storeSlug: store.slug,
+      loadError: 'Gagal memeriksa langganan toko. Coba lagi.',
+    }
+  }
   const limits = limitsFor(subscription)
   const customDomainAllowed =
     limits.customDomain && subscription.status !== 'PAST_DUE'
@@ -160,7 +171,13 @@ export async function addDomainAction(
   if ('error' in owner) return { error: owner.error }
   const { supabase, store } = owner
 
-  const subscription = await getStoreSubscription(supabase, store.id)
+  // R-03: gagal baca langganan = fail-closed, terlihat oleh seller.
+  let subscription
+  try {
+    subscription = await getStoreSubscription(supabase, store.id)
+  } catch {
+    return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
+  }
   const limits = limitsFor(subscription)
   if (!limits.customDomain || subscription.status === 'PAST_DUE') {
     return {

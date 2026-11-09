@@ -6,7 +6,11 @@ import type { MetadataRoute } from 'next'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { siteUrlFromEnv, sitemapStoreUrl, sitemapProductUrl } from '@/lib/seo'
-import { getPublicStoreSubscription } from '@/lib/subscriptions-server'
+import {
+  TIER_LIMITS,
+  limitsFor,
+  type SubscriptionRow,
+} from '@/lib/subscription-tiers'
 
 type StoreRow = { id: string; slug: string; name: string }
 type ProductRow = {
@@ -49,11 +53,33 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Tabel belum ada — sitemap tetap jalan dengan URL platform.
   }
 
-  // Toko SUSPENDED dikeluarkan (cek satu per satu; jumlah toko masih kecil).
+  // P2-04: satu query subscriptions untuk semua toko (bukan N+1
+  // getPublicStoreSubscription per toko), lalu filter di memori.
+  // Toko tanpa baris langganan = Free; toko SUSPENDED dikeluarkan.
+  const subByStore = new Map<string, SubscriptionRow>()
+  try {
+    const { data: subs } = await supabase
+      .from('subscriptions')
+      .select('store_id, tier, status, current_period_end')
+      .in('store_id', storeList.map((s) => s.id))
+    for (const row of (subs ?? []) as Array<
+      SubscriptionRow & { store_id: string }
+    >) {
+      subByStore.set(row.store_id, row)
+    }
+  } catch {
+    // Tabel belum ada — semua toko dianggap Free (bukan error).
+  }
   const visibleStores: StoreRow[] = []
+  const maxProductsByStore = new Map<string, number>()
   for (const store of storeList) {
-    const subscription = await getPublicStoreSubscription(store.id)
-    if (subscription.status !== 'SUSPENDED') visibleStores.push(store)
+    const sub = subByStore.get(store.id)
+    if (sub?.status === 'SUSPENDED') continue
+    visibleStores.push(store)
+    maxProductsByStore.set(
+      store.id,
+      sub ? limitsFor(sub).maxProducts : TIER_LIMITS.free.maxProducts
+    )
   }
 
   const storeIds = visibleStores.map((s) => s.id)
@@ -67,6 +93,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const productList = (products ?? []) as ProductRow[]
   const storeById = new Map(visibleStores.map((s) => [s.id, s]))
 
+  // P2-04: terapkan batas produk per tier di sitemap juga — produk di
+  // atas batas paket disembunyikan dari storefront, jadi tidak boleh
+  // masuk sitemap. Produk diurutkan updated_at desc, jadi N pertama
+  // per toko adalah yang terbaru (sama seperti visibleSlugs di halaman
+  // detail produk).
+  const keptByStore = new Map<string, number>()
+  const visibleProducts: ProductRow[] = []
+  for (const product of productList) {
+    const cap = maxProductsByStore.get(product.store_id)
+    if (cap === undefined) continue
+    const kept = keptByStore.get(product.store_id) ?? 0
+    if (kept >= cap) continue
+    keptByStore.set(product.store_id, kept + 1)
+    visibleProducts.push(product)
+  }
+
   for (const store of visibleStores) {
     entries.push({
       url: sitemapStoreUrl(store, verifiedByStore.get(store.id) ?? null, siteUrl),
@@ -74,7 +116,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     })
   }
-  for (const product of productList) {
+  for (const product of visibleProducts) {
     const store = storeById.get(product.store_id)
     if (!store) continue
     entries.push({

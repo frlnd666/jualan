@@ -139,7 +139,12 @@ export default function SettingsPage() {
 
       const { data: store } = await supabase
         .from('stores')
-        .select('*')
+        // Daftar kolom eksplisit, BUKAN '*' (K-03): '*' di PostgREST
+        // bisa mengembang ke kolom yang sudah dicabut hak SELECT-nya
+        // (cache skema basi) sehingga baca toko gagal total.
+        .select(
+          'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url, onboarding_step'
+        )
         .eq('owner_id', user.id)
         .single()
 
@@ -230,7 +235,7 @@ export default function SettingsPage() {
       const { data, error } = await supabase
         .from('stores')
         .insert(fullPayload(user.id))
-        .select()
+        .select('id')
         .single()
       saveError = error
       if (data) {

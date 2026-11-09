@@ -159,7 +159,13 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
-    .select('*')
+    // Daftar kolom eksplisit, BUKAN '*' (K-03): setelah migrasi hak
+    // SELECT tingkat kolom, '*' di PostgREST bisa mengembang ke kolom
+    // yang sudah dicabut (cache skema basi) dan seluruh halaman jadi
+    // 404. Kolom di sini = semua kolom tampilan publik.
+    .select(
+      'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url'
+    )
     .eq('slug', storeSlug)
     .maybeSingle()
 

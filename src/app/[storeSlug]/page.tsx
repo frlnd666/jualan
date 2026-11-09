@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { CSSProperties } from 'react'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
@@ -20,6 +21,7 @@ import {
 } from '@/lib/seo'
 import type { HostKind } from '@/lib/domains'
 import { MapPin, Package, PackageOpen } from 'lucide-react'
+import { resolveStoreTheme } from '@/lib/store-themes'
 import {
   activeFlashSaleForProduct,
   discountPercent,
@@ -260,8 +262,17 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
   const totalProducts = productList.length
   const featuredProducts = productList.slice(0, 2)
 
+  // Tema toko (lib/store-themes.ts): override CSS variable di
+  // pembungkus — pilihan tema seller akhirnya benar-benar diterapkan.
+  const theme = resolveStoreTheme(
+    (store as { theme?: string | null }).theme
+  )
+
   return (
-    <div className="min-h-screen bg-[var(--bg)] pb-24 text-zinc-900">
+    <div
+      className="min-h-screen bg-[var(--bg)] pb-24 text-[var(--text)]"
+      style={theme.vars as CSSProperties}
+    >
       {/* Fase 5 — JSON-LD Store untuk mesin pencari. */}
       <script
         type="application/ld+json"
@@ -291,7 +302,10 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
             </>
           ) : (
             <>
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.16),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(255,210,160,0.18),_transparent_24%),linear-gradient(135deg,#4b342b_0%,#2f241f_52%,#211814_100%)]" />
+              <div
+                className="absolute inset-0"
+                style={{ background: theme.heroBackground }}
+              />
               <div className="absolute right-[-40px] top-[-10px] h-40 w-40 rounded-full bg-[var(--surface)]/10 blur-3xl" />
               <div className="absolute bottom-[-50px] left-[-30px] h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
             </>
@@ -398,7 +412,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 {activeBanner.link_url ? (
                   <Link
                     href={activeBanner.link_url}
-                    className="mt-2 inline-flex items-center justify-center rounded-full bg-[#0b6b4a] px-4 py-2 text-xs font-semibold text-white"
+                    className="mt-2 inline-flex items-center justify-center rounded-full bg-[var(--primary)] px-4 py-2 text-xs font-semibold text-white"
                   >
                     Lihat selengkapnya
                   </Link>
@@ -432,7 +446,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                     className="overflow-hidden rounded-[28px] border border-black/5 bg-[var(--surface)] shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
                   >
                     <div className="grid grid-cols-[112px_1fr]">
-                      <div className="relative h-full min-h-[112px] bg-[#efe6dc]">
+                      <div className="relative h-full min-h-[112px] bg-[var(--surface-muted)]">
                         {product.images?.[0] ? (
                           <WatermarkedImage
                             src={product.images[0]}
@@ -482,7 +496,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                               </p>
                             ) : null}
                           </div>
-                          <span className="inline-flex items-center justify-center rounded-full bg-[#f3efe9] px-3 py-1.5 text-xs font-semibold text-[var(--text)]">
+                          <span className="inline-flex items-center justify-center rounded-full bg-[var(--surface-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text)]">
                             Lihat
                           </span>
                         </div>
@@ -579,7 +593,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                             </p>
                           ) : null}
                         </div>
-                        <span className="rounded-full bg-[#f4efe9] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6d5f54]">
+                        <span className="rounded-full bg-[var(--surface-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                           Detail
                         </span>
                       </div>

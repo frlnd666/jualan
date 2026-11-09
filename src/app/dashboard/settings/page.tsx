@@ -15,6 +15,7 @@ import {
 } from '@/lib/actions/store-payment'
 import ShopeePaySettingsForm from '@/components/dashboard/ShopeePaySettingsForm'
 import { clearStoredPlan, readStoredPlan } from '@/lib/register-plan'
+import { STORE_THEMES } from '@/lib/store-themes'
 import { useRouter } from 'next/navigation'
 
 type SectionKey = 'profil' | 'kontak' | 'tampilan' | 'pembayaran'
@@ -563,9 +564,9 @@ export default function SettingsPage() {
             onChange={(e) => setTheme(e.target.value)}
             className={inputClassName}
           >
-            <option value="default">Default (Indigo)</option>
-            <option value="warm">Warm (Amber)</option>
-            <option value="minimal">Minimal (Slate)</option>
+            <option value="default">{STORE_THEMES.default.label}</option>
+            <option value="warm">{STORE_THEMES.warm.label}</option>
+            <option value="minimal">{STORE_THEMES.minimal.label}</option>
           </select>
         </Field>
 

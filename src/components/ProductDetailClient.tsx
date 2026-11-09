@@ -163,12 +163,12 @@ export default function ProductDetailClient({
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f1ea] pb-32 text-[#241b17]">
+    <div className="min-h-screen bg-[var(--bg)] pb-32 text-[var(--text)]">
       <div className="mx-auto max-w-4xl">
         <div className="px-4 pt-4 sm:px-6">
           <Link
             href={backHref}
-            className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-4 py-2 text-sm font-semibold text-[#241b17] shadow-[0_8px_20px_rgba(33,24,20,0.05)] transition hover:bg-[#faf6f1]"
+            className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-4 py-2 text-sm font-semibold text-[var(--text)] shadow-[0_8px_20px_rgba(33,24,20,0.05)] transition hover:bg-[var(--surface-soft)]"
           >
             <span aria-hidden="true">←</span>
             Kembali ke toko
@@ -177,7 +177,7 @@ export default function ProductDetailClient({
 
         <main className="px-4 pb-8 pt-4 sm:px-6">
           <div className="overflow-hidden rounded-[32px] border border-black/5 bg-white shadow-[0_16px_40px_rgba(33,24,20,0.07)]">
-            <section className="relative bg-[#efe7de]">
+            <section className="relative bg-[var(--surface-muted)]">
               <div className="relative aspect-[4/5] w-full overflow-hidden sm:aspect-[16/10]">
                 {activeImage ? (
                   <WatermarkedImage
@@ -198,7 +198,7 @@ export default function ProductDetailClient({
 
               {product.badge ? (
                 <div className="absolute left-4 top-4">
-                  <span className="rounded-full bg-[#2f241f] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white shadow-lg">
+                  <span className="rounded-full bg-[var(--primary-deep)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white shadow-lg">
                     {product.badge}
                   </span>
                 </div>
@@ -206,7 +206,7 @@ export default function ProductDetailClient({
             </section>
 
             {images.length > 1 ? (
-              <section className="border-t border-black/5 bg-[#fcfaf7] px-4 py-4 sm:px-6">
+              <section className="border-t border-black/5 bg-[var(--surface)] px-4 py-4 sm:px-6">
                 <div className="flex gap-3 overflow-x-auto pb-1">
                   {images.map((image, index) => {
                     const isActive = image === activeImage
@@ -237,10 +237,10 @@ export default function ProductDetailClient({
             <section className="px-4 py-5 sm:px-6 sm:py-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8d7f73]">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
                     Detail produk
                   </p>
-                  <h1 className="mt-2 text-2xl font-bold leading-tight text-[#241b17]">
+                  <h1 className="mt-2 text-2xl font-bold leading-tight text-[var(--text)]">
                     {product.name}
                   </h1>
                 </div>
@@ -252,13 +252,13 @@ export default function ProductDetailClient({
                 </span>
               </div>
 
-              <div className="mt-4 flex items-end justify-between gap-4 rounded-[28px] bg-[#f7f1eb] px-4 py-4">
+              <div className="mt-4 flex items-end justify-between gap-4 rounded-[28px] bg-[var(--surface-soft)] px-4 py-4">
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8d7f73]">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
                     Harga
                   </p>
                   {hasFlash ? (
-                    <p className="mt-1 text-sm font-medium text-[#8d7f73] line-through">
+                    <p className="mt-1 text-sm font-medium text-[var(--text-muted)] line-through">
                       Rp {formatRupiah(normalPrice)}
                     </p>
                   ) : null}
@@ -276,18 +276,18 @@ export default function ProductDetailClient({
                 </div>
 
                 <div className="text-right">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8d7f73]">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
                     Status
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-[#241b17]">
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                     {isDisabled ? 'Belum bisa dipesan' : 'Siap dipesan'}
                   </p>
                 </div>
               </div>
 
               {!isDisabled ? (
-                <div className="mt-4 flex items-center justify-between gap-4 rounded-[28px] border border-[#eadfd4] bg-white px-4 py-3">
-                  <p className="text-sm font-semibold text-[#241b17]">Jumlah</p>
+                <div className="mt-4 flex items-center justify-between gap-4 rounded-[28px] border border-[var(--line)] bg-white px-4 py-3">
+                  <p className="text-sm font-semibold text-[var(--text)]">Jumlah</p>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -296,12 +296,12 @@ export default function ProductDetailClient({
                         setQty((q) => Math.max(1, q - 1))
                         setAdded(false)
                       }}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-base font-bold text-[#241b17] transition hover:bg-[#faf6f1] disabled:opacity-40"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-base font-bold text-[var(--text)] transition hover:bg-[var(--surface-soft)] disabled:opacity-40"
                       disabled={qty <= 1}
                     >
                       −
                     </button>
-                    <span className="w-8 text-center text-sm font-bold text-[#241b17]">
+                    <span className="w-8 text-center text-sm font-bold text-[var(--text)]">
                       {qty}
                     </span>
                     <button
@@ -311,7 +311,7 @@ export default function ProductDetailClient({
                         setQty((q) => Math.min(maxQty, q + 1))
                         setAdded(false)
                       }}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-base font-bold text-[#241b17] transition hover:bg-[#faf6f1] disabled:opacity-40"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/10 bg-white text-base font-bold text-[var(--text)] transition hover:bg-[var(--surface-soft)] disabled:opacity-40"
                       disabled={qty >= maxQty}
                     >
                       +
@@ -321,49 +321,49 @@ export default function ProductDetailClient({
               ) : null}
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl bg-[#fcfaf7] px-4 py-4">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8d7f73]">
+                <div className="rounded-2xl bg-[var(--surface)] px-4 py-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]">
                     Kategori visual
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-[#241b17]">
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                     Menu pilihan
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-[#fcfaf7] px-4 py-4">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8d7f73]">
+                <div className="rounded-2xl bg-[var(--surface)] px-4 py-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]">
                     Stok
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-[#241b17]">
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                     {Number(product.stock ?? 0)} tersedia
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-[#fcfaf7] px-4 py-4">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8d7f73]">
+                <div className="rounded-2xl bg-[var(--surface)] px-4 py-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]">
                     Pengambilan
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-[#241b17]">
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                     Cek saat checkout
                   </p>
                 </div>
               </div>
 
               <section className="mt-6">
-                <h2 className="text-base font-bold text-[#241b17]">
+                <h2 className="text-base font-bold text-[var(--text)]">
                   Deskripsi
                 </h2>
-                <p className="mt-3 text-sm leading-7 text-[#6f6258]">
+                <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
                   {product.description?.trim() ||
                     'Produk ini disiapkan untuk memberikan pengalaman rasa yang nyaman, rapi, dan cocok dinikmati kapan saja. Detail tambahan seperti komposisi, ukuran, atau catatan khusus dapat ditanyakan saat pemesanan.'}
                 </p>
               </section>
 
-              <section className="mt-6 rounded-[28px] border border-[#eadfd4] bg-[#fffaf5] p-4">
-                <h2 className="text-base font-bold text-[#241b17]">
+              <section className="mt-6 rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4">
+                <h2 className="text-base font-bold text-[var(--text)]">
                   Catatan pemesanan
                 </h2>
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-[#6f6258]">
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-muted)]">
                   <li>- Pastikan jumlah dan varian sudah sesuai sebelum melanjutkan checkout.</li>
                   <li>- Metode pengiriman atau pengambilan akan muncul sesuai pengaturan toko.</li>
                   <li>- Foto produk dapat sedikit berbeda tergantung penyajian.</li>
@@ -374,20 +374,20 @@ export default function ProductDetailClient({
         </main>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[#fffaf5]/95 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[var(--surface)]/95 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8d7f73]">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
               Harga
             </p>
-            <p className="truncate text-base font-bold text-[#241b17]">
+            <p className="truncate text-base font-bold text-[var(--text)]">
               Rp {formatRupiah(displayPrice)}
             </p>
           </div>
 
           <Link
             href={backHref}
-            className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm font-semibold text-[#241b17] transition hover:bg-[#faf6f1]"
+            className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
           >
             Lihat menu lain
           </Link>

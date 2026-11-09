@@ -36,7 +36,7 @@ export default function BuyerBottomNav() {
   if (!shouldShowBuyerNav(pathname)) return null
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[#fffaf5]/95 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[var(--surface)]/95 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden">
       <div className="mx-auto grid max-w-6xl grid-cols-3 gap-1">
         {BUYER_NAV_ITEMS.map(({ href, label }) => {
           const Icon = ICONS[href]
@@ -48,8 +48,8 @@ export default function BuyerBottomNav() {
               href={href}
               className={`relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-2xl px-2 text-[11px] font-semibold transition active:scale-[0.98] ${
                 active
-                  ? 'bg-emerald-50 text-[#0b6b4a]'
-                  : 'text-[#8d7f73]'
+                  ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+                  : 'text-[var(--text-muted)]'
               }`}
             >
               <span className="relative">

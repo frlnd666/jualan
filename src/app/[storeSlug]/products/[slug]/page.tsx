@@ -19,6 +19,8 @@ import {
   safeJsonLd,
 } from '@/lib/seo'
 import type { HostKind } from '@/lib/domains'
+import type { CSSProperties } from 'react'
+import { resolveStoreTheme } from '@/lib/store-themes'
 
 type ProductDetailPageProps = {
   params: Promise<{
@@ -85,7 +87,7 @@ export default async function ProductDetailPage({
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
-    .select('id, name, slug')
+    .select('id, name, slug, theme')
     .eq('slug', storeSlug)
     .maybeSingle()
 
@@ -187,19 +189,21 @@ export default async function ProductDetailPage({
           ),
         }}
       />
-      <ProductDetailClient
-        storeSlug={store.slug}
-        homeHref={homeHref}
-        flashSale={flashSale}
-        watermarked={tierLimits.watermark}
-        product={{
-          ...product,
-          images: (product.images ?? []).slice(
-            0,
-            tierLimits.maxPhotosPerProduct
-          ),
-        }}
-      />
+      <div style={resolveStoreTheme(store.theme).vars as CSSProperties}>
+        <ProductDetailClient
+          storeSlug={store.slug}
+          homeHref={homeHref}
+          flashSale={flashSale}
+          watermarked={tierLimits.watermark}
+          product={{
+            ...product,
+            images: (product.images ?? []).slice(
+              0,
+              tierLimits.maxPhotosPerProduct
+            ),
+          }}
+        />
+      </div>
     </>
   )
 }

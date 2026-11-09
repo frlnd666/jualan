@@ -19,6 +19,7 @@ import {
   getShipmentStatusLabel,
 } from '@/lib/order-status'
 import UploadPaymentProofForm from '@/components/invoice/UploadPaymentProofForm'
+import ClearCartOnSuccess from '@/components/invoice/ClearCartOnSuccess'
 import DynamicQrisPanel from '@/components/invoice/DynamicQrisPanel'
 import PaymentDestination from '@/components/invoice/PaymentDestination'
 import { getQrisPaymentForInvoiceAction } from '@/lib/actions/qris'
@@ -232,6 +233,9 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
 
   return (
     <div className="min-h-screen bg-neutral-50 px-4 pb-28 pt-6 md:px-6 md:pb-6">
+      {/* Pesanan baru: bersihkan keranjang lokal (hanya tercapai bila
+          pesanan sudah terbentuk — lihat ClearCartOnSuccess). */}
+      {isNewOrder ? <ClearCartOnSuccess /> : null}
       <div className="mx-auto max-w-5xl space-y-6">
         {isNewOrder && !isCancelled ? (
           <div className="rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white shadow-sm md:p-8">

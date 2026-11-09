@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
 import { createOrderAction } from '@/lib/actions/checkout'
@@ -52,8 +53,7 @@ const inputClassName =
 
 export default function CheckoutClient() {
   const router = useRouter()
-  const { items, clearCart, loadItems, storeSlug, storeId: cartStoreId } =
-    useCart()
+  const { items, storeId: cartStoreId } = useCart()
 
   const [step, setStep] = useState(1)
 
@@ -386,14 +386,16 @@ export default function CheckoutClient() {
 
     setErrorMessage('')
 
-    // P1-28: clearCart() setelah await tidak pernah jalan — redirect()
-    // di akhir createOrderAction meng-abort eksekusi, jadi keranjang
-    // lokal tidak terhapus dan pembeli bisa checkout ganda. Bersihkan
-    // dulu, lalu kembalikan isinya bila checkout gagal (validasi/stok)
-    // supaya pembeli tidak kehilangan keranjangnya karena error.
-    const cartSnapshot = { items, storeSlug, storeId: cartStoreId }
-    clearCart()
-
+    // Keranjang TIDAK dibersihkan di sini. Dua alasan (bug 2026-11-09):
+    //  (1) clearCart() SEBELUM await membuat halaman langsung
+    //      menampilkan "Cart masih kosong" selama action berjalan
+    //      (8-13 dtk) — pembeli mengira checkout gagal lalu mengulang,
+    //      dan terbentuk pesanan duplikat.
+    //  (2) redirect() di akhir createOrderAction melempar NEXT_REDIRECT;
+    //      bila tertelan catch di bawah, navigasi ke invoice tidak
+    //      terjadi dan pembeli terjebak di /checkout. Keranjang
+    //      dibersihkan di halaman invoice (?baru=1) yang hanya tercapai
+    //      bila pesanan sudah terbentuk (ClearCartOnSuccess).
     startTransition(async () => {
       try {
         await createOrderAction({
@@ -417,11 +419,10 @@ export default function CheckoutClient() {
           })),
         })
       } catch (error) {
-        loadItems(
-          cartSnapshot.items,
-          cartSnapshot.storeSlug,
-          cartSnapshot.storeId
-        )
+        // redirect() sukses = navigasi ke invoice — lempar ulang supaya
+        // router menjalankannya; hanya error beneran yang ditampilkan,
+        // dengan keranjang tetap utuh supaya pembeli bisa coba lagi.
+        if (isRedirectError(error)) throw error
         const message =
           error instanceof Error ? error.message : 'Terjadi kesalahan saat checkout.'
         setErrorMessage(message)

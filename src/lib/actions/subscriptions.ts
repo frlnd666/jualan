@@ -13,11 +13,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import { logAudit } from '@/lib/audit'
+import { dispatchNotify } from '@/lib/notify'
 import {
   getStoreSubscription,
   periodEndFor,
   allowedCheckoutMethods,
   TIER_PRICES,
+  TIER_LABELS,
   type Tier,
 } from '@/lib/subscriptions'
 import {
@@ -445,6 +447,42 @@ export async function verifySubscriptionPayment(
       payment_id: paymentId,
     },
   })
+
+  // Beri tahu pemilik toko hasil verifikasi: in-app + email + WhatsApp.
+  // Fire-and-forget — verifikasi sudah sukses, notifikasi tidak boleh
+  // mengubah hasilnya.
+  try {
+    const { data: store } = await admin
+      .from('stores')
+      .select('owner_id, name')
+      .eq('id', (payment as { store_id: string }).store_id)
+      .maybeSingle()
+    const storeRow = store as { owner_id: string; name: string } | null
+    if (storeRow) {
+      const tierLabel =
+        TIER_LABELS[(payment as { tier: 'silver' | 'gold' }).tier]
+      void dispatchNotify(admin, {
+        userId: storeRow.owner_id,
+        storeId: (payment as { store_id: string }).store_id,
+        type: decision === 'verify' ? 'SUBSCRIPTION_VERIFIED' : 'SUBSCRIPTION_REJECTED',
+        title:
+          decision === 'verify'
+            ? `Pembayaran langganan ${storeRow.name} terverifikasi`
+            : `Pembayaran langganan ${storeRow.name} ditolak`,
+        body:
+          decision === 'verify'
+            ? `Paket ${tierLabel} sudah aktif.`
+            : 'Periksa bukti pembayaranmu dan ajukan ulang.',
+        link: '/dashboard/subscription',
+        data: {
+          storeName: storeRow.name,
+          tier: tierLabel,
+          link: '/dashboard/subscription',
+        },
+        recipient: 'seller',
+      })
+    }
+  } catch {}
 
   revalidatePath('/dashboard/admin/subscriptions')
   revalidatePath('/dashboard/subscription')

@@ -136,7 +136,7 @@ describe('sitemap URL', () => {
 
 describe('siteUrlFromEnv', () => {
   it('fallback ke domain live bila env kosong', () => {
-    expect(siteUrlFromEnv('')).toBe('https://jualin-delta.vercel.app')
+    expect(siteUrlFromEnv('')).toBe('https://cuan.is-a.web.id')
     expect(siteUrlFromEnv('https://cuan.id/')).toBe('https://cuan.id')
   })
 })

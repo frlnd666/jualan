@@ -71,7 +71,7 @@ export function HeroSection() {
               <span className="h-2.5 w-2.5 rounded-full bg-[#e0d5c6]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#e0d5c6]" />
               <span className="ml-2 truncate rounded-md bg-[var(--surface)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]">
-                jualin-delta.vercel.app/kopisore
+                cuan.is-a.web.id/kopisore
               </span>
             </div>
 

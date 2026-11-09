@@ -40,6 +40,7 @@ describe('validateDomain', () => {
   })
 
   it('menolak domain platform', () => {
+    expect(validateDomain('cuan.is-a.web.id')).not.toBeNull()
     expect(validateDomain('jualin-delta.vercel.app')).not.toBeNull()
   })
 })

@@ -258,17 +258,20 @@ Urutan jalankan di Supabase SQL Editor, SETELAH seluruh migrasi Fase 0–4:
      harus ditambahkan manual di Vercel Dashboard → Settings → Domains;
      JANGAN commit nilainya).
    - `VERCEL_PROJECT_ID` (sudah ada fallback `prj_N19xmVADtzl3Dvcnvoup2DW4L4s0`).
-   - `NEXT_PUBLIC_PLATFORM_DOMAIN` (opsional — domain platform untuk
-     subdomain `{slug}.domain`, mis. cuan.id; kosong = subdomain tidak aktif).
-   - `NEXT_PUBLIC_SITE_URL` (default https://jualin-delta.vercel.app).
-3. **Subdomain platform** (bila domain platform sudah ada): tambah
-   `*.domain` di Vercel Dashboard → Settings → Domains, lalu pasang DNS
-   wildcard `* CNAME cname.vercel-dns.com` di registrar.
+   - `NEXT_PUBLIC_PLATFORM_DOMAIN` (domain platform untuk subdomain
+     `{slug}.domain` — sudah diset `cuan.is-a.web.id`; kosong = subdomain
+     tidak aktif).
+   - `NEXT_PUBLIC_SITE_URL` (default https://cuan.is-a.web.id).
+3. **Subdomain platform** (sudah dipasang): `cuan.is-a.web.id` dan
+   `*.cuan.is-a.web.id` sudah ditambahkan ke project Vercel `jualin`.
+   DNS yang harus ada di pengelola DNS `is-a.web.id`:
+   `cuan CNAME cname.vercel-dns.com` dan `*.cuan CNAME cname.vercel-dns.com`.
+   Tanpa record ini, domain belum membuka aplikasi.
 
 **Cara kerja routing:** middleware membaca header `host`. Host platform
-(jualin-delta.vercel.app, `*.vercel.app`, localhost, domain platform)
-jalan biasa. Subdomain `{slug}.domain-platform` di-rewrite ke
-`/{slug}` (header `x-cuan-host-kind: subdomain`). Domain custom
+(cuan.is-a.web.id, jualin-delta.vercel.app, `*.vercel.app`, localhost,
+domain platform) jalan biasa. Subdomain `{slug}.cuan.is-a.web.id`
+di-rewrite ke `/{slug}` (header `x-cuan-host-kind: subdomain`). Domain custom
 terverifikasi di tabel `store_domains` di-rewrite ke `/{slug}` (header
 `x-cuan-host-kind: custom`). Hanya path storefront (`/` dan
 `/products/...`) yang di-rewrite — checkout, cart, invoice, auth, api,
@@ -363,7 +366,7 @@ query ke tabel `notifications` yang sudah ada (Fase 3).
    sekali; jalankan tombol kedua kalinya di hari yang sama — pengingat
    dilewati (duplikat).
 3. Cek route cron langsung (butuh CRON_SECRET):
-   `curl -H "Authorization: Bearer <CRON_SECRET>" https://jualin-delta.vercel.app/api/cron/subscription-transitions`
+   `curl -H "Authorization: Bearer <CRON_SECRET>" https://cuan.is-a.web.id/api/cron/subscription-transitions`
    Tanpa header → 401.
 
 **Perilaku bila cron belum jalan:** tidak ada yang rusak — status
@@ -373,6 +376,173 @@ habis masih tertulis TRIALING) sampai cron berikutnya jalan atau admin
 menekan tombol manual.
 
 **Yang TIDAK dibangun di cron ini:** auto-debit/perpanjangan otomatis
-(pembayaran langganan tetap manual + verifikasi admin), pengingat
-email/WhatsApp (hanya in-app), dan pengingat sebelum masa tenggang
-habis (pemilik sudah diberi tahu saat masuk PAST_DUE).
+(pembayaran langganan tetap manual + verifikasi admin), dan pengingat
+sebelum masa tenggang habis (pemilik sudah diberi tahu saat masuk PAST_DUE).
+Pengingat + transisi di atas sekarang juga dikirim lewat email (Resend)
+dan WhatsApp (Meta Cloud API) — lihat bagian "Notifikasi email +
+WhatsApp" di bawah; sebelum bagian itu ada, hanya in-app yang jalan.
+
+## Notifikasi email + WhatsApp (2026-11-09)
+
+Satu dispatcher terpusat `src/lib/notify.ts` — `dispatchNotify()` menulis
+notifikasi in-app (pakai `notifyUser` Fase 3) + mengirim email (Resend) +
+WhatsApp (Meta Cloud API) sesuai preferensi penerima. Semua event
+melewati dispatcher yang sama; tidak ada duplikasi logika kirim.
+
+**Event yang di-wire** (in-app + email + WA, sesuai preferensi):
+- Order dibuat → seller (`ORDER_CREATED`).
+- Pembayaran terkonfirmasi → buyer + seller (`ORDER_PAID`; QRIS lunas
+  otomatis via webhook ShopeePay → `QRIS_PAID`, isi sama).
+- Bukti bayar diunggah → seller (`PAYMENT_PROOF_UPLOADED`).
+- Order dikirim → buyer, sertakan resi (`ORDER_SHIPPED`).
+- Order selesai → buyer (`ORDER_COMPLETED`).
+- Order dibatalkan → buyer + seller (`ORDER_CANCELLED`).
+- Pembayaran langganan diverifikasi / ditolak admin → seller
+  (`SUBSCRIPTION_VERIFIED` / `SUBSCRIPTION_REJECTED`).
+- Staff ditambahkan → staff (`STAFF_ADDED`).
+- Transisi cron + pengingat H-3/H-1 → seller (dipanggil dari
+  `runSubscriptionTransitions`, logika transisi + dedup tidak berubah).
+
+**Aturan pengiriman:** dispatcher TIDAK PERNAH melempar dan tidak boleh
+memperlambat request utama — pemanggil di alur panas (checkout,
+konfirmasi bayar, webhook, ubah status) memakai fire-and-forget
+(`void dispatchNotify(...)` / `void notifyOrderEvent(...)`); cron yang
+memang background memakai `await`. Kegagalan satu channel hanya dicatat
+ke observability (`logEvent('notify_dispatch', { type, email, whatsapp,
+... })`); channel lain + in-app tetap jalan.
+
+### 1. Migrasi — preferensi penerima
+
+Jalankan di Supabase SQL Editor, SETELAH migrasi Fase 0–5:
+
+1. **`migrations/20261109_notification_prefs.sql`** — tabel
+   `notification_preferences` (1 baris per user; tidak ada baris =
+   semua aktif). Idempotent; RLS owner-only + admin baca.
+   Kolom: `user_id`, `email_enabled` (default true),
+   `whatsapp_enabled` (default true), `whatsapp_number` (nullable).
+
+Pengaturan: buyer di `/akun/notifikasi`, seller di
+`/dashboard/notifications` (toggle email/WA + nomor WA khusus).
+Bila nomor WA kosong, dispatcher memakai fallback berurutan:
+`whatsapp_number` preferensi → nomor HP alamat terakhir pembeli
+(`buyer_addresses.phone`) → nomor HP order terakhir pembeli
+(`orders.customer_phone`) → nomor WhatsApp toko (`stores.whatsapp`,
+untuk pemilik toko). Email diambil dari akun auth pengguna
+(`auth.users`, lewat service_role). Pembeli tamu tidak punya email —
+email dilewati, WA tetap bisa jalan lewat `customer_phone` dari order.
+
+**Perilaku sebelum migrasi dijalankan:** dispatcher memakai default
+(semua aktif) + fallback nomor di atas; halaman pengaturan menampilkan
+pesan "jalankan migrasi dulu" (bukan crash). In-app tetap jalan.
+
+### 2. Email — Resend (gratis)
+
+Paket gratis Resend (permanen, tanpa kartu kredit, tanpa overage):
+**3.000 email/bulan, maks 100/hari.** Bila cap tercapai, pengiriman
+berhenti (API mengembalikan error) — tidak ada tagihan mendadak.
+Template email HTML sederhana (template string, tanpa React Email),
+Bahasa Indonesia, dengan link ke halaman terkait.
+
+**Cara daftar + isi env:**
+1. Daftar gratis di https://resend.com/signup (tanpa kartu kredit).
+2. Dashboard → API Keys → Create API Key → salin nilainya.
+3. Isi di Vercel (Production) + `.env.local`: `RESEND_API_KEY`,
+   `RESEND_FROM` (lihat `.env.local.example`).
+4. **Verifikasi domain CUAN (untuk kirim ke semua orang):** Resend →
+   Domains → Add Domain → `cuan.is-a.web.id` → pasang record DNS yang
+   diminta di pengelola DNS `is-a.web.id` → tunggu status Verified. Lalu set
+   `RESEND_FROM=CUAN <noreply@cuan.is-a.web.id>` (sudah diset di Vercel).
+5. **Tanpa domain terverifikasi, Resend HANYA bisa mengirim ke alamat
+   email pemilik akun Resend itu.** Jadi untuk tes awal: set
+   `RESEND_FROM=CUAN <onboarding@resend.dev>` dan kirim tes ke email
+   pemilik akun (lihat "Cara test" di bawah).
+
+Tanpa `RESEND_API_KEY`, email dilewati diam-diam (status `skipped` di
+log) dan in-app + WA tetap jalan.
+
+### 3. WhatsApp — Meta Cloud API (resmi, BERBAYAR per pesan)
+
+**Biaya jujur — baca dulu sebelum mengaktifkan:**
+- Akses API-nya gratis, tapi tiap pesan **template utility** yang
+  dikirim proaktif (di luar jendela balasan pelanggan) **ditagih Meta
+  Rp356,65/pesan** (rate card 1 Okt 2026, Indonesia). Contoh: 100
+  notifikasi order/bulan ≈ Rp35.665/bulan.
+- Yang gratis hanya **1.000 service reply/bulan per nomor** — yaitu
+  balasan atas chat yang DIMULAI pelanggan. Notifikasi proaktif di sini
+  BUKAN service reply, jadi tidak gratis.
+- Karena itu channel ini **env-gated dan NONAKTIF bila env belum
+  diisi** — tanpa token, WA dilewati diam-diam dan in-app + email
+  tetap jalan. **JANGAN** jadikan Fonnte/Wablas/dll sebagai default:
+  berbayar bulanan + tidak resmi (risiko nomor diblokir Meta).
+
+**Cara setup:**
+1. https://developers.facebook.com → buat aplikasi → tambah produk
+   **WhatsApp** → buat / pilih WhatsApp Business Account (WABA) +
+   nomor pengirim.
+2. Salin **Phone Number ID** (WhatsApp → API Setup).
+3. Buat token akses permanen: buat **System User** (Business Settings
+   → Users → System Users → Add, beri akses WhatsApp) → Generate New
+   Token (izin `whatsapp_business_messaging`). Token sementara dari
+   API Setup hanya bertahan 24 jam — jangan pakai untuk produksi.
+4. Isi di Vercel (Production) + `.env.local`:
+   `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
+5. **Buat + minta persetujuan template** (WhatsApp Manager →
+   Account Tools → Message Templates, kategori **Utility**, bahasa
+   `id`). Nama default yang dipakai kode (ubah lewat env
+   `WHATSAPP_TEMPLATE_<JENIS>` bila namamu berbeda):
+   `cuan_order_created`, `cuan_order_paid`, `cuan_payment_proof`,
+   `cuan_order_shipped`, `cuan_order_completed`, `cuan_order_cancelled`,
+   `cuan_subscription_reminder`, `cuan_subscription_update`,
+   `cuan_subscription_verified`, `cuan_subscription_rejected`,
+   `cuan_staff_added`, `cuan_test`.
+   **Parameter body `{{1}}..{{n}}` harus cocok urutannya** dengan
+   `buildWhatsAppTemplateParams` di `src/lib/notify.ts`, mis.
+   `cuan_order_paid` (buyer): {{1}} nama toko, {{2}} nomor invoice,
+   {{3}} total; (seller): {{1}} nama customer, {{2}} nomor invoice,
+   {{3}} total. Template yang belum disetujui Meta = pengiriman gagal
+   (tercatat di log, alur utama tetap jalan).
+
+### 4. Cara test
+
+1. **Halaman test admin** (admin-only): `/dashboard/admin/notifications`
+   — menampilkan status konfigurasi (env terisi/belum) + form kirim
+   tes: email tes ke email admin sendiri, WA tes ke nomor yang diisi,
+   hasil tampil per channel (`Terkirim` / `Dilewati` / `Gagal` +
+   alasan).
+2. **Test email tanpa domain terverifikasi:** set
+   `RESEND_FROM=CUAN <onboarding@resend.dev>`, lalu kirim tes dari
+   halaman admin — email masuk ke email pemilik akun Resend (harus
+   sama dengan email admin yang login; bila berbeda, email dilewati
+   Resend dengan error "can only send to your own email").
+3. **Test WA bila nanti diaktifkan:** isi token + Phone Number ID,
+   buat + tunggu persetujuan template `cuan_test` (1 parameter),
+   lalu kirim tes dari halaman admin ke nomor HP sendiri. Ingat:
+   tiap tes WA = 1 pesan utility berbayar (Rp356,65).
+4. **Test end-to-end event:** sebagai buyer login, checkout 1 produk
+   (COD, toko sendiri) → seller terima in-app + email + WA
+   `ORDER_CREATED`; seller konfirmasi pembayaran → buyer terima
+   `ORDER_PAID`; seller input resi → buyer terima `ORDER_SHIPPED`
+   berisi nomor resi. Cek log Vercel dengan filter
+   `notify_dispatch` untuk hasil per channel.
+5. **Test cron:** ubah satu toko trial agar berakhir 3 hari lagi,
+   lalu tekan "Jalankan transisi sekarang" di
+   `/dashboard/admin/subscriptions` — pengingat `TRIAL_ENDING_SOON`
+   terkirim (in-app + email + WA) sekali; jalankan kedua kalinya di
+   hari yang sama — pengingat dilewati (dedup).
+
+### 5. Perilaku bila provider belum dikonfigurasi
+
+| Keadaan | In-app | Email | WhatsApp |
+|---|---|---|---|
+| Tanpa `RESEND_API_KEY` | jalan | dilewati | — |
+| Tanpa token / Phone Number ID WA | jalan | jalan | dilewati |
+| Tanpa keduanya | jalan | dilewati | dilewati |
+| Nomor WA penerima kosong | jalan | jalan | dilewati |
+| Preferensi channel dimatikan user | jalan | dilewati | dilewati |
+| Cap Resend 100/hari tercapai | jalan | gagal (log) | jalan |
+
+**Yang TIDAK dibangun di sini:** auto-debit, pengiriman WA service
+reply (balasan chat pelanggan — butuh webhook inbound + jendela 24 jam,
+bukan notifikasi proaktif), template WA interaktif (tombol/daftar),
+dan pengiriman email massal/newsletter (batas 100/hari Resend gratis
+tidak cocok untuk itu).

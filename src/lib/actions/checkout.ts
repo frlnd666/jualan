@@ -15,7 +15,7 @@ import {
 } from '@/lib/actions/vouchers'
 import { calcShippingCost, totalWeightGrams } from '@/lib/shipping'
 import { tryGenerateDynamicQrForInvoice } from '@/lib/shopeepay/qris-server'
-import { notifyOrderStatusChange } from '@/lib/notifications'
+import { notifyOrderEvent } from '@/lib/notify'
 import { loadActiveFlashSalesForStore } from '@/lib/actions/flash-sales'
 import { logEvent } from '@/lib/observability'
 import type { CheckoutFormInput, PaymentMethod } from '@/lib/types/order'
@@ -539,8 +539,9 @@ export async function createOrderAction(input: CheckoutFormInput) {
     buyerLoggedIn: buyerId !== null,
   })
 
-  // Fase 3 — beri tahu pemilik toko ada pesanan baru (in-app).
-  // Best-effort: kegagalan notifikasi tidak boleh menggagalkan pesanan.
+  // Notifikasi email + WhatsApp + in-app ke pemilik toko (pesanan baru).
+  // Fire-and-forget: dispatcher tidak pernah melempar dan tidak boleh
+  // memperlambat redirect ke halaman invoice.
   try {
     const { data: storeRow } = await supabase
       .from('stores')
@@ -549,7 +550,7 @@ export async function createOrderAction(input: CheckoutFormInput) {
       .maybeSingle()
     const owner = storeRow as { owner_id: string; name: string } | null
     if (owner) {
-      await notifyOrderStatusChange(
+      void notifyOrderEvent(
         supabase,
         {
           ownerId: owner.owner_id,
@@ -561,7 +562,8 @@ export async function createOrderAction(input: CheckoutFormInput) {
           total,
         },
         'ORDER_CREATED',
-        owner.name
+        owner.name,
+        { buyerPhone: normalizedPhone }
       )
     }
   } catch {}

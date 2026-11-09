@@ -17,6 +17,7 @@ import { getOwnerStore } from '@/lib/dashboard-access'
 import { getStoreSubscription } from '@/lib/subscriptions'
 import { TIER_LIMITS, effectiveTier } from '@/lib/subscription-tiers'
 import { logAudit } from '@/lib/audit'
+import { dispatchNotify } from '@/lib/notify'
 
 // Cari akun auth berdasarkan email lewat listUsers berhalaman
 // (versi supabase-js di repo ini tidak menyediakan getUserByEmail).
@@ -181,6 +182,20 @@ export async function addStaffAction(
     entityType: 'profile',
     entityId: targetId,
     details: { email: normalizedEmail },
+  })
+
+  // Beri tahu staff baru: in-app + email + WhatsApp. Fire-and-forget —
+  // penambahan staff sudah sukses, notifikasi tidak boleh mengubahnya.
+  void dispatchNotify(admin, {
+    userId: targetId,
+    email: normalizedEmail,
+    storeId: store.id,
+    type: 'STAFF_ADDED',
+    title: `Kamu jadi staff ${store.name}`,
+    body: 'Kamu sekarang bisa mengelola produk dan pesanan toko ini.',
+    link: '/dashboard',
+    data: { storeName: store.name, link: '/dashboard' },
+    recipient: 'seller',
   })
   return { success: true }
 }

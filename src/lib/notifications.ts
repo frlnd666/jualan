@@ -4,9 +4,10 @@
 // Pemanggilan di sini best-effort: kegagalan notifikasi TIDAK BOLEH
 // menggagalkan alur utama (checkout / webhook / konfirmasi bayar).
 //
-// Yang TIDAK dibangun di Fase 3 (TODO): pengiriman email (tidak ada
-// jalur mail di codebase) dan WhatsApp (butuh keputusan provider dari
-// Ferlan). Lihat README Fase 3.
+// Email + WhatsApp dibangun di atas file ini: dispatcher terpusat di
+// src/lib/notify.ts memakai notifyUser di bawah untuk in-app, lalu
+// mengirim email (Resend) + WA (Meta Cloud API) sesuai preferensi.
+// Lihat supabase/README.md bagian "Notifikasi email + WhatsApp".
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -18,6 +19,13 @@ export type NotificationType =
   | 'ORDER_SHIPPED'
   | 'ORDER_COMPLETED'
   | 'ORDER_CANCELLED'
+  // Bukti bayar diunggah pembeli (ke seller) — email/WA + in-app.
+  | 'PAYMENT_PROOF_UPLOADED'
+  // Verifikasi pembayaran langganan oleh admin (ke seller).
+  | 'SUBSCRIPTION_VERIFIED'
+  | 'SUBSCRIPTION_REJECTED'
+  // Staff baru ditambahkan (ke staff).
+  | 'STAFF_ADDED'
   // Cron langganan (transisi status + pengingat H-3/H-1).
   | 'TRIAL_ENDING_SOON'
   | 'TRIAL_ENDED'

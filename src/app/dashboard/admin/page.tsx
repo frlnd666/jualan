@@ -175,6 +175,12 @@ export default async function AdminIndexPage() {
         >
           Log audit
         </Link>
+        <Link
+          href="/dashboard/admin/notifications"
+          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold text-[var(--text)]"
+        >
+          Tes notifikasi email &amp; WhatsApp
+        </Link>
       </div>
 
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]">

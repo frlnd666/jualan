@@ -6,6 +6,7 @@ import {
   getInvoiceAccessToken,
   isInvoiceTokenValid,
 } from '@/lib/invoice-access'
+import { dispatchNotify } from '@/lib/notify'
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -66,7 +67,7 @@ export async function uploadPaymentProof(formData: FormData) {
 
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
-    .select('id, invoice_number, payment_status')
+    .select('id, invoice_number, payment_status, order_id')
     .eq('id', invoiceId)
     .maybeSingle()
 
@@ -133,6 +134,53 @@ export async function uploadPaymentProof(formData: FormData) {
 
   revalidatePath(`/invoice/${invoiceNumber}`)
   revalidatePath(`/track/${invoiceNumber}`)
+
+  // Beri tahu pemilik toko ada bukti bayar baru: in-app + email + WA.
+  // Fire-and-forget — upload sudah sukses, notifikasi tidak boleh
+  // mengubah hasilnya.
+  try {
+    const inv = invoice as { order_id?: string | null }
+    if (inv.order_id) {
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id, store_id, customer_name, total')
+        .eq('id', inv.order_id)
+        .maybeSingle()
+      const ord = order as {
+        id: string
+        store_id: string
+        customer_name: string
+        total: number
+      } | null
+      if (ord) {
+        const { data: store } = await supabase
+          .from('stores')
+          .select('owner_id, name')
+          .eq('id', ord.store_id)
+          .maybeSingle()
+        const storeRow = store as { owner_id: string; name: string } | null
+        if (storeRow) {
+          void dispatchNotify(supabase, {
+            userId: storeRow.owner_id,
+            storeId: ord.store_id,
+            orderId: ord.id,
+            type: 'PAYMENT_PROOF_UPLOADED',
+            title: `Bukti bayar baru dari ${ord.customer_name}`,
+            body: 'Periksa bukti transfer dan konfirmasi pembayaran.',
+            link: `/dashboard/orders/${ord.id}`,
+            data: {
+              storeName: storeRow.name,
+              orderNumber: invoiceNumber,
+              customerName: ord.customer_name,
+              total: Number(ord.total),
+              link: `/dashboard/orders/${ord.id}`,
+            },
+            recipient: 'seller',
+          })
+        }
+      }
+    }
+  } catch {}
 
   return { success: 'Bukti transfer berhasil diupload.' }
 }

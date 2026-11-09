@@ -7,7 +7,7 @@
 /** URL situs platform (env NEXT_PUBLIC_SITE_URL, fallback domain live). */
 export function siteUrlFromEnv(envValue?: string | null): string {
   const value = (envValue ?? '').trim().replace(/\/+$/, '')
-  return value || 'https://jualin-delta.vercel.app'
+  return value || 'https://cuan.is-a.web.id'
 }
 
 export function truncate(text: string, maxLength: number): string {

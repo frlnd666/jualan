@@ -28,7 +28,7 @@ import { GRACE_DAYS } from '@/lib/subscription-tiers'
 import type { SubscriptionStatus, Tier } from '@/lib/subscription-tiers'
 import { logAudit } from '@/lib/audit'
 import { logEvent } from '@/lib/observability'
-import { notifyUser } from '@/lib/notifications'
+import { dispatchNotify } from '@/lib/notify'
 
 export type TransitionKind =
   | 'trial-ended'
@@ -390,13 +390,22 @@ export async function runSubscriptionTransitions(
       })
 
       const msg = transitionMessage(decision.kind, store.name)
-      await notifyUser(admin, {
+      // Notifikasi ke pemilik toko lewat dispatcher yang sama dengan
+      // event lain: in-app + email + WhatsApp sesuai preferensi.
+      // Cron memang background, jadi di-await (bukan fire-and-forget).
+      await dispatchNotify(admin, {
         userId: store.owner_id,
         storeId: raw.store_id,
         type: TRANSITION_TYPE[decision.kind],
         title: msg.title,
         body: msg.body,
         link: '/dashboard/subscription',
+        data: {
+          storeName: store.name,
+          tier: raw.tier,
+          link: '/dashboard/subscription',
+        },
+        recipient: 'seller',
       })
       continue
     }
@@ -419,14 +428,25 @@ export async function runSubscriptionTransitions(
     }
 
     const msg = reminderMessage(reminder.kind, reminder.daysLeft, store.name, raw.tier)
-    const sent = await notifyUser(admin, {
+    // Pengingat H-3/H-1 lewat dispatcher yang sama (in-app + email +
+    // WA). Dedup di atas tetap berlaku — dispatcher tidak menduplikasi
+    // logika dedup, hanya mengirim.
+    const dispatched = await dispatchNotify(admin, {
       userId: store.owner_id,
       storeId: raw.store_id,
       type,
       title: msg.title,
       body: msg.body,
       link: '/dashboard/subscription',
+      data: {
+        storeName: store.name,
+        tier: raw.tier,
+        daysLeft: reminder.daysLeft,
+        link: '/dashboard/subscription',
+      },
+      recipient: 'seller',
     })
+    const sent = dispatched.inApp
     if (sent) {
       summary.reminders[reminder.kind] += 1
     } else {

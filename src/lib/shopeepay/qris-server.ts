@@ -9,7 +9,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDecryptedCredentials } from '@/lib/shopeepay/credentials'
-import { notifyOrderStatusChange } from '@/lib/notifications'
+import { notifyOrderEvent } from '@/lib/notify'
 import {
   generateDynamicQr,
   ShopeePayError,
@@ -300,7 +300,7 @@ export async function applyQrisPaid(
 
     const { data: order } = await supabase
       .from('orders')
-      .select('id, store_id, status, customer_name, total, buyer_id')
+      .select('id, store_id, status, customer_name, customer_phone, total, buyer_id')
       .eq('id', inv.order_id)
       .maybeSingle()
     if (order) {
@@ -309,6 +309,7 @@ export async function applyQrisPaid(
         store_id: string
         status: string
         customer_name: string
+        customer_phone: string | null
         total: number
         buyer_id: string | null
       }
@@ -320,7 +321,8 @@ export async function applyQrisPaid(
           .eq('status', 'PENDING_PAYMENT')
       }
 
-      // Notifikasi best-effort (webhook tidak boleh gagal karenanya).
+      // Notifikasi best-effort (webhook tidak boleh gagal karenanya):
+      // in-app + email + WhatsApp ke pemilik toko + pembeli.
       try {
         const { data: store } = await supabase
           .from('stores')
@@ -329,7 +331,7 @@ export async function applyQrisPaid(
           .maybeSingle()
         const storeRow = store as { owner_id: string; name: string } | null
         if (storeRow) {
-          await notifyOrderStatusChange(
+          void notifyOrderEvent(
             supabase,
             {
               ownerId: storeRow.owner_id,
@@ -341,7 +343,8 @@ export async function applyQrisPaid(
               total: Number(ord.total),
             },
             'QRIS_PAID',
-            storeRow.name
+            storeRow.name,
+            { buyerPhone: ord.customer_phone }
           )
         }
       } catch {}

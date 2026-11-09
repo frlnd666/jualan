@@ -4,7 +4,7 @@
 // (tidak menyentuh database) supaya gampang dites.
 //
 // Aturan:
-// - Domain platform: env NEXT_PUBLIC_PLATFORM_DOMAIN (mis. cuan.id).
+// - Domain platform: env NEXT_PUBLIC_PLATFORM_DOMAIN (cuan.is-a.web.id).
 //   Bila belum diset, platform hanya di jualin-delta.vercel.app dan
 //   host *.vercel.app (preview) + localhost.
 // - Custom domain = hostname apa pun yang bukan platform dan bukan
@@ -16,7 +16,7 @@
 import { SLUG_PATTERN, RESERVED_STORE_SLUGS } from '@/lib/store-slug'
 
 /** Domain platform bawaan (live saat ini). */
-export const DEFAULT_PLATFORM_DOMAIN = 'jualin-delta.vercel.app'
+export const DEFAULT_PLATFORM_DOMAIN = 'cuan.is-a.web.id'
 
 /** Maksimal domain custom per toko (batas server action, bukan CHECK). */
 export const MAX_DOMAINS_PER_STORE = 5
@@ -30,7 +30,12 @@ export function platformDomainFromEnv(envValue?: string | null): string | null {
 
 /** Semua hostname yang dianggap "platform" (landing + dashboard). */
 export function platformHosts(platformDomain: string | null): string[] {
-  const hosts = [DEFAULT_PLATFORM_DOMAIN, 'localhost', '127.0.0.1']
+  const hosts = [
+    DEFAULT_PLATFORM_DOMAIN,
+    'jualin-delta.vercel.app',
+    'localhost',
+    '127.0.0.1',
+  ]
   if (platformDomain && !hosts.includes(platformDomain)) {
     hosts.push(platformDomain)
   }

@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getDashboardAccess } from '@/lib/dashboard-access'
-import { notifyOrderStatusChange, type NotificationType } from '@/lib/notifications'
+import { notifyOrderEvent } from '@/lib/notify'
+import type { NotificationType } from '@/lib/notifications'
 import type { OrderStatus } from '@/lib/types/order'
 
 export interface ActionResult {
@@ -57,7 +58,7 @@ async function getOwnedOrder(supabase: SupabaseServerClient, orderId: string) {
 
   const { data: order } = await supabase
     .from('orders')
-    .select('id, store_id, status, customer_name, total, buyer_id')
+    .select('id, store_id, status, customer_name, customer_phone, total, buyer_id')
     .eq('id', orderId)
     .eq('store_id', store.id)
     .maybeSingle()
@@ -111,24 +112,27 @@ function statusToNotificationType(status: OrderStatus): NotificationType | null 
 }
 
 /**
- * Fase 3 — beri tahu pemilik toko + pembeli login saat status berubah.
- * Best-effort: tidak boleh menggagalkan update status.
+ * Beri tahu pemilik toko + pembeli saat status berubah: in-app + email +
+ * WhatsApp lewat dispatcher terpusat. Fire-and-forget — tidak boleh
+ * menggagalkan update status.
  */
 async function notifyOrderChange(
   order: {
     id: string
     customer_name: string
+    customer_phone: string | null
     total: number
     buyer_id: string | null
   },
   store: { id: string; name: string; owner_id: string },
-  nextStatus: OrderStatus
+  nextStatus: OrderStatus,
+  shipment?: { trackingNumber: string; courier: string }
 ): Promise<void> {
   const type = statusToNotificationType(nextStatus)
   if (!type) return
   try {
     const notifyClient = await createPublicInvoiceClient()
-    await notifyOrderStatusChange(
+    void notifyOrderEvent(
       notifyClient,
       {
         ownerId: store.owner_id,
@@ -140,7 +144,12 @@ async function notifyOrderChange(
         total: Number(order.total),
       },
       type,
-      store.name
+      store.name,
+      {
+        trackingNumber: shipment?.trackingNumber ?? null,
+        courier: shipment?.courier ?? null,
+        buyerPhone: order.customer_phone,
+      }
     )
   } catch {}
 }
@@ -262,8 +271,12 @@ export async function saveShipmentAction(
       .eq('status', currentStatus)
   }
 
-  // Fase 3: resi tersimpan = pesanan dikirim — beri tahu pembeli.
-  await notifyOrderChange(owned.order, owned.store, 'SHIPPED')
+  // Fase 3: resi tersimpan = pesanan dikirim — beri tahu pembeli
+  // (sertakan nomor resi di email/WA).
+  await notifyOrderChange(owned.order, owned.store, 'SHIPPED', {
+    trackingNumber,
+    courier,
+  })
 
   revalidatePath('/dashboard/orders')
   revalidatePath(`/dashboard/orders/${owned.order.id}`)

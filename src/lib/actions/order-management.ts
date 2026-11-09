@@ -19,7 +19,7 @@ import {
   ALLOWED_TRANSITIONS,
   restoreStock,
 } from '@/lib/actions/order-fulfillment'
-import { notifyOrderStatusChange } from '@/lib/notifications'
+import { notifyOrderEvent } from '@/lib/notify'
 import type { NotificationType } from '@/lib/notifications'
 import type { OrderStatus } from '@/lib/types/order'
 
@@ -112,13 +112,14 @@ export async function bulkUpdateOrderStatusAction(
     store_id: string
     status: OrderStatus
     customer_name: string
+    customer_phone: string | null
     total: number
     buyer_id: string | null
   }
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, store_id, status, customer_name, total, buyer_id')
+    .select('id, store_id, status, customer_name, customer_phone, total, buyer_id')
     .in('id', orderIds)
     .eq('store_id', store.id)
 
@@ -166,10 +167,11 @@ export async function bulkUpdateOrderStatusAction(
     }
     updated += 1
 
-    // Notifikasi best-effort (tidak boleh menggagalkan bulk update).
+    // Notifikasi best-effort (tidak boleh menggagalkan bulk update):
+    // in-app + email + WhatsApp lewat dispatcher terpusat.
     const notifType = statusToNotificationType(nextStatus)
     if (notifType) {
-      await notifyOrderStatusChange(
+      void notifyOrderEvent(
         notifyClient,
         {
           ownerId: store.owner_id,
@@ -181,7 +183,8 @@ export async function bulkUpdateOrderStatusAction(
           total: Number(order.total),
         },
         notifType,
-        store.name
+        store.name,
+        { buyerPhone: order.customer_phone }
       )
     }
   }

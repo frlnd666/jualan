@@ -79,7 +79,7 @@ export default async function DomainsPage() {
             Upgrade ke Gold (Rp50.000/3 bulan) untuk memakai domain sendiri dan
             subdomain toko. Sementara itu tokomu tetap bisa dibuka lewat{' '}
             <code className="rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-xs">
-              jualin-delta.vercel.app/{data.storeSlug}
+              cuan.is-a.web.id/{data.storeSlug}
             </code>
             .
           </p>

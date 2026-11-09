@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
 import BuyerCartSync from "@/components/BuyerCartSync";
+import BuyerBottomNav from "@/components/storefront/BuyerBottomNav";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="id">
       <body className={inter.variable}>
         {children}
+        <BuyerBottomNav />
         <PwaRegister />
         <BuyerCartSync />
       </body>

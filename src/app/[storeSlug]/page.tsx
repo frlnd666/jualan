@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import StoreCartButton from '@/components/storefront/StoreCartButton'
 import StoreChatWidget from '@/components/storefront/StoreChatWidget'
 import WatermarkedImage from '@/components/storefront/WatermarkedImage'
 import AffiliateAdSlide from '@/components/storefront/AffiliateAdSlide'
@@ -295,12 +296,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                 Toko buka
               </div>
 
-              <Link
-                href="/"
-                className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/15"
-              >
-                Kembali
-              </Link>
+              <StoreCartButton />
             </div>
 
             <div className="mt-10 flex items-end gap-4">

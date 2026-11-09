@@ -17,6 +17,7 @@ import {
   REGISTER_PLAN_KEY,
   type RegisterPlan,
 } from '@/lib/register-plan'
+import { isSafeNextPath } from '@/lib/safe-next'
 
 const PLAN_COPY: Record<RegisterPlan, string> = {
   free: 'Paket Free — 4 produk, pembayaran COD saja.',
@@ -40,6 +41,17 @@ function readTypeFromUrl(): 'seller' | 'buyer' {
     : 'seller'
 }
 
+// ?next= tujuan kembali setelah daftar (mis. halaman produk yang
+// diklik tamu lewat "Pesan sekarang"). Hanya path relatif same-origin
+// yang diterima — sisanya diabaikan supaya tidak jadi open redirect.
+// Dibaca dari window.location.search seperti readPlanFromUrl (bukan
+// useSearchParams) supaya halaman tidak butuh Suspense boundary.
+function readNextFromUrl(): string | null {
+  if (typeof window === 'undefined') return null
+  const next = new URLSearchParams(window.location.search).get('next')
+  return isSafeNextPath(next) ? next : null
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -51,6 +63,7 @@ export default function RegisterPage() {
   const [info, setInfo] = useState('')
   const [plan] = useState<RegisterPlan>(() => readPlanFromUrl())
   const [accountType] = useState<'seller' | 'buyer'>(() => readTypeFromUrl())
+  const [nextPath] = useState<string | null>(() => readNextFromUrl())
   const isBuyer = accountType === 'buyer'
 
   // Simpan pilihan paket sekali saat halaman dibuka, sebelum user
@@ -70,9 +83,11 @@ export default function RegisterPage() {
     setError('')
     setInfo('')
 
-    // Pembeli: setelah verifikasi email, kembali ke akun pembeli.
+    // Pembeli: setelah verifikasi email, kembali ke tujuan `next`
+    // (halaman produk / checkout) bila ada, atau ke akun pembeli.
+    const buyerNext = nextPath ?? '/akun'
     const emailRedirectTo = isBuyer
-      ? `${location.origin}/auth/callback?next=/akun`
+      ? `${location.origin}/auth/callback?next=${encodeURIComponent(buyerNext)}`
       : `${location.origin}/auth/callback`
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -101,7 +116,7 @@ export default function RegisterPage() {
       // Cookie pengarah untuk middleware: pembeli baru belum punya baris
       // profiles, jadi peran belum bisa dibaca dari database.
       document.cookie = 'cuan_account_type=buyer; path=/; max-age=86400'
-      router.push('/akun')
+      router.push(nextPath ?? '/akun')
       return
     }
     router.push('/dashboard')
@@ -113,7 +128,7 @@ export default function RegisterPage() {
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${location.origin}/auth/callback?next=/akun`,
+          redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(nextPath ?? '/akun')}`,
         },
       })
       return
@@ -138,7 +153,14 @@ export default function RegisterPage() {
       footer={
         <p className="text-center text-sm text-neutral-500">
           Sudah punya akun?{' '}
-          <Link href="/login" className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]">
+          <Link
+            href={
+              nextPath
+                ? `/login?next=${encodeURIComponent(nextPath)}`
+                : '/login'
+            }
+            className="font-semibold text-[#0b6b4a] hover:text-[#084d3c]"
+          >
             Masuk
           </Link>
           {' · '}

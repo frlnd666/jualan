@@ -199,7 +199,7 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
     : null
 
   return (
-    <div className="min-h-screen bg-neutral-50 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-neutral-50 px-4 pb-28 pt-6 md:px-6 md:pb-6">
       <div className="mx-auto max-w-5xl space-y-6">
         {isNewOrder && !isCancelled ? (
           <div className="rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white shadow-sm md:p-8">

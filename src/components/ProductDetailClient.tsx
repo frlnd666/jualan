@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCart } from '@/lib/use-cart'
+import { createClient } from '@/lib/supabase/client'
 import WatermarkedImage from '@/components/storefront/WatermarkedImage'
 import {
   discountPercent,
@@ -80,6 +82,8 @@ export default function ProductDetailClient({
   watermarked = false,
   homeHref,
 }: ProductDetailClientProps) {
+  const router = useRouter()
+  const supabase = createClient()
   const backHref = homeHref ?? `/${storeSlug}`
   const images = useMemo(() => {
     return Array.isArray(product.images) ? product.images.filter(Boolean) : []
@@ -103,6 +107,36 @@ export default function ProductDetailClient({
   const maxQty = Math.max(1, Number(product.stock ?? 1))
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(false)
+
+  // "Pesan sekarang" hanya untuk pembeli login: tamu diarahkan daftar
+  // sebagai pembeli dulu, lalu kembali ke halaman produk ini (param
+  // next). Keranjang sendiri tetap bisa diisi tamu (localStorage);
+  // gate ini hanya di tombol pesan — checkout tamu ditutup di
+  // createOrderAction + halaman /checkout.
+  async function handleOrderNow() {
+    if (isDisabled) return
+    setCheckingAuth(true)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        const currentPath =
+          window.location.pathname + window.location.search
+        router.push(
+          `/register?type=buyer&next=${encodeURIComponent(currentPath)}`
+        )
+        return
+      }
+    } catch {
+      // Cek sesi gagal (mis. jaringan) — lanjut seperti biasa (tambah
+      // ke keranjang); penegakan yang mengikat ada di server checkout.
+    } finally {
+      setCheckingAuth(false)
+    }
+    handleAddToCart()
+  }
 
   function handleAddToCart() {
     addItem(
@@ -364,11 +398,15 @@ export default function ProductDetailClient({
           ) : (
             <button
               type="button"
-              disabled={isDisabled}
-              onClick={handleAddToCart}
+              disabled={isDisabled || checkingAuth}
+              onClick={handleOrderNow}
               className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[#5b3df5] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(91,61,245,0.24)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
             >
-              {isDisabled ? 'Belum tersedia' : 'Pesan sekarang'}
+              {isDisabled
+                ? 'Belum tersedia'
+                : checkingAuth
+                  ? 'Memproses...'
+                  : 'Pesan sekarang'}
             </button>
           )}
         </div>

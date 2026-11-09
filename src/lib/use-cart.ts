@@ -2,6 +2,11 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { CartItem, Product } from '@/lib/types'
 
+/** Total kuantitas seluruh item di keranjang (dipakai badge). */
+export function cartTotalQty(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + Math.max(0, Number(item.qty) || 0), 0)
+}
+
 interface CartStore {
   items: CartItem[]
   storeSlug: string | null

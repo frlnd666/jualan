@@ -87,6 +87,25 @@ export async function createOrderAction(input: CheckoutFormInput) {
   if (!isValidPaymentMethod(input.paymentMethod)) throw new Error('Metode pembayaran tidak valid.')
   if (!input.items?.length) throw new Error('Cart kosong.')
 
+  // Checkout tamu DITUTUP: order baru wajib dari pembeli login.
+  // Cek sesi lewat client user (cookie request) — BUKAN lewat client
+  // publik di atas (service_role tidak punya sesi user). Ini penegakan
+  // sisi server supaya jalur tamu tidak bisa diakali dengan memanggil
+  // action/URL langsung; gate di halaman /checkout dan tombol di /cart
+  // hanya UX di atasnya. Order tamu lama yang sudah ada tidak diubah.
+  let buyerId: string
+  try {
+    const userClient = await createClient()
+    const {
+      data: { user: buyerUser },
+    } = await userClient.auth.getUser()
+    if (!buyerUser) throw new Error('Masuk atau daftar dulu sebelum checkout.')
+    buyerId = buyerUser.id
+  } catch {
+    // Sesi tidak bisa diverifikasi = dianggap belum login.
+    throw new Error('Masuk atau daftar dulu sebelum checkout.')
+  }
+
   // Fase 1 (Bab 3): toko Free hanya boleh COD; toko yang dibekukan admin
   // (SUSPENDED) tidak menerima pesanan sama sekali. Cek ini di server —
   // pilihan di halaman checkout hanya cerminan, bukan penegak.
@@ -288,19 +307,12 @@ export async function createOrderAction(input: CheckoutFormInput) {
 
   const total = subtotal - voucherDiscount + shippingCost
 
-  // Fase 2: bila pembeli login, ikat order ke akunnya supaya muncul di
-  // riwayat pesanan (/akun/pesanan). Tamu tetap jalan (buyer_id null).
-  // Bila kolom buyer_id belum ada (migrasi f2 belum dijalankan), insert
-  // diulang tanpa kolom itu — checkout tidak boleh mati karenanya.
-  let buyerId: string | null = null
-  try {
-    const userClient = await createClient()
-    const {
-      data: { user: buyerUser },
-    } = await userClient.auth.getUser()
-    buyerId = buyerUser?.id ?? null
-  } catch {}
-
+  // Order selalu terikat ke akun pembeli login (buyer_id wajib) supaya
+  // muncul di riwayat pesanan (/akun/pesanan). Checkout tamu ditutup —
+  // tidak ada lagi fallback buyer_id null; bila kolom buyer_id belum
+  // ada (migrasi f2 belum dijalankan), insert gagal dan checkout
+  // menolak dengan "Gagal membuat order." (migrasi f2 sudah jalan di
+  // live, jadi ini hanya pengaman keadaan transisi).
   const orderPayload = {
     store_id: input.storeId,
     customer_name: input.customerName.trim(),
@@ -321,7 +333,7 @@ export async function createOrderAction(input: CheckoutFormInput) {
     total_weight_gram: totalWeightGram,
     courier_code:
       (shippingMethod as { courier_code?: string | null }).courier_code ?? null,
-    ...(buyerId ? { buyer_id: buyerId } : {}),
+    buyer_id: buyerId,
   }
 
   let order: { id: string } | null = null
@@ -334,25 +346,12 @@ export async function createOrderAction(input: CheckoutFormInput) {
       .single()
     order = attempt.data as { id: string } | null
     orderError = attempt.error as { message?: string } | null
-    if (orderError && buyerId && isMissingColumnError(orderError, 'buyer_id')) {
-      const legacyPayload = { ...orderPayload }
-      delete legacyPayload.buyer_id
-      const retry = await supabase
-        .from('orders')
-        .insert(legacyPayload)
-        .select('id')
-        .single()
-      order = retry.data as { id: string } | null
-      orderError = retry.error as { message?: string } | null
-      // Order tamu tanpa ikatan akun — keranjang tersimpan tidak ada
-      // yang perlu dibersihkan.
-      buyerId = null
-    }
     // Fase 3: bila kolom voucher/berat belum ada (migrasi f3 belum
     // dijalankan), insert diulang tanpa kolom itu — checkout tidak boleh
     // mati karenanya. Diskon tetap dihitung di total (pembeli tidak
     // dirugikan), tapi pemakaian voucher tidak tercatat sampai migrasi
-    // dijalankan — keadaan transisi, sama seperti buyer_id di Fase 2.
+    // dijalankan. (Retry tanpa buyer_id sengaja DIHAPUS: itu akan
+    // membuat order tamu, yang sudah ditutup.)
     if (
       orderError &&
       (isMissingColumnError(orderError, 'voucher_code') ||
@@ -363,7 +362,6 @@ export async function createOrderAction(input: CheckoutFormInput) {
       delete legacyPayload.voucher_code
       delete legacyPayload.discount_amount
       delete legacyPayload.total_weight_gram
-      if (buyerId === null) delete legacyPayload.buyer_id
       const retry = await supabase
         .from('orders')
         .insert(legacyPayload)
@@ -536,7 +534,8 @@ export async function createOrderAction(input: CheckoutFormInput) {
     total,
     paymentMethod: input.paymentMethod,
     itemCount: verifiedItems.length,
-    buyerLoggedIn: buyerId !== null,
+    // Checkout tamu ditutup — order baru selalu dari pembeli login.
+    buyerLoggedIn: true,
   })
 
   // Notifikasi email + WhatsApp + in-app ke pemilik toko (pesanan baru).
@@ -568,18 +567,16 @@ export async function createOrderAction(input: CheckoutFormInput) {
     }
   } catch {}
 
-  // Fase 2: pesanan pembeli login berhasil — bersihkan juga keranjang
-  // tersimpan di akun (keranjang lokal dibersihkan halaman checkout).
-  // Best-effort: kegagalan di sini tidak boleh menggagalkan pesanan.
-  if (buyerId) {
-    try {
-      await supabase
-        .from('buyer_carts')
-        .delete()
-        .eq('buyer_id', buyerId)
-        .eq('store_id', input.storeId)
-    } catch {}
-  }
+  // Pesanan berhasil — bersihkan juga keranjang tersimpan di akun
+  // (keranjang lokal dibersihkan halaman checkout). Best-effort:
+  // kegagalan di sini tidak boleh menggagalkan pesanan.
+  try {
+    await supabase
+      .from('buyer_carts')
+      .delete()
+      .eq('buyer_id', buyerId)
+      .eq('store_id', input.storeId)
+  } catch {}
 
   // &baru=1 membuat halaman invoice menampilkan sambutan "pesanan berhasil
   // dibuat" + langkah pembayaran bernomor (mode sukses setelah checkout).

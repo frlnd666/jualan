@@ -13,7 +13,7 @@ import {
 
 export default function HomePage() {
   return (
-    <main className="overflow-x-hidden">
+    <main className="overflow-x-hidden pb-[84px] md:pb-0">
       <Navbar />
       <HeroSection />
       <TrustSection />

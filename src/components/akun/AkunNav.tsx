@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const items = [
+  { href: '/akun/profil', label: 'Profil' },
   { href: '/akun/pesanan', label: 'Pesanan Saya' },
   { href: '/akun/alamat', label: 'Alamat Saya' },
   { href: '/akun/notifikasi', label: 'Notifikasi' },

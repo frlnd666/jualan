@@ -1,12 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCart } from '@/lib/use-cart'
+import { createClient } from '@/lib/supabase/client'
 import { storeHref } from '@/lib/store-links'
 import { platformHosts, platformDomainFromEnv } from '@/lib/domains'
 
 export default function CartPage() {
+  const router = useRouter()
   const { items, updateQty, removeItem, subtotal, clearCart, storeSlug } = useCart()
+  const [checkingAuth, setCheckingAuth] = useState(false)
   // Fase 5 — "Kembali ke toko" tetap di host yang melayani (domain
   // custom/subdomain = root, platform = /{slug}).
   const backHref = storeSlug
@@ -19,8 +24,27 @@ export default function CartPage() {
       )
     : '/'
 
+  // Checkout wajib login: tamu diarahkan daftar sebagai pembeli dulu,
+  // lalu kembali ke /checkout. Melihat isi keranjang tetap bebas.
+  // Bila cek sesi gagal, biarkan halaman /checkout yang memutuskan
+  // (gate server di sana mengarahkan tamu ke register).
+  async function handleCheckoutClick() {
+    setCheckingAuth(true)
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      router.push(user ? '/checkout' : '/register?type=buyer&next=/checkout')
+    } catch {
+      router.push('/checkout')
+    } finally {
+      setCheckingAuth(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 p-4 pb-28 md:pb-4">
       <div className="max-w-xl mx-auto bg-white rounded-2xl p-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-bold text-gray-900">Cart</h1>
@@ -61,7 +85,14 @@ export default function CartPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <button onClick={clearCart} className="border border-gray-200 rounded-xl py-3 text-sm font-semibold">Kosongkan</button>
-          <Link href="/checkout" className="bg-indigo-600 text-white rounded-xl py-3 text-center text-sm font-semibold">Checkout</Link>
+          <button
+            type="button"
+            onClick={handleCheckoutClick}
+            disabled={checkingAuth}
+            className="bg-indigo-600 text-white rounded-xl py-3 text-center text-sm font-semibold disabled:opacity-50"
+          >
+            {checkingAuth ? 'Memproses...' : 'Checkout'}
+          </button>
         </div>
       </div>
     </div>

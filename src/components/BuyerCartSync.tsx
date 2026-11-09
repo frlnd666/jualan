@@ -17,6 +17,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useCart } from '@/lib/use-cart'
 import { resolveCartOnLogin } from '@/lib/access-rules'
 import {
+  clearBuyerCartAction,
   getBuyerCartAction,
   saveBuyerCartAction,
 } from '@/lib/actions/buyer-cart'
@@ -92,6 +93,17 @@ export default function BuyerCartSync() {
       if (!syncedForUserId.current) return
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => {
+        // Keranjang kosong = hapus keranjang tersimpan. JANGAN return
+        // dini saat storeId null: clearCart() mengosongkan storeId,
+        // dan melewatkan penghapusan inilah yang membuat item kembali
+        // dari server saat sinkronisasi berikutnya — tombol "Kosongkan"
+        // di /cart tampak bekerja, tapi isi kembali setelah navigasi
+        // (bug 2026-11-09). Hapus-per-item tidak kena bug ini karena
+        // removeItem mempertahankan storeId.
+        if (state.items.length === 0) {
+          void clearBuyerCartAction()
+          return
+        }
         if (!state.storeId) return
         void saveBuyerCartAction({
           storeId: state.storeId,

@@ -22,6 +22,13 @@ import {
 import { notifyOrderEvent } from '@/lib/notify'
 import type { NotificationType } from '@/lib/notifications'
 import type { OrderStatus } from '@/lib/types/order'
+// Diagnostik sementara 2026-11-09 (hapus setelah akar masalah ketemu):
+// aksi seller menggantung — lihat src/lib/action-timeout.ts.
+import {
+  createStepTracker,
+  DIAGNOSTIC_TIMEOUT_MS,
+  withActionTimeout,
+} from '@/lib/action-timeout'
 
 export interface ActionResult {
   success: boolean
@@ -204,24 +211,44 @@ export async function saveSellerNoteAction(
     return { success: false, error: 'Catatan maksimal 500 karakter.' }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Kamu harus login.' }
+  // Diagnostik sementara 2026-11-09: catat langkah terakhir + batas waktu
+  // agar langkah yang menggantung terlihat dari UI (hapus setelah fix).
+  const tracker = createStepTracker()
+  const run = (async (): Promise<ActionResult> => {
+    tracker.set('createClient')
+    const supabase = await createClient()
+    tracker.set('auth.getUser')
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Kamu harus login.' }
 
-  const access = await getDashboardAccess(supabase, user.id)
-  if (!access) return { success: false, error: 'Toko tidak ditemukan untuk akun ini.' }
+    tracker.set('getDashboardAccess')
+    const access = await getDashboardAccess(supabase, user.id)
+    if (!access)
+      return { success: false, error: 'Toko tidak ditemukan untuk akun ini.' }
 
-  const { error } = await supabase
-    .from('orders')
-    .update({ seller_note: note || null })
-    .eq('id', orderId)
-    .eq('store_id', access.store.id)
+    tracker.set('update orders.seller_note')
+    const { error } = await supabase
+      .from('orders')
+      .update({ seller_note: note || null })
+      .eq('id', orderId)
+      .eq('store_id', access.store.id)
 
-  if (error) return { success: false, error: 'Gagal menyimpan catatan.' }
-  revalidatePath(`/dashboard/orders/${orderId}`)
-  return { success: true }
+    if (error) return { success: false, error: 'Gagal menyimpan catatan.' }
+    tracker.set('revalidatePath')
+    revalidatePath(`/dashboard/orders/${orderId}`)
+    return { success: true }
+  })()
+
+  try {
+    return await withActionTimeout(run, DIAGNOSTIC_TIMEOUT_MS, tracker)
+  } catch (e) {
+    return {
+      success: false,
+      error: `Diagnostik: ${e instanceof Error ? e.message : 'timeout'}`,
+    }
+  }
 }
 
 // --- Export CSV -----------------------------------------------------------

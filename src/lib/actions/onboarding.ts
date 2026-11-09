@@ -27,6 +27,9 @@ export type OnboardingStore = {
   bank_account_number: string | null
   qris_image_url: string | null
   cod_enabled: boolean | null
+  // Kota asal pengiriman — dipetakan dari kolom DB `origin_city_id`
+  // (tidak ada kolom `origin` di tabel stores; select/update memakai
+  // nama itu akan error). Nilai saat ini teks bebas ("Kota Serang").
   origin: string | null
   onboarding_step: number
 }
@@ -64,14 +67,19 @@ async function requireOwnerStore(): Promise<
   const { data: store } = await storeReadClient
     .from('stores')
     .select(
-      'id, name, slug, description, whatsapp, city, address, bank_name, bank_account_name, bank_account_number, qris_image_url, cod_enabled, origin, onboarding_step'
+      'id, name, slug, description, whatsapp, city, address, bank_name, bank_account_name, bank_account_number, qris_image_url, cod_enabled, origin_city_id, onboarding_step'
     )
     .eq('owner_id', user.id)
     .maybeSingle()
+  const row = store as
+    | (Omit<OnboardingStore, 'origin'> & { origin_city_id: string | null })
+    | null
+  if (!row) return { supabase, userId: user.id, store: null }
+  const { origin_city_id, ...rest } = row
   return {
     supabase,
     userId: user.id,
-    store: (store as OnboardingStore | null) ?? null,
+    store: { ...rest, origin: origin_city_id ?? null },
   }
 }
 
@@ -196,7 +204,7 @@ export async function saveOnboardingShippingAction(input: {
 
   const { error } = await owner.supabase
     .from('stores')
-    .update({ origin, onboarding_step: 3 })
+    .update({ origin_city_id: origin, onboarding_step: 3 })
     .eq('id', owner.store.id)
   if (error) return { error: 'Gagal menyimpan pengiriman.' }
 

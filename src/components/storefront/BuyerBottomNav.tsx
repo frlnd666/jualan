@@ -1,23 +1,23 @@
 // Bottom navbar pembeli (mobile-first, pola mirip MobileBottomNav
 // dashboard). Tampil di storefront publik, sembunyi di dashboard /
 // auth / checkout / detail produk — aturannya di lib/buyer-nav.ts.
+// Item: Keranjang, Pesanan, Akun — TANPA Beranda (tombol Home mengarah
+// ke landing, tidak diperlukan di nav pembeli).
 'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Package, ShoppingCart, User } from 'lucide-react'
+import { Package, ShoppingCart, User } from 'lucide-react'
 import { cartTotalQty, useCart } from '@/lib/use-cart'
-import { shouldShowBuyerNav } from '@/lib/buyer-nav'
+import { BUYER_NAV_ITEMS, shouldShowBuyerNav } from '@/lib/buyer-nav'
 
-const items = [
-  { href: '/', label: 'Beranda', icon: Home },
-  { href: '/cart', label: 'Keranjang', icon: ShoppingCart },
-  { href: '/akun/pesanan', label: 'Pesanan', icon: Package },
-  { href: '/akun/profil', label: 'Akun', icon: User },
-] as const
+const ICONS = {
+  '/cart': ShoppingCart,
+  '/akun/pesanan': Package,
+  '/akun/profil': User,
+} as const
 
 function isActiveItem(href: string, pathname: string): boolean {
-  if (href === '/') return pathname === '/'
   if (href === '/cart') return pathname === '/cart'
   if (href === '/akun/pesanan') {
     // Halaman invoice adalah lacak pesanan — sorot "Pesanan" juga.
@@ -37,8 +37,9 @@ export default function BuyerBottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[#fffaf5]/95 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden">
-      <div className="mx-auto grid max-w-6xl grid-cols-4 gap-1">
-        {items.map(({ href, label, icon: Icon }) => {
+      <div className="mx-auto grid max-w-6xl grid-cols-3 gap-1">
+        {BUYER_NAV_ITEMS.map(({ href, label }) => {
+          const Icon = ICONS[href]
           const active = isActiveItem(href, pathname)
           const showBadge = href === '/cart' && count > 0
           return (

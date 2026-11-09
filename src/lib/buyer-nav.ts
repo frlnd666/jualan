@@ -65,3 +65,14 @@ export function shouldShowBuyerNav(pathname: string): boolean {
 
   return false
 }
+
+/**
+ * Item BuyerBottomNav — 3 item, TANPA Beranda: tombol Home mengarah ke
+ * landing (/) dan tidak diperlukan di nav pembeli. Ikon dipetakan di
+ * komponen (lucide) berdasarkan href.
+ */
+export const BUYER_NAV_ITEMS = [
+  { href: '/cart', label: 'Keranjang' },
+  { href: '/akun/pesanan', label: 'Pesanan' },
+  { href: '/akun/profil', label: 'Akun' },
+] as const

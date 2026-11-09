@@ -40,7 +40,6 @@ export default async function DashboardLayout({
   const access = await getDashboardAccess(supabase, user.id)
   const store = access?.store ?? null
   const isStaff = access?.role === 'staff'
-  const { data: isAdmin } = await supabase.rpc('is_admin')
   // Fase 3: lonceng notifikasi di header (best-effort — tabel belum ada
   // sebelum migrasi f3, jadi gagal dihitung = 0).
   let unreadCount = 0
@@ -76,14 +75,14 @@ export default async function DashboardLayout({
             <LogoutButton />
           </div>
         </div>
-        <DesktopNav isStaff={isStaff} isAdmin={isAdmin === true} />
+        <DesktopNav isStaff={isStaff} />
       </header>
 
       <main className="mx-auto max-w-6xl px-4 pb-[calc(88px+env(safe-area-inset-bottom))] pt-4 md:pb-6">
         {children}
       </main>
 
-      <MobileBottomNav isStaff={isStaff} isAdmin={isAdmin === true} />
+      <MobileBottomNav isStaff={isStaff} />
     </div>
   )
 }

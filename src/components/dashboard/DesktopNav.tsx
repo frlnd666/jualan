@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { isAdminRoute } from '@/lib/dashboard-nav'
+import AdminDesktopNav from '@/components/dashboard/AdminDesktopNav'
 
 const items = [
   { href: '/dashboard', label: 'Beranda' },
@@ -27,23 +29,24 @@ const STAFF_ITEMS = [
 ]
 
 /**
- * Navigasi desktop — sebelumnya dashboard tidak punya menu sama sekali di
- * layar besar (bottom nav hanya tampil di mobile), sehingga halaman seperti
- * Pengiriman hanya bisa dicapai dari tautan berserakan.
+ * Navigasi desktop penjual — sebelumnya dashboard tidak punya menu sama
+ * sekali di layar besar (bottom nav hanya tampil di mobile), sehingga
+ * halaman seperti Pengiriman hanya bisa dicapai dari tautan berserakan.
+ *
+ * Admin TIDAK ditempel di sini: di route /dashboard/admin/* komponen
+ * ini menampilkan AdminDesktopNav (nav admin sendiri).
  */
 export default function DesktopNav({
   isStaff = false,
-  isAdmin = false,
 }: {
   isStaff?: boolean
-  isAdmin?: boolean
 }) {
   const pathname = usePathname()
-  const visibleItems = isStaff
-    ? STAFF_ITEMS
-    : isAdmin
-      ? [...items, { href: '/dashboard/admin', label: 'Admin' }]
-      : items
+
+  // Area admin punya navbar sendiri.
+  if (isAdminRoute(pathname)) return <AdminDesktopNav />
+
+  const visibleItems = isStaff ? STAFF_ITEMS : items
 
   return (
     <nav className="mx-auto hidden max-w-6xl items-center gap-1 px-4 pb-3 md:flex">

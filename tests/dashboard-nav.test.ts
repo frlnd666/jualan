@@ -3,6 +3,7 @@ import {
   ADMIN_NAV_ITEMS,
   isAdminNavItemActive,
   isAdminRoute,
+  notificationHrefFor,
 } from '@/lib/dashboard-nav'
 import { BUYER_NAV_ITEMS } from '@/lib/buyer-nav'
 
@@ -75,6 +76,30 @@ describe('isAdminNavItemActive', () => {
     expect(
       isAdminNavItemActive('/dashboard/admin/notifications', '/dashboard/admin')
     ).toBe(false)
+  })
+})
+
+describe('notificationHrefFor', () => {
+  it('di area admin → halaman tes notifikasi admin', () => {
+    expect(notificationHrefFor('/dashboard/admin')).toBe(
+      '/dashboard/admin/notifications'
+    )
+    expect(notificationHrefFor('/dashboard/admin/stores')).toBe(
+      '/dashboard/admin/notifications'
+    )
+    expect(notificationHrefFor('/dashboard/admin/audit')).toBe(
+      '/dashboard/admin/notifications'
+    )
+  })
+
+  it('di luar area admin → inbox notifikasi penjual', () => {
+    expect(notificationHrefFor('/dashboard')).toBe('/dashboard/notifications')
+    expect(notificationHrefFor('/dashboard/products')).toBe(
+      '/dashboard/notifications'
+    )
+    expect(notificationHrefFor('/dashboard/adminx')).toBe(
+      '/dashboard/notifications'
+    )
   })
 })
 

@@ -1,13 +1,18 @@
 // Lonceng notifikasi di header dashboard (Fase 3) — Client Component.
 // Badge angka = jumlah belum dibaca (di-hitung server di layout).
+// Tujuan lonceng mengikuti area: di route admin menuju halaman tes
+// notifikasi admin, di luar itu menuju inbox notifikasi penjual.
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { notificationHrefFor } from '@/lib/dashboard-nav'
 
 export default function NotificationBell({ unreadCount }: { unreadCount: number }) {
+  const pathname = usePathname()
   return (
     <Link
-      href="/dashboard/notifications"
+      href={notificationHrefFor(pathname)}
       aria-label={`Notifikasi${unreadCount > 0 ? `, ${unreadCount} belum dibaca` : ''}`}
       className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-white text-lg shadow-[var(--shadow-sm)] transition active:scale-[0.98]"
     >

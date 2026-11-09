@@ -28,3 +28,17 @@ export function isAdminNavItemActive(href: string, pathname: string): boolean {
   if (href === '/dashboard/admin') return pathname === '/dashboard/admin'
   return pathname === href || pathname.startsWith(`${href}/`)
 }
+
+/**
+ * Tujuan lonceng notifikasi di header dashboard: di area admin menuju
+ * halaman tes notifikasi admin (/dashboard/admin/notifications — nav
+ * admin), di luar itu menuju inbox notifikasi penjual
+ * (/dashboard/notifications). Admin tidak menerima notifikasi in-app
+ * (dispatcher hanya mengirim ke pemilik toko/staff), jadi lonceng
+ * admin tidak kehilangan inbox apa pun.
+ */
+export function notificationHrefFor(pathname: string): string {
+  return isAdminRoute(pathname)
+    ? '/dashboard/admin/notifications'
+    : '/dashboard/notifications'
+}

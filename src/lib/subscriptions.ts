@@ -26,6 +26,54 @@ export { effectiveTier, limitsFor }
 export const SILVER_PRICE = 19900
 export const GOLD_PRICE = 50000
 
+/**
+ * P1-01: putuskan paket yang BOLEH dibuat untuk toko baru dari intent
+ * register + riwayat trial pemilik. Fungsi murni (bisa di-unit-test).
+ * - Intent tidak dikenal (mis. localStorage `cuan_plan` dimanipulasi)
+ *   → 'free'.
+ * - 'gold' selalu dibuat sebagai Free — Gold aktif hanya setelah
+ *   pembayaran manual diverifikasi admin.
+ * - 'silver-trial' hanya bila pemilik belum pernah memakai trial
+ *   (profiles.trial_used_at null); bila sudah pernah → Free +
+ *   trialAlreadyUsed, supaya pemanggil menampilkan pesan jelas.
+ *   JANGAN andalkan trigger DB yang menurunkan diam-diam.
+ */
+export function resolvePlanIntent(
+  plan: string,
+  trialUsedAt: string | null
+): {
+  tier: 'free' | 'silver'
+  status: 'ACTIVE' | 'TRIALING'
+  trialAlreadyUsed: boolean
+} {
+  if (plan === 'silver-trial' && !trialUsedAt) {
+    return { tier: 'silver', status: 'TRIALING', trialAlreadyUsed: false }
+  }
+  return {
+    tier: 'free',
+    status: 'ACTIVE',
+    trialAlreadyUsed: plan === 'silver-trial',
+  }
+}
+
+/** P1-01: pesan saat trial kedua ditolak — toko tetap dibuat sebagai Free. */
+export const TRIAL_ALREADY_USED_MESSAGE =
+  'Toko tersimpan dengan paket Free — trial Silver sudah pernah dipakai akun ini, jadi tidak bisa dipakai lagi. Upgrade ke Silver atau Gold dari halaman Langganan.'
+
+/**
+ * P1-09: pesan antrean pending ganda — dipakai cek awal DAN tangkapan
+ * race 23505 di submitSubscriptionPayment, supaya pesannya sama persis.
+ */
+export const PENDING_PAYMENT_EXISTS_MESSAGE =
+  'Masih ada pembayaran langganan yang menunggu verifikasi admin. Tunggu hasilnya dulu sebelum mengajukan lagi.'
+
+/** P1-09: pelanggaran unique index (Postgrest error code 23505). */
+export function isUniqueViolation(
+  error: { code?: string } | null | undefined
+): boolean {
+  return error?.code === '23505'
+}
+
 export const TIER_PRICES: Record<Exclude<Tier, 'free'>, number> = {
   silver: SILVER_PRICE,
   gold: GOLD_PRICE,
@@ -91,8 +139,21 @@ export async function getStoreSubscription(
 
 /** Akhir periode baru untuk tier berbayar, dihitung dari `from`. */
 export function periodEndFor(tier: Exclude<Tier, 'free'>, from: Date): Date {
+  // P2-22: Date.setMonth meluber di akhir bulan (31 Jan +1 bln = 3 Mar)
+  // — clamp ke hari terakhir bulan tujuan (31 Jan +1 bln = 28/29 Feb,
+  // 31 Jan +3 bln = 30 Apr). Set tanggal ke 1 dulu supaya setMonth
+  // tidak meluber sebelum clamp; jam/menit/detik ikut `from`.
+  const months = tier === 'silver' ? 1 : 3
+  const day = from.getDate()
   const end = new Date(from)
-  end.setMonth(end.getMonth() + (tier === 'silver' ? 1 : 3))
+  end.setDate(1)
+  end.setMonth(end.getMonth() + months)
+  const daysInTargetMonth = new Date(
+    end.getFullYear(),
+    end.getMonth() + 1,
+    0
+  ).getDate()
+  end.setDate(Math.min(day, daysInTargetMonth))
   return end
 }
 

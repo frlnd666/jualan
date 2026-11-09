@@ -15,7 +15,9 @@ interface OrderFulfillmentProps {
 }
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'PAID', label: 'Sudah dibayar' },
+  // P2-23: 'PAID' tidak pernah bisa dicapai (confirmPayment dan
+  // applyQrisPaid lompat langsung ke PROCESSING) — jangan tawarkan
+  // sebagai tujuan; memilihnya hanya akan ditolak action.
   { value: 'PROCESSING', label: 'Sedang diproses' },
   { value: 'SHIPPED', label: 'Sedang dikirim' },
   { value: 'COMPLETED', label: 'Selesai' },
@@ -42,13 +44,20 @@ export default function OrderFulfillment({
     setMessage('')
     setError('')
     startTransition(async () => {
-      const result = await action()
-      if (!result.success) {
-        setError(result.error || 'Terjadi kesalahan.')
-        return
+      try {
+        const result = await action()
+        if (!result.success) {
+          setError(result.error || 'Terjadi kesalahan.')
+          return
+        }
+        setMessage('Tersimpan.')
+        router.refresh()
+      } catch {
+        // P2-13: action melempar (mis. jaringan putus) — tampilkan pesan
+        // inline, jangan biarkan error boundary menelan seluruh halaman
+        // dan penjual mengira resi/status tidak tersimpan tanpa kabar.
+        setError('Gagal menyimpan. Periksa koneksi lalu coba lagi.')
       }
-      setMessage('Tersimpan.')
-      router.refresh()
     })
   }
 

@@ -29,7 +29,8 @@ export interface ActionResult {
 
 const ORDER_STATUSES: OrderStatus[] = [
   'PENDING_PAYMENT',
-  'PAID',
+  // P2-23: 'PAID' dihapus — lihat penjelasan di order-fulfillment.ts.
+  // Tidak ada jalur kode yang pernah men-set PAID sebagai status order.
   'PROCESSING',
   'SHIPPED',
   'COMPLETED',
@@ -81,6 +82,12 @@ export async function bulkUpdateOrderStatusAction(
   } catch {
     orderIds = []
   }
+
+  // P1-06: dedup dulu — ID yang sama 2× dalam satu request membuat
+  // iterasi ke-2 memakai status basi (sudah berubah di iterasi ke-1):
+  // update-nya kalah 0 baris tapi restoreStock tetap jalan bila target
+  // CANCELLED, jadi stok kembali 2× dan laporan `updated` bohong.
+  orderIds = [...new Set(orderIds)]
 
   if (!orderIds.length) {
     return { success: false, updated: 0, failed: [], error: 'Tidak ada pesanan dipilih.' }

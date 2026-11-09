@@ -135,6 +135,16 @@ async function runMiddleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // P2-24: /akun/* hanya untuk user login — sebelumnya hanya mengandalkan
+  // layout (redirect bila tidak login). Satu tempat di middleware supaya
+  // halaman /akun baru yang lupa cek auth tidak langsung terbuka.
+  if (
+    !user &&
+    (pathname === '/akun' || pathname.startsWith('/akun/'))
+  ) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
   if (user && (pathname === '/login' || pathname === '/register')) {
     // Fase 2: pembeli yang sudah login diarahkan ke /akun, bukan
     // /dashboard. Peran dibaca dari profiles; bila belum ada baris

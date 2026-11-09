@@ -105,13 +105,19 @@ export default function ShopeePaySettingsForm() {
 
   async function handleToggle(next: boolean) {
     setErrorMessage('')
-    const result = await setShopeePayActiveAction(next)
-    if (result.error) {
-      setErrorMessage(result.error)
-      return
+    try {
+      const result = await setShopeePayActiveAction(next)
+      if (result.error) {
+        setErrorMessage(result.error)
+        return
+      }
+      setSuccessMessage(result.success ?? '')
+      await load()
+    } catch {
+      // P2-14: action melempar (mis. jaringan putus) — tampilkan pesan,
+      // jangan jadi unhandled rejection.
+      setErrorMessage('Gagal mengubah status ShopeePay. Periksa koneksi lalu coba lagi.')
     }
-    setSuccessMessage(result.success ?? '')
-    await load()
   }
 
   async function handleDelete() {
@@ -123,13 +129,18 @@ export default function ShopeePaySettingsForm() {
       return
     }
     setErrorMessage('')
-    const result = await deleteShopeePayCredentialsAction()
-    if (result.error) {
-      setErrorMessage(result.error)
-      return
+    try {
+      const result = await deleteShopeePayCredentialsAction()
+      if (result.error) {
+        setErrorMessage(result.error)
+        return
+      }
+      setSuccessMessage(result.success ?? '')
+      await load()
+    } catch {
+      // P2-14: action melempar — tampilkan pesan, jangan unhandled rejection.
+      setErrorMessage('Gagal menghapus kredensial ShopeePay. Periksa koneksi lalu coba lagi.')
     }
-    setSuccessMessage(result.success ?? '')
-    await load()
   }
 
   if (loading) {

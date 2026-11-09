@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getDashboardAccess } from '@/lib/dashboard-access'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import ProductDeleteButton from '@/components/dashboard/ProductDeleteButton'
 
 function formatRupiah(value: number | string | null) {
   const numeric = Number(value ?? 0)
@@ -227,6 +228,13 @@ export default async function ProductsPage() {
                 >
                   Edit produk
                 </Link>
+
+                {/* P2-20: hapus permanen (konfirmasi dulu); produk yang
+                    sudah pernah dipesan ditolak server action-nya. */}
+                <ProductDeleteButton
+                  productId={product.id}
+                  productName={product.name}
+                />
               </div>
             </section>
           ))}

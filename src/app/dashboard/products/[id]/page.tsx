@@ -121,16 +121,24 @@ export default function EditProductPage({ params }: EditProductPageProps) {
   }, [])
 
   async function uploadProductImage(file: File) {
+    // P1-02: path menyertakan store_id — policy storage baru hanya
+    // mengizinkan tulis ke folder toko sendiri (products/<store_id>/...).
+    if (!storeId) {
+      throw new Error('Toko tidak ditemukan. Muat ulang halaman lalu coba lagi.')
+    }
     const fileExt = file.name.split('.').pop() || 'jpg'
     const safeSlug = slug.trim() || `product-${Date.now()}`
     const fileName = `${safeSlug}-${Date.now()}.${fileExt}`
-    const filePath = `products/${fileName}`
+    const filePath = `products/${storeId}/${fileName}`
 
     const { error: uploadError } = await supabase.storage
       .from('product-images')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: true,
+        // P1-02: upsert:false — policy UPDATE sudah dicabut migrasi
+        // storage, jadi timpa tidak mungkin; path baru selalu unik
+        // (timestamp) sehingga tidak ada yang perlu ditimpa.
+        upsert: false,
       })
 
     if (uploadError) {

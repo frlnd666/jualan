@@ -17,7 +17,13 @@ export interface ActionResult {
 
 const ORDER_STATUSES: OrderStatus[] = [
   'PENDING_PAYMENT',
-  'PAID',
+  // P2-23: 'PAID' dihapus dari daftar status yang bisa dituju seller —
+  // tidak ada jalur kode yang pernah men-set PAID (confirmPayment dan
+  // applyQrisPaid lompat langsung ke PROCESSING). Order yang sudah
+  // berstatus PAID (data lama) tetap ditangani di tempat lain
+  // (saveShipmentAction, tab perlu-dikirim); yang dihapus di sini hanya
+  // PAID sebagai TUJUAN perubahan status. ALLOWED_TRANSITIONS dan
+  // constraint DB tidak diubah.
   'PROCESSING',
   'SHIPPED',
   'COMPLETED',

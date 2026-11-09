@@ -8,6 +8,7 @@ import StaffDeniedCard from '@/components/dashboard/StaffDeniedCard'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { normalizeStoreSlug, validateStoreSlug } from '@/lib/store-slug'
 import { ensureStoreSubscription } from '@/lib/actions/subscriptions'
+import { TRIAL_ALREADY_USED_MESSAGE } from '@/lib/subscriptions'
 import {
   getStorePaymentAction,
   saveStorePaymentAction,
@@ -214,9 +215,19 @@ export default function SettingsPage() {
   }, [])
 
   async function handleUpload(file: File, type: 'logo' | 'banner') {
-    const url = await uploadToCloudinary(file)
-    if (type === 'logo') setLogoUrl(url)
-    else setBannerUrl(url)
+    // P2-14: uploadToCloudinary melempar saat jaringan gagal — tanpa
+    // try/catch jadi unhandled rejection dari onChange input file.
+    // Pesan tampil di seksi Tampilan (tempat logo/banner berada).
+    try {
+      const url = await uploadToCloudinary(file)
+      if (type === 'logo') setLogoUrl(url)
+      else setBannerUrl(url)
+    } catch {
+      setSectionError({
+        section: 'tampilan',
+        message: 'Gagal mengunggah gambar. Periksa koneksi lalu coba lagi.',
+      })
+    }
   }
 
   function fullPayload(userId: string) {
@@ -291,6 +302,14 @@ export default function SettingsPage() {
             })
             return
           }
+          // P1-01: trial kedua diturunkan jadi Free oleh server action —
+          // beri tahu pemilik (toko tetap tersimpan; bukan error simpan).
+          if (sub.trialAlreadyUsed) {
+            setSectionError({
+              section,
+              message: TRIAL_ALREADY_USED_MESSAGE,
+            })
+          }
         }
       }
 
@@ -335,11 +354,27 @@ export default function SettingsPage() {
   }
 
   function saveKontak() {
+    // P2-27: username Instagram hanya boleh huruf, angka, titik, dan
+    // garis bawah (maks. 30 karakter) — nilai seperti 'foo/bar?x=1'
+    // menghasilkan tautan rusak di halaman toko
+    // (https://instagram.com/<username>). Kosong = tidak diisi.
+    const cleanedInstagram = instagram.trim().replace(/^@/, '')
+    if (
+      cleanedInstagram &&
+      !/^[A-Za-z0-9._]{1,30}$/.test(cleanedInstagram)
+    ) {
+      setSectionError({
+        section: 'kontak',
+        message:
+          'Username Instagram hanya boleh huruf, angka, titik, dan garis bawah (maksimal 30 karakter, tanpa @, /, spasi, atau ?).',
+      })
+      return
+    }
     void saveSection('kontak', {
       whatsapp,
       city: city.trim() || null,
       address: address.trim() || null,
-      instagram: instagram.trim().replace(/^@/, '') || null,
+      instagram: cleanedInstagram || null,
     })
   }
 

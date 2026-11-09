@@ -97,6 +97,12 @@ export async function createStoreBannerAction(
   if (linkUrl && !/^https?:\/\//i.test(linkUrl) && !linkUrl.startsWith('/')) {
     return { error: 'Tautan harus URL lengkap atau path internal (mis. /produk).' }
   }
+  // P2-26: tolak protocol-relative '//evil.com' — regex di atas
+  // meloloskannya sebagai path internal, padahal <Link> merendernya
+  // sebagai tautan keluar ke domain asing.
+  if (linkUrl?.startsWith('//')) {
+    return { error: 'Tautan tidak boleh diawali //. Pakai URL lengkap (https://...) atau path internal (mis. /produk).' }
+  }
 
   const { error } = await supabase.from('store_banners').insert({
     store_id: store.id,

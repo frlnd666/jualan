@@ -403,6 +403,18 @@ export async function createOrderAction(input: CheckoutFormInput) {
         p_qty: entry.qty,
       })
     }
+    // P2-21: hapus juga invoice (dan QR dinamis bila sudah dibuat) supaya
+    // tidak tertinggal invoice yatim yang menunjuk order_id yang sudah
+    // dihapus — halaman invoice-nya 404 dan nomor invoice terbuang.
+    const { data: invoiceRows } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('order_id', orderId)
+    const invoiceIds = (invoiceRows ?? []).map((r) => (r as { id: string }).id)
+    if (invoiceIds.length > 0) {
+      await supabase.from('qris_payments').delete().in('invoice_id', invoiceIds)
+      await supabase.from('invoices').delete().in('id', invoiceIds)
+    }
     await supabase.from('order_items').delete().eq('order_id', orderId)
     await supabase.from('orders').delete().eq('id', orderId)
   }

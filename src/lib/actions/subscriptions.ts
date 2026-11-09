@@ -18,6 +18,9 @@ import {
   getStoreSubscription,
   periodEndFor,
   allowedCheckoutMethods,
+  resolvePlanIntent,
+  PENDING_PAYMENT_EXISTS_MESSAGE,
+  isUniqueViolation,
   TIER_PRICES,
   TIER_LABELS,
   type Tier,
@@ -88,6 +91,19 @@ async function requireAdmin() {
  * Idempotent — bila baris subscriptions sudah ada, tidak ditimpa.
  * Paket 'gold' di sini tetap dibuat sebagai Free; Gold aktif hanya
  * setelah pembayaran manual diverifikasi admin (halaman Langganan).
+ *
+ * P1-01: intent paket dari client (localStorage `cuan_plan`) TIDAK
+ * dipercaya apa adanya — resolvePlanIntent memvalidasi allowlist +
+ * mengecek riwayat trial pemilik (profiles.trial_used_at) SEBELUM
+ * membuat TRIALING. localStorage yang dimanipulasi tidak bisa memberi
+ * apa pun di luar yang diizinkan server ('gold' tetap dibuat Free;
+ * trial kedua jadi Free + trialAlreadyUsed, supaya pemanggil bisa
+ * menampilkan pesan jelas — bukan andalkan trigger DB yang menurunkan
+ * diam-diam). Menyimpan intent di server (kolom/cookie saat register)
+ * sengaja tidak dilakukan: intent hanya dipakai sekali saat toko
+ * dibuat dan server sudah menjadi penentu akhir — nilai client kini
+ * hanya petunjuk, bukan keputusan. Pencatatan trial_used_at sendiri
+ * tetap tugas trigger enforce_single_trial di DB (sudah live).
  */
 export async function ensureStoreSubscription(
   storeId: string,
@@ -115,18 +131,33 @@ export async function ensureStoreSubscription(
     .eq('store_id', storeId)
     .maybeSingle()
 
+  let trialAlreadyUsed = false
   if (!existing) {
     const now = new Date()
+    // P1-01: cek riwayat trial pemilik sebelum membuat TRIALING.
+    let trialUsedAt: string | null = null
+    if (plan === 'silver-trial') {
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('trial_used_at')
+        .eq('id', user.id)
+        .maybeSingle()
+      trialUsedAt = (profile as { trial_used_at: string | null } | null)
+        ?.trial_used_at ?? null
+    }
+    const resolved = resolvePlanIntent(plan, trialUsedAt)
+    trialAlreadyUsed = resolved.trialAlreadyUsed
     const trialEndsAt =
-      plan === 'silver-trial'
+      resolved.status === 'TRIALING'
         ? new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
         : null
     const { error } = await admin.from('subscriptions').insert({
       store_id: storeId,
-      tier: plan === 'silver-trial' ? 'silver' : 'free',
-      status: plan === 'silver-trial' ? 'TRIALING' : 'ACTIVE',
+      tier: resolved.tier,
+      status: resolved.status,
       trial_ends_at: trialEndsAt,
-      current_period_start: plan === 'silver-trial' ? now.toISOString() : null,
+      current_period_start:
+        resolved.status === 'TRIALING' ? now.toISOString() : null,
       current_period_end: trialEndsAt,
     })
     if (error) return { error: `Gagal membuat langganan: ${error.message}` }
@@ -151,7 +182,11 @@ export async function ensureStoreSubscription(
 
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/subscription')
-  return { success: true }
+  // P1-01: beri tahu pemanggil bila trial kedua diturunkan jadi Free —
+  // pemanggil (Pengaturan Toko) menampilkan TRIAL_ALREADY_USED_MESSAGE.
+  return trialAlreadyUsed
+    ? { success: true as const, trialAlreadyUsed: true as const }
+    : { success: true as const }
 }
 
 /**
@@ -216,10 +251,16 @@ export async function createProductAction(input: {
     }
   }
 
+  // P2-20: kuota dihitung dari produk AVAILABLE saja — produk nonaktif
+  // tidak lagi memakan kuota selamanya. Trigger batas tier di DB
+  // (migrasi 20261109_p1_tier_limits_trigger.sql) menghitung hal yang
+  // sama sejak diperbaiki sebelum jalan live, jadi menonaktifkan
+  // produk membebaskan kuota di kedua lapisan.
   const { count, error: countError } = await supabase
     .from('products')
     .select('id', { count: 'exact', head: true })
     .eq('store_id', storeId)
+    .eq('available', true)
   if (countError) return { error: 'Gagal memeriksa jumlah produk.' }
   if ((count ?? 0) >= limits.maxProducts) {
     return {
@@ -363,6 +404,62 @@ export async function updateProductAction(input: {
 }
 
 /**
+ * Hapus produk permanen (P2-20) — pasangan create/updateProductAction.
+ * Hanya owner/staff toko pemilik. Produk yang sudah pernah dipesan
+ * DITOLAK hapusnya (riwayat order harus tetap utuh — item order
+ * menunjuk product_id ini); seller bisa menonaktifkannya saja supaya
+ * tidak tampil di toko. Produk yang belum pernah dipesan dihapus
+ * permanen — ini juga yang membebaskan kuota tier (lihat hitung kuota
+ * di createProductAction yang hanya menghitung produk available).
+ */
+export async function deleteProductAction(input: {
+  productId: string
+}): Promise<{ success: true } | { error: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Kamu harus login untuk menghapus produk.' }
+
+  const access = await getDashboardAccess(supabase, user.id)
+  const storeId = access?.store.id
+  if (!storeId) return { error: 'Toko tidak ditemukan untuk akun ini.' }
+
+  const { data: existing } = await supabase
+    .from('products')
+    .select('id, name')
+    .eq('id', input.productId)
+    .eq('store_id', storeId)
+    .maybeSingle()
+  if (!existing) return { error: 'Produk tidak ditemukan.' }
+
+  // Pernah dipesan = jangan hapus (riwayat order ikut menunjuk produk ini).
+  const { count: orderedCount, error: checkError } = await supabase
+    .from('order_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('product_id', input.productId)
+    .limit(1)
+  if (checkError) return { error: 'Gagal memeriksa riwayat pesanan produk.' }
+  if ((orderedCount ?? 0) > 0) {
+    return {
+      error:
+        'Produk ini sudah pernah dipesan dan tidak bisa dihapus supaya riwayat pesanan tetap utuh. Nonaktifkan saja supaya tidak tampil di toko.',
+    }
+  }
+
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', input.productId)
+    .eq('store_id', storeId)
+  if (error) return { error: `Gagal menghapus produk: ${error.message}` }
+
+  revalidatePath('/dashboard/products')
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+/**
  * Upload bukti pembayaran langganan ke bucket `payment-proofs` (privat),
  * path subscription/<storeId>/.... Nilai yang dikembalikan adalah URL
  * publik hasil getPublicUrl — sama seperti bukti transfer order — dan
@@ -434,10 +531,24 @@ export async function submitSubscriptionPayment(input: {
   if (!input.proofUrl) {
     return { error: 'Upload bukti pembayaran dulu.' }
   }
+  // P2-28: bukti harus berasal dari upload toko ini sendiri — path
+  // `subscription/<storeId>/` di bucket payment-proofs (lihat
+  // uploadSubscriptionProof). Tanpa cek ini, seller bisa mengajukan URL
+  // bukti toko lain atau URL arbitrer dan admin harus menilainya
+  // secara visual.
+  if (
+    !input.proofUrl.includes(`/payment-proofs/subscription/${storeId}/`)
+  ) {
+    return {
+      error:
+        'Bukti pembayaran tidak valid — upload ulang bukti lewat form ini (bukan tempel URL dari tempat lain).',
+    }
+  }
 
   const amount = TIER_PRICES[input.tier]
 
   // Satu pengajuan pending per toko — cegah antrean ganda untuk paket yang sama.
+  // P1-09: pesan dipakai ulang di bawah untuk tangkapan race 23505.
   const { data: pending } = await supabase
     .from('subscription_payments')
     .select('id')
@@ -446,8 +557,7 @@ export async function submitSubscriptionPayment(input: {
     .limit(1)
   if (pending && pending.length > 0) {
     return {
-      error:
-        'Masih ada pembayaran langganan yang menunggu verifikasi admin. Tunggu hasilnya dulu sebelum mengajukan lagi.',
+      error: PENDING_PAYMENT_EXISTS_MESSAGE,
     }
   }
 
@@ -467,6 +577,13 @@ export async function submitSubscriptionPayment(input: {
     status: 'PENDING_VERIFICATION',
   })
   if (error) {
+    // P1-09: pengajuan lain menang race di antara cek pending di atas
+    // dan insert — partial unique index satu-pending menolak dengan
+    // 23505. Pesannya harus SAMA dengan cek pending (bukan error
+    // generik dari supabase-js).
+    if (isUniqueViolation(error)) {
+      return { error: PENDING_PAYMENT_EXISTS_MESSAGE }
+    }
     return { error: `Gagal mengajukan pembayaran: ${error.message}` }
   }
 
@@ -643,9 +760,22 @@ export async function cancelSubscription() {
   if (row.status === 'CANCELLED') {
     return { error: 'Langganan sudah dibatalkan sebelumnya.' }
   }
+  // P1-07: tolak eksplisit — batal saat SUSPENDED bisa mencabut
+  // pembekuan admin (cron cancelled-ended mengembalikan Free/ACTIVE),
+  // dan batal saat EXPIRED tidak ada gunanya (sudah turun ke Free).
+  if (row.status === 'SUSPENDED') {
+    return { error: 'Toko sedang dibekukan admin — langganan tidak bisa dibatalkan dari sini. Hubungi admin platform.' }
+  }
+  if (row.status === 'EXPIRED') {
+    return { error: 'Langganan sudah berakhir — tidak perlu dibatalkan.' }
+  }
 
   if (row.status === 'TRIALING') {
-    const { error } = await admin
+    // P1-07: guard status — bila admin sempat memverifikasi pembayaran
+    // di antara baca dan tulis (TRIALING → ACTIVE berbayar), update
+    // ini tidak cocok dan batal, supaya paket yang baru dibayar tidak
+    // di-downgrade diam-diam ke Free.
+    const { data: updated, error } = await admin
       .from('subscriptions')
       .update({
         tier: 'free',
@@ -655,13 +785,23 @@ export async function cancelSubscription() {
         current_period_end: null,
       })
       .eq('store_id', storeId)
+      .eq('status', 'TRIALING')
+      .select('id')
     if (error) return { error: `Gagal membatalkan: ${error.message}` }
+    if (!updated || updated.length === 0) {
+      return { error: 'Status langganan sudah berubah. Muat ulang halaman lalu coba lagi.' }
+    }
   } else {
-    const { error } = await admin
+    const { data: updated, error } = await admin
       .from('subscriptions')
       .update({ status: 'CANCELLED' })
       .eq('store_id', storeId)
+      .eq('status', row.status)
+      .select('id')
     if (error) return { error: `Gagal membatalkan: ${error.message}` }
+    if (!updated || updated.length === 0) {
+      return { error: 'Status langganan sudah berubah. Muat ulang halaman lalu coba lagi.' }
+    }
   }
 
   // Fase 4 — audit log (best-effort).

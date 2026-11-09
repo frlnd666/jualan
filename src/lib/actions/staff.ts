@@ -26,7 +26,10 @@ async function findUserIdByEmail(
   email: string
 ): Promise<string | null> {
   const wanted = email.trim().toLowerCase()
-  for (let page = 1; page <= 10; page++) {
+  // P2-29: batas dinaikkan dari 10.000 ke 20.000 pengguna (20 halaman).
+  // Bila tetap tidak ketemu, pemanggil menyampaikan batasnya di pesan
+  // error (lihat addStaffAction) supaya tidak terkesan akunnya tidak ada.
+  for (let page = 1; page <= 20; page++) {
     const { data, error } = await admin.auth.admin.listUsers({
       page,
       perPage: 1000,
@@ -148,7 +151,7 @@ export async function addStaffAction(
   if (!targetId) {
     return {
       error:
-        'Akun dengan email itu belum terdaftar. Minta calon staff daftar dulu sebagai pembeli, lalu coba lagi.',
+        'Akun dengan email itu belum terdaftar (dicari dalam 20.000 pengguna pertama). Minta calon staff daftar dulu sebagai pembeli, lalu coba lagi.',
     }
   }
 

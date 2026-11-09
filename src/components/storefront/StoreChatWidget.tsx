@@ -45,9 +45,18 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
     let cancelled = false
 
     async function poll() {
-      const result = await getChatMessages(session!.sessionId, session!.accessToken)
-      if (!cancelled && result.success && result.messages) {
-        setMessages(result.messages)
+      // P2-14: poll jalan tiap 5 detik via setInterval — tanpa try/catch,
+      // satu gagal fetch jadi unhandled rejection yang berulang tiap
+      // 5 detik. Poll bersifat best-effort: gagal = diam, pesan lama
+      // tetap tampil; error saat kirim/mulai chat tetap ditampilkan
+      // oleh handleSend/handleStart.
+      try {
+        const result = await getChatMessages(session!.sessionId, session!.accessToken)
+        if (!cancelled && result.success && result.messages) {
+          setMessages(result.messages)
+        }
+      } catch {
+        // Abaikan — polling berikutnya mencoba lagi.
       }
     }
 

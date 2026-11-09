@@ -16,6 +16,7 @@ function voucher(overrides: Partial<VoucherLike> = {}): VoucherLike {
     discount_value: 10,
     min_order: 0,
     max_uses: null,
+    max_uses_per_buyer: null,
     used_count: 0,
     starts_at: null,
     ends_at: null,
@@ -77,6 +78,23 @@ describe('validateVoucher', () => {
     const r = validateVoucher(voucher({ min_order: 50000 }), 49999)
     expect(r.ok).toBe(false)
     expect(r).toMatchObject({ ok: false })
+  })
+  it('batas per pembeli: di bawah batas lolos, mencapai batas ditolak', () => {
+    const v = voucher({ max_uses_per_buyer: 1 })
+    expect(validateVoucher(v, 100000, new Date(), 0).ok).toBe(true)
+    const r = validateVoucher(v, 100000, new Date(), 1)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('batas per pembeli')
+  })
+  it('batas per pembeli null = buyerUses berapa pun lolos', () => {
+    expect(
+      validateVoucher(voucher(), 100000, new Date(), 99).ok
+    ).toBe(true)
+  })
+  it('batas per pembeli 2: dua kali pakai ditolak, sekali lolos', () => {
+    const v = voucher({ max_uses_per_buyer: 2 })
+    expect(validateVoucher(v, 100000, new Date(), 1).ok).toBe(true)
+    expect(validateVoucher(v, 100000, new Date(), 2).ok).toBe(false)
   })
 })
 

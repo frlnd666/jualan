@@ -10,6 +10,12 @@ import {
   RunTransitionsButton,
   VerifyPaymentButtons,
 } from '@/components/dashboard/SubscriptionActions'
+import {
+  paginate,
+  paymentStatusLabel,
+  paymentStatusPillClass,
+} from '@/lib/admin-ui'
+import AdminPagination from '@/components/admin/AdminPagination'
 
 type PaymentRow = {
   id: string
@@ -22,7 +28,12 @@ type PaymentRow = {
   created_at: string
 }
 
-export default async function AdminSubscriptionsPage() {
+export default async function AdminSubscriptionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
+  const { page: rawPage } = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
@@ -51,13 +62,32 @@ export default async function AdminSubscriptionsPage() {
     )
   }
 
-  const { data: paymentsData } = await supabase
+  // Redesign 2026-11-10: antrean menunggu selalu tampil penuh
+  // (biasanya sedikit dan butuh aksi), riwayat yang sudah diproses
+  // dipaginasi server-side — sebelumnya satu query limit 50 dibagi dua
+  // di client, riwayat lama hilang dari jangkauan.
+  const { data: pendingData } = await supabase
     .from('subscription_payments')
     .select('id, store_id, tier, amount, method, proof_url, status, created_at')
+    .eq('status', 'PENDING_VERIFICATION')
     .order('created_at', { ascending: false })
-    .limit(50)
-  const payments = (paymentsData ?? []) as PaymentRow[]
+    .limit(100)
+  const pending = (pendingData ?? []) as PaymentRow[]
 
+  const { count: processedTotal } = await supabase
+    .from('subscription_payments')
+    .select('id', { count: 'exact', head: true })
+    .neq('status', 'PENDING_VERIFICATION')
+  const pageInfo = paginate(processedTotal ?? 0, rawPage)
+  const { data: processedData } = await supabase
+    .from('subscription_payments')
+    .select('id, store_id, tier, amount, method, proof_url, status, created_at')
+    .neq('status', 'PENDING_VERIFICATION')
+    .order('created_at', { ascending: false })
+    .range(pageInfo.from, pageInfo.to)
+  const processed = (processedData ?? []) as PaymentRow[]
+
+  const payments = [...pending, ...processed]
   const storeIds = Array.from(new Set(payments.map((p) => p.store_id)))
   const storeNames = new Map<string, string>()
   if (storeIds.length > 0) {
@@ -69,9 +99,6 @@ export default async function AdminSubscriptionsPage() {
       storeNames.set(s.id, `${s.name} (/${s.slug})`)
     }
   }
-
-  const pending = payments.filter((p) => p.status === 'PENDING_VERIFICATION')
-  const processed = payments.filter((p) => p.status !== 'PENDING_VERIFICATION')
 
   const proofUrls = new Map<string, string | null>()
   for (const p of payments) {
@@ -126,8 +153,13 @@ export default async function AdminSubscriptionsPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-bold text-[var(--text)]">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[var(--text)]">
                       {storeNames.get(p.store_id) ?? p.store_id}
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${paymentStatusPillClass(p.status)}`}
+                      >
+                        {paymentStatusLabel(p.status)}
+                      </span>
                     </p>
                     <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                       {TIER_LABELS[p.tier as 'silver' | 'gold']} •{' '}
@@ -175,7 +207,7 @@ export default async function AdminSubscriptionsPage() {
 
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] md:p-6">
         <h2 className="text-base font-bold text-[var(--text)]">
-          Sudah diproses ({processed.length})
+          Sudah diproses ({processedTotal ?? 0})
         </h2>
         {processed.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--text-muted)]">
@@ -199,18 +231,21 @@ export default async function AdminSubscriptionsPage() {
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                    p.status === 'VERIFIED'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-rose-100 text-rose-700'
-                  }`}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${paymentStatusPillClass(p.status)}`}
                 >
-                  {p.status === 'VERIFIED' ? 'Terverifikasi' : 'Ditolak'}
+                  {paymentStatusLabel(p.status)}
                 </span>
               </li>
             ))}
           </ul>
         )}
+        <AdminPagination
+          basePath="/dashboard/admin/subscriptions"
+          page={pageInfo.page}
+          pageCount={pageInfo.pageCount}
+          total={pageInfo.total}
+          unitLabel="pembayaran"
+        />
       </section>
     </div>
   )

@@ -101,9 +101,9 @@ export default function VoucherForm({ disabled }: { disabled: boolean }) {
           </label>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Maks. pemakaian</span>
+            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Maks. pemakaian (semua pembeli)</span>
             <input
               name="maxUses"
               disabled={disabled || saving}
@@ -113,6 +113,22 @@ export default function VoucherForm({ disabled }: { disabled: boolean }) {
             />
           </label>
 
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Maks. per pembeli</span>
+            <input
+              name="maxUsesPerBuyer"
+              disabled={disabled || saving}
+              className={inputClassName}
+              placeholder="Kosong = tanpa batas"
+              inputMode="numeric"
+            />
+            <span className="mt-2 block text-xs text-[var(--text-muted)]">
+              Isi 1 supaya tiap pembeli hanya bisa memakai kode ini sekali.
+            </span>
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Berlaku dari</span>
             <input

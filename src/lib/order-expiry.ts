@@ -16,6 +16,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { applyCancellationEffects } from '@/lib/actions/order-fulfillment'
 import { notifyOrderEvent } from '@/lib/notify'
+import { logEvent } from '@/lib/observability'
 
 export const ORDER_EXPIRY_HOURS = 24
 
@@ -66,19 +67,28 @@ export async function runOrderExpiry(
   if (orderRows.length === 0) return summary
 
   // Invoice untuk seluruh batch (status bayar + nomor untuk notifikasi).
+  // PENTING (audit 2026-11-10 W-1): error query di sini TIDAK boleh
+  // diabaikan — peta kosong berarti perlindungan WAITING_VERIFICATION
+  // hilang dan order yang buktinya sedang dicek seller ikut terbatal.
+  // Bila query batch gagal, batalkan seluruh run; cron besok mencoba
+  // lagi (order belum berubah status apa pun).
   const invoiceByOrder = new Map<
     string,
     { invoice_number: string; payment_status: string }
   >()
   {
-    const { data: invoices } = await admin
+    const { data: invoices, error: invoiceError } = await admin
       .from('invoices')
       .select('order_id, invoice_number, payment_status')
       .in(
         'order_id',
         orderRows.map((o) => o.id)
       )
-    for (const inv of (invoices ?? []) as Array<{
+    if (invoiceError || !invoices) {
+      logEvent('order_expiry_aborted', { reason: 'invoice_query_failed' })
+      return { ...summary, errors: 1 }
+    }
+    for (const inv of invoices as Array<{
       order_id: string
       invoice_number: string
       payment_status: string
@@ -91,15 +101,20 @@ export async function runOrderExpiry(
   }
 
   // Info toko untuk notifikasi (owner + nama), satu query per batch.
+  // Query ini hanya untuk notifikasi — kegagalannya tidak menghentikan
+  // pembatalan (notifikasi dilewati), tapi tercatat di log.
   const storeById = new Map<string, { owner_id: string; name: string }>()
   {
-    const { data: stores } = await admin
+    const { data: stores, error: storeError } = await admin
       .from('stores')
       .select('id, owner_id, name')
       .in(
         'id',
         [...new Set(orderRows.map((o) => o.store_id))]
       )
+    if (storeError) {
+      logEvent('order_expiry_store_lookup_failed', {})
+    }
     for (const store of (stores ?? []) as Array<{
       id: string
       owner_id: string

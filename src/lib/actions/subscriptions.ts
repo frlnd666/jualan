@@ -859,6 +859,29 @@ export async function cancelSubscription() {
   return { success: true }
 }
 
+/**
+ * Aturan checkout publik yang bergantung tier toko — dipakai preview
+ * checkout supaya angka pratinjau sama dengan yang ditagih server.
+ * Audit 2026-11-10 (W-5): tarif per-kg hanya berlaku untuk paket
+ * berbayar; server meng-nol-kannya untuk Free (checkout.ts), tapi
+ * preview klien sebelumnya tetap menghitungnya sehingga pratinjau
+ * ongkir toko Free bisa LEBIH MAHAL dari tagihan.
+ */
+export async function getStoreCheckoutRulesAction(
+  storeId: string
+): Promise<{ perKgAllowed: boolean }> {
+  if (!storeId) return { perKgAllowed: false }
+  const supabase = await createPublicInvoiceClient()
+  try {
+    const subscription = await getStoreSubscription(supabase, storeId)
+    return { perKgAllowed: effectiveTier(subscription).tier !== 'free' }
+  } catch {
+    // Gagal baca → samakan dengan perilaku server yang fail-closed
+    // pada tier: anggap Free (per-kg tidak diterapkan di preview).
+    return { perKgAllowed: false }
+  }
+}
+
 /** Metode pembayaran yang diizinkan di checkout untuk sebuah toko. */
 export async function getAllowedPaymentMethodsAction(storeId: string) {
   if (!storeId) return [] as Array<'BANK_TRANSFER' | 'QRIS' | 'COD'>

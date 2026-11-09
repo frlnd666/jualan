@@ -16,6 +16,9 @@ export type LogEventName =
   | 'subscription_transitions_run'
   | 'subscription_read_failed'
   | 'notify_dispatch'
+  | 'order_expiry_aborted'
+  | 'order_expiry_store_lookup_failed'
+  | 'stock_restore_failed'
 
 export interface LogEventRecord {
   ts: string

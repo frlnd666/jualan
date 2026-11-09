@@ -67,6 +67,21 @@ export function shouldShowBuyerNav(pathname: string): boolean {
 }
 
 /**
+ * Slug toko dari pathname platform, bila halaman ini halaman toko.
+ * Dipakai BuyerBottomNav untuk mengambil tema toko (audit 2026-11-10
+ * W-3: nav dirender di root layout, di luar pembungkus bertema
+ * storefront, jadi tema harus diterapkan sendiri oleh nav).
+ * Di domain custom/subdomain path toko adalah '/' — slug tidak bisa
+ * diturunkan dari path, kembalikan null (nav memakai warna platform).
+ */
+export function storeSlugFromBuyerPathname(pathname: string): string | null {
+  const parts = pathname.split('/').filter(Boolean)
+  if (parts.length !== 1) return null
+  if (RESERVED_SINGLE_SEGMENT.has(parts[0])) return null
+  return parts[0]
+}
+
+/**
  * Item BuyerBottomNav — 3 item, TANPA Beranda: tombol Home mengarah ke
  * landing (/) dan tidak diperlukan di nav pembeli. Ikon dipetakan di
  * komponen (lucide) berdasarkan href.

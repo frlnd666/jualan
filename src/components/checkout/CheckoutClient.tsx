@@ -6,7 +6,10 @@ import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
 import { createOrderAction } from '@/lib/actions/checkout'
-import { getAllowedPaymentMethodsAction } from '@/lib/actions/subscriptions'
+import {
+  getAllowedPaymentMethodsAction,
+  getStoreCheckoutRulesAction,
+} from '@/lib/actions/subscriptions'
 import { validateVoucherCodeAction } from '@/lib/actions/vouchers'
 import {
   calcShippingCost,
@@ -75,6 +78,10 @@ export default function CheckoutClient() {
   // Metode pembayaran yang diizinkan paket toko (Fase 1): Free hanya COD.
   // Diambil dari server; penegakan yang mengikat tetap di createOrderAction.
   const [allowedMethods, setAllowedMethods] = useState<PaymentMethod[] | null>(null)
+  // Audit 2026-11-10 (W-5): tarif per-kg hanya untuk paket berbayar —
+  // server meng-nol-kannya untuk Free; preview harus sama. Default
+  // true (perilaku lama) sampai aturan toko termuat.
+  const [perKgAllowed, setPerKgAllowed] = useState(true)
   // Voucher (Fase 3): kode divalidasi ke server; diskon tampil di
   // ringkasan. Penegakan final tetap di createOrderAction.
   const [voucherCode, setVoucherCode] = useState('')
@@ -137,7 +144,9 @@ export default function CheckoutClient() {
     ? calcShippingCost(
         {
           basePrice: Number(selectedShipping.price),
-          perKgPrice: Number(selectedShipping.per_kg_price ?? 0),
+          perKgPrice: perKgAllowed
+            ? Number(selectedShipping.per_kg_price ?? 0)
+            : 0,
           baseWeightGram: Number(selectedShipping.base_weight_gram ?? 1000),
         },
         totalWeightGram
@@ -202,6 +211,13 @@ export default function CheckoutClient() {
 
     async function fetchAllowedMethods() {
       if (!storeId) return
+      try {
+        const rules = await getStoreCheckoutRulesAction(storeId)
+        setPerKgAllowed(rules.perKgAllowed)
+      } catch {
+        // Gagal memuat aturan = biarkan preview apa adanya; angka yang
+        // mengikat tetap dihitung server.
+      }
       try {
         const allowed = await getAllowedPaymentMethodsAction(storeId)
         setAllowedMethods(allowed)
@@ -720,7 +736,7 @@ export default function CheckoutClient() {
                               Estimasi {method.estimated_days || '-'}
                               {method.courier_code ? ` • ${method.courier_code}` : ''}
                             </p>
-                            {Number(method.per_kg_price ?? 0) > 0 ? (
+                            {perKgAllowed && Number(method.per_kg_price ?? 0) > 0 ? (
                               <p className="text-xs text-[var(--text-muted)]">
                                 Termasuk {formatWeight(Number(method.base_weight_gram ?? 1000))} pertama,
                                 lalu + Rp{' '}

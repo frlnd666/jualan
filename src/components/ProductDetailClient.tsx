@@ -395,7 +395,7 @@ export default function ProductDetailClient({
           {added && !isDisabled ? (
             <Link
               href="/cart"
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(11,107,74,0.24)] transition hover:opacity-95"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,0,0,0.18)] transition hover:opacity-95"
             >
               <Check className="h-4 w-4" /> Ditambahkan — Lihat keranjang
             </Link>
@@ -404,7 +404,7 @@ export default function ProductDetailClient({
               type="button"
               disabled={isDisabled || checkingAuth}
               onClick={handleOrderNow}
-              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(11,107,74,0.24)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,0,0,0.18)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
             >
               {isDisabled
                 ? 'Belum tersedia'

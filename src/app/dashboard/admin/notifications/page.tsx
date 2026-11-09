@@ -10,6 +10,7 @@ import { requireAdminUser } from '@/lib/admin-access'
 import { isEmailConfigured } from '@/lib/email-resend'
 import { isWhatsAppConfigured } from '@/lib/whatsapp'
 import NotificationTestForm from '@/components/dashboard/NotificationTestForm'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 export default async function AdminNotificationsTestPage() {
   const supabase = await createClient()
@@ -60,7 +61,17 @@ export default async function AdminNotificationsTestPage() {
         </h2>
         <ul className="mt-3 space-y-2 text-sm">
           <li className="flex items-start gap-2">
-            <span aria-hidden>{emailReady ? '✅' : '⚠️'}</span>
+            {emailReady ? (
+              <CheckCircle2
+                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                aria-hidden
+              />
+            ) : (
+              <AlertTriangle
+                className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                aria-hidden
+              />
+            )}
             <span>
               <b>Email (Resend):</b>{' '}
               {emailReady
@@ -69,7 +80,17 @@ export default async function AdminNotificationsTestPage() {
             </span>
           </li>
           <li className="flex items-start gap-2">
-            <span aria-hidden>{whatsappReady ? '✅' : '⚠️'}</span>
+            {whatsappReady ? (
+              <CheckCircle2
+                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                aria-hidden
+              />
+            ) : (
+              <AlertTriangle
+                className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                aria-hidden
+              />
+            )}
             <span>
               <b>WhatsApp (Meta Cloud API):</b>{' '}
               {whatsappReady

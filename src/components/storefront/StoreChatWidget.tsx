@@ -144,14 +144,14 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(11,107,74,0.35)] transition hover:opacity-95 sm:right-6"
+        className="fixed bottom-[92px] right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(0,0,0,0.25)] transition hover:opacity-95 sm:right-6 md:bottom-5"
         aria-expanded={open}
       >
         <MessageCircle className="h-4 w-4" aria-hidden /> Chat toko
       </button>
 
       {open ? (
-        <div className="fixed bottom-20 right-4 z-40 flex h-[480px] w-[min(92vw,360px)] flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-[0_24px_48px_rgba(33,24,20,0.25)] sm:right-6">
+        <div className="fixed bottom-[152px] right-4 z-40 flex h-[480px] max-h-[calc(100dvh-170px)] w-[min(92vw,360px)] flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-[0_24px_48px_rgba(0,0,0,0.25)] sm:right-6 md:bottom-20 md:max-h-none">
           <div className="bg-[var(--primary-deep)] px-4 py-3 text-white">
             <p className="text-sm font-bold">{storeName}</p>
             <p className="text-xs text-white/70">

@@ -5,11 +5,18 @@
 // ke landing, tidak diperlukan di nav pembeli).
 'use client'
 
+import { useEffect, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Package, ShoppingCart, User } from 'lucide-react'
 import { cartTotalQty, useCart } from '@/lib/use-cart'
-import { BUYER_NAV_ITEMS, shouldShowBuyerNav } from '@/lib/buyer-nav'
+import {
+  BUYER_NAV_ITEMS,
+  shouldShowBuyerNav,
+  storeSlugFromBuyerPathname,
+} from '@/lib/buyer-nav'
+import { createClient } from '@/lib/supabase/client'
+import { storeThemeStyle } from '@/lib/store-themes'
 
 const ICONS = {
   '/cart': ShoppingCart,
@@ -33,10 +40,44 @@ export default function BuyerBottomNav() {
   const pathname = usePathname()
   const count = useCart((state) => cartTotalQty(state.items))
 
+  // Tema toko (audit 2026-11-10 W-3): nav ini dirender di root layout,
+  // di luar pembungkus bertema halaman toko, jadi override tema tidak
+  // merambat ke sini. Ambil tema dari slug di path dan terapkan
+  // sendiri. Gagal baca / bukan halaman toko = warna platform.
+  const [themeVars, setThemeVars] = useState<CSSProperties>({})
+  useEffect(() => {
+    const slug = storeSlugFromBuyerPathname(pathname)
+    if (!slug) {
+      setThemeVars({})
+      return
+    }
+    let cancelled = false
+    const supabase = createClient()
+    void supabase
+      .from('stores')
+      .select('theme')
+      .eq('slug', slug)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        setThemeVars(
+          storeThemeStyle(
+            (data as { theme?: string | null } | null)?.theme ?? null
+          )
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
+
   if (!shouldShowBuyerNav(pathname)) return null
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[var(--surface)]/95 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden">
+    <nav
+      style={themeVars}
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[var(--surface)]/95 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden"
+    >
       <div className="mx-auto grid max-w-6xl grid-cols-3 gap-1">
         {BUYER_NAV_ITEMS.map(({ href, label }) => {
           const Icon = ICONS[href]

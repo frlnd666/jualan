@@ -6,6 +6,13 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminUser } from '@/lib/admin-access'
 import AdminStoreActions from '@/components/dashboard/AdminStoreActions'
+import { STATUS_LABELS, TIER_LABELS } from '@/lib/subscriptions'
+import {
+  subscriptionStatusPillClass,
+  tierPillClass,
+} from '@/lib/admin-ui'
+import { getOrderStatusLabel } from '@/lib/order-status'
+import { ArrowLeft, Package, ReceiptText, TrendingUp } from 'lucide-react'
 
 export default async function AdminStoreDetailPage({
   params,
@@ -102,10 +109,10 @@ export default async function AdminStoreDetailPage({
     <div className="mx-auto max-w-2xl space-y-5 pt-6">
       <div>
         <Link
-          href="/dashboard/admin"
-          className="text-sm font-semibold text-[var(--primary)]"
+          href="/dashboard/admin/stores"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--primary)]"
         >
-          ← Semua toko
+          <ArrowLeft className="h-4 w-4" aria-hidden /> Semua toko
         </Link>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-[var(--text)]">
           {store.name}
@@ -126,9 +133,19 @@ export default async function AdminStoreDetailPage({
         <h2 className="text-base font-bold text-[var(--text)]">Langganan</h2>
         {sub ? (
           <div className="mt-3 space-y-1 text-sm">
-            <p>
-              Paket: <strong>{sub.tier}</strong> • Status:{' '}
-              <strong>{sub.status}</strong>
+            <p className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${tierPillClass(sub.tier)}`}
+              >
+                {TIER_LABELS[sub.tier as keyof typeof TIER_LABELS] ??
+                  sub.tier}
+              </span>
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${subscriptionStatusPillClass(sub.status)}`}
+              >
+                {STATUS_LABELS[sub.status as keyof typeof STATUS_LABELS] ??
+                  sub.status}
+              </span>
             </p>
             {sub.current_period_end ? (
               <p className="text-[var(--text-muted)]">
@@ -173,24 +190,24 @@ export default async function AdminStoreDetailPage({
 
       <section className="grid grid-cols-3 gap-3">
         <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            Produk
+          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            <Package className="h-3.5 w-3.5" aria-hidden /> Produk
           </p>
           <p className="mt-2 text-2xl font-bold text-[var(--text)]">
             {productCount ?? 0}
           </p>
         </div>
         <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            Order
+          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            <ReceiptText className="h-3.5 w-3.5" aria-hidden /> Order
           </p>
           <p className="mt-2 text-2xl font-bold text-[var(--text)]">
             {orders.length}
           </p>
         </div>
         <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)]">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            GMV (10 terakhir)
+          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            <TrendingUp className="h-3.5 w-3.5" aria-hidden /> GMV (10 terakhir)
           </p>
           <p className="mt-2 text-lg font-bold text-[var(--text)]">
             Rp {gmv.toLocaleString('id-ID')}
@@ -216,7 +233,7 @@ export default async function AdminStoreDetailPage({
                     {order.customer_name}
                   </p>
                   <p className="text-xs text-[var(--text-muted)]">
-                    {order.status} •{' '}
+                    {getOrderStatusLabel(order.status)} •{' '}
                     {new Date(order.created_at).toLocaleDateString('id-ID', {
                       day: 'numeric',
                       month: 'short',

@@ -11,7 +11,13 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createPublicInvoiceClient } from '@/lib/invoice-access'
 import { getOwnerStore } from '@/lib/dashboard-access'
-import { getStoreSubscription, limitsFor } from '@/lib/subscriptions'
+import {
+  effectiveTier,
+  getStoreSubscription,
+  limitsFor,
+} from '@/lib/subscriptions'
+import { checkRateLimit } from '@/lib/rate-limit'
+import { headers } from 'next/headers'
 import {
   canCreateVoucher,
   normalizeVoucherCode,
@@ -145,7 +151,16 @@ export async function createVoucherAction(
     return { error: 'Gagal memeriksa langganan toko. Coba lagi.' }
   }
   const limits = limitsFor(subscription)
-  if (!canCreateVoucher(limits.vouchers, subscription.status === 'PAST_DUE')) {
+  // Audit 2026-11-10 (W-4): kunci premium memakai effectiveTier
+  // (lazy), sama seperti gerbang flash sale — sebelumnya status
+  // mentah, jadi toko ACTIVE yang periodenya lewat tetap bisa
+  // membuat voucher selama masa tenggang.
+  if (
+    !canCreateVoucher(
+      limits.vouchers,
+      effectiveTier(subscription).premiumLocked
+    )
+  ) {
     return {
       error:
         'Voucher hanya untuk paket Silver/Gold. Upgrade paketmu di halaman Langganan untuk memakai fitur ini.',
@@ -297,6 +312,28 @@ export async function validateVoucherCodeAction(
   const normalized = normalizeVoucherCode(code)
   if (!storeId || !normalized) {
     return { ok: false, discount: 0, code: null, error: 'Kode voucher kosong.' }
+  }
+
+  // Audit 2026-11-10 (R-3): action publik ini membedakan "kode tidak
+  // ditemukan" vs nominal diskon — tanpa rem, kode toko mana pun bisa
+  // dienumerasi massal. Batasi per IP + per toko (in-memory per
+  // instance, pola sama dengan limiter checkout).
+  const requestHeaders = await headers()
+  const clientIp =
+    requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const ipLimit = checkRateLimit(`voucher:ip:${clientIp}`, 30, 10 * 60 * 1000)
+  const storeLimit = checkRateLimit(
+    `voucher:store:${storeId}:${clientIp}`,
+    10,
+    10 * 60 * 1000
+  )
+  if (!ipLimit.allowed || !storeLimit.allowed) {
+    return {
+      ok: false,
+      discount: 0,
+      code: null,
+      error: 'Terlalu banyak percobaan kode voucher. Coba lagi nanti.',
+    }
   }
 
   const supabase = await createPublicInvoiceClient()

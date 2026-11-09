@@ -9,6 +9,7 @@ import { notifyOrderEvent } from '@/lib/notify'
 import type { NotificationType } from '@/lib/notifications'
 import type { OrderStatus } from '@/lib/types/order'
 import { ALLOWED_TRANSITIONS } from '@/lib/order-transitions'
+import { logEvent } from '@/lib/observability'
 
 export interface ActionResult {
   success: boolean
@@ -80,11 +81,21 @@ export async function restoreStock(supabase: SupabaseServerClient, orderId: stri
     // untuk pemanggil ber-JWT, jadi seller hanya bisa mengembalikan stok
     // produk tokonya sendiri. Sebelumnya baca-ubah-tulis dari kode
     // (update stock = nilai_baca + qty) bisa menimpa perubahan bersamaan.
-    // Kegagalan di sini best-effort: order sudah terlanjur CANCELLED.
-    await supabase.rpc('increment_stock', {
+    // Kegagalan di sini best-effort: order sudah terlanjur CANCELLED —
+    // tapi sejak audit 2026-11-10 (W-2) kegagalannya DICATAT, bukan
+    // hilang diam-diam, supaya stok yang tidak kembali bisa dilacak
+    // dari log Vercel dan dikoreksi manual.
+    const { error: rpcError } = await supabase.rpc('increment_stock', {
       p_product_id: item.product_id,
       p_qty: qty,
     })
+    if (rpcError) {
+      logEvent('stock_restore_failed', {
+        orderId,
+        productId: item.product_id,
+        qty,
+      })
+    }
   }
 }
 

@@ -18,7 +18,12 @@ const securityHeaders = [
       "default-src 'self'",
       // Next.js menyuntikkan script/style inline untuk RSC; tanpa nonce
       // keduanya perlu diizinkan agar aplikasi tetap berjalan.
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // 'unsafe-eval' hanya dipertahankan di dev (Fast Refresh memakai
+      // eval); di produksi dihapus supaya script yang disuntikkan
+      // penyerang tidak bisa jalan — pelengkap perbaikan K-01.
+      ...(process.env.NODE_ENV === 'production'
+        ? ["script-src 'self' 'unsafe-inline'"]
+        : ["script-src 'self' 'unsafe-inline' 'unsafe-eval'"]),
       "style-src 'self' 'unsafe-inline'",
       // Gambar produk (Cloudinary), bukti transfer (Supabase Storage), blob/data lokal.
       "img-src 'self' data: blob: https:",

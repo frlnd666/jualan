@@ -11,6 +11,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureStoreSubscription } from '@/lib/actions/subscriptions'
 
 export type OnboardingStore = {
@@ -51,7 +52,16 @@ async function requireOwnerStore(): Promise<
     return { error: 'Admin platform tidak memakai wizard toko.' }
   }
 
-  const { data: store } = await supabase
+  // Baca baris toko lewat service_role (K-03): kolom rekening tidak lagi
+  // bisa dibaca peran anon/authenticated, sedangkan wizard butuh prefill
+  // kolom itu. Kepemilikan tetap ditegakkan di query (.eq owner_id =
+  // user), jadi service_role di sini hanya membaca toko milik pemanggil.
+  // Bila service role belum diset (lingkungan lama), fallback ke client
+  // anon seperti sebelumnya — migrasi K-03 memang harus jalan SETELAH
+  // deploy kode ini.
+  const storeReadClient = createAdminClient() ?? supabase
+
+  const { data: store } = await storeReadClient
     .from('stores')
     .select(
       'id, name, slug, description, whatsapp, city, address, bank_name, bank_account_name, bank_account_number, qris_image_url, cod_enabled, origin, onboarding_step'

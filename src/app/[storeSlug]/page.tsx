@@ -16,6 +16,7 @@ import {
   storeDescription,
   storeCanonicalUrl,
   storeJsonLd,
+  safeJsonLd,
 } from '@/lib/seo'
 import type { HostKind } from '@/lib/domains'
 import {
@@ -258,7 +259,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: safeJsonLd(
             storeJsonLd({
               name: store.name,
               slug: store.slug,

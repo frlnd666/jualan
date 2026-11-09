@@ -9,6 +9,7 @@ import {
   productCanonicalUrl,
   storeJsonLd,
   productJsonLd,
+  safeJsonLd,
   sitemapStoreUrl,
   sitemapProductUrl,
   siteUrlFromEnv,
@@ -138,5 +139,26 @@ describe('siteUrlFromEnv', () => {
   it('fallback ke domain live bila env kosong', () => {
     expect(siteUrlFromEnv('')).toBe('https://cuan.is-a.web.id')
     expect(siteUrlFromEnv('https://cuan.id/')).toBe('https://cuan.id')
+  })
+})
+
+describe('safeJsonLd', () => {
+  it('hasilnya tetap JSON valid yang diparse ke nilai asal', () => {
+    const value = { name: 'Kopi Sore', price: 15000 }
+    expect(JSON.parse(safeJsonLd(value))).toEqual(value)
+  })
+
+  it('tidak mengandung </script> mentah dari nama/deskripsi penjual (K-01)', () => {
+    const payload = 'Toko </script><img src=x onerror=alert(1)>'
+    const out = safeJsonLd(storeJsonLd({ ...STORE, name: payload, canonicalUrl: 'https://tokoku.com' }))
+    expect(out).not.toContain('</script>')
+    expect(out).not.toContain('<img')
+    expect(out).toContain('\\u003c/script\\u003e')
+    expect(JSON.parse(out).name).toBe(payload)
+  })
+
+  it('meng-escape & supaya tidak membentuk entitas HTML', () => {
+    expect(safeJsonLd({ d: 'a & b' })).toContain('\\u0026')
+    expect(safeJsonLd({ d: 'a & b' })).not.toContain(' & ')
   })
 })

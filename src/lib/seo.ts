@@ -140,6 +140,22 @@ export function productJsonLd(input: ProductJsonLdInput): Record<string, unknown
   return jsonLd
 }
 
+/**
+ * Serialisasi JSON-LD yang aman disuntik ke <script> via
+ * dangerouslySetInnerHTML (K-01, stored XSS).
+ *
+ * `JSON.stringify` saja TIDAK cukup: `</script>` di dalam nama/deskripsi
+ * toko/produk (input penjual, tanpa sanitasi) akan menutup tag script dan
+ * string sisanya dieksekusi sebagai HTML. Escape `<`, `>` dan `&` ke
+ * bentuk \uXXXX — tetap JSON valid, parser JSON-LD membacanya sama.
+ */
+export function safeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+}
+
 /** Baris sitemap untuk satu toko (URL kanonisnya). */
 export function sitemapStoreUrl(
   store: StoreSeoInput,

@@ -16,6 +16,7 @@ import {
   productDescription,
   productCanonicalUrl,
   productJsonLd,
+  safeJsonLd,
 } from '@/lib/seo'
 import type { HostKind } from '@/lib/domains'
 
@@ -163,7 +164,7 @@ export default async function ProductDetailPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: safeJsonLd(
             productJsonLd({
               name: product.name,
               slug: product.slug,

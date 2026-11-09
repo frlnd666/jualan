@@ -494,7 +494,10 @@ export async function uploadSubscriptionProof(formData: FormData) {
     .from('payment-proofs')
     .upload(objectPath, file, { cacheControl: '3600', upsert: false })
   if (uploadError) {
-    return { error: `Gagal upload bukti: ${uploadError.message}` }
+    // Detail storage hanya untuk log server — client cukup pesan umum
+    // (audit 2026-11-09: jangan bocorkan pesan mentah storage).
+    console.error('uploadSubscriptionProof gagal:', uploadError.message)
+    return { error: 'Gagal upload bukti. Coba lagi sebentar.' }
   }
 
   const { data } = storage.storage
@@ -536,8 +539,18 @@ export async function submitSubscriptionPayment(input: {
   // uploadSubscriptionProof). Tanpa cek ini, seller bisa mengajukan URL
   // bukti toko lain atau URL arbitrer dan admin harus menilainya
   // secara visual.
+  // Audit 2026-11-09: validasi URL terstruktur, bukan substring — URL
+  // harus benar-benar menunjuk objek di prefix toko ini.
+  let proofPathname = ''
+  try {
+    proofPathname = new URL(input.proofUrl).pathname
+  } catch {
+    proofPathname = ''
+  }
   if (
-    !input.proofUrl.includes(`/payment-proofs/subscription/${storeId}/`)
+    !proofPathname.startsWith(
+      `/storage/v1/object/public/payment-proofs/subscription/${storeId}/`
+    )
   ) {
     return {
       error:
@@ -622,6 +635,36 @@ export async function verifySubscriptionPayment(
   }
 
   const now = new Date()
+
+  // Audit 2026-11-09 (alur bisnis): perpanjangan tier yang sama saat
+  // periode lama masih berjalan harus DITUMPUK, bukan menimpa — basis
+  // periode baru = akhir periode berjalan, supaya sisa hari yang sudah
+  // dibayar seller tidak hangus.
+  const paymentTier = (payment as { tier: 'silver' | 'gold' }).tier
+  let periodStart = now
+  let periodEnd = periodEndFor(paymentTier, now)
+  if (decision === 'verify') {
+    const { data: currentSub } = await admin
+      .from('subscriptions')
+      .select('tier, current_period_start, current_period_end')
+      .eq('store_id', (payment as { store_id: string }).store_id)
+      .maybeSingle()
+    const sub = currentSub as {
+      tier: string
+      current_period_start: string | null
+      current_period_end: string | null
+    } | null
+    if (sub && sub.tier === paymentTier && sub.current_period_end) {
+      const prevEnd = new Date(sub.current_period_end)
+      if (prevEnd.getTime() > now.getTime()) {
+        periodStart = sub.current_period_start
+          ? new Date(sub.current_period_start)
+          : now
+        periodEnd = periodEndFor(paymentTier, prevEnd)
+      }
+    }
+  }
+
   // R-10: guard race verify-vs-reject — update hanya cocok bila payment
   // masih PENDING_VERIFICATION. Dua admin yang memproses bersamaan:
   // hanya satu yang cocok; yang lain mendapat "sudah diproses" dan
@@ -634,11 +677,8 @@ export async function verifySubscriptionPayment(
       verified_at: now.toISOString(),
       ...(decision === 'verify'
         ? {
-            period_start: now.toISOString(),
-            period_end: periodEndFor(
-              (payment as { tier: 'silver' | 'gold' }).tier,
-              now
-            ).toISOString(),
+            period_start: periodStart.toISOString(),
+            period_end: periodEnd.toISOString(),
           }
         : {}),
     })
@@ -659,8 +699,8 @@ export async function verifySubscriptionPayment(
       .update({
         tier,
         status: 'ACTIVE',
-        current_period_start: now.toISOString(),
-        current_period_end: periodEndFor(tier, now).toISOString(),
+        current_period_start: periodStart.toISOString(),
+        current_period_end: periodEnd.toISOString(),
         trial_ends_at: null,
         grace_ends_at: null,
       })

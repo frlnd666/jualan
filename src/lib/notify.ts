@@ -207,6 +207,15 @@ export function buildEmailContent(
 
   switch (type) {
     case 'ORDER_CREATED':
+      if (recipient === 'buyer') {
+        return {
+          subject: `Pesananmu di ${store} berhasil dibuat — ${orderNo}`,
+          html: emailShell(`Pesananmu di ${store} berhasil dibuat`, [
+            `Halo ${escapeHtml(data.customerName ?? 'kak')}, pesananmu (${escapeHtml(orderNo)}) dengan total <b>${escapeHtml(total)}</b> sudah kami catat.`,
+            'Selesaikan pembayaran sesuai instruksi di halaman pesananmu — simpan email ini sebagai salinan.',
+          ], link ? { label: 'Lihat & bayar pesanan', href: abs(link) } : undefined),
+        }
+      }
       return {
         subject: `Pesanan baru di ${store} — ${orderNo}`,
         html: emailShell(`Pesanan baru dari ${data.customerName ?? 'customer'}`, [
@@ -618,6 +627,10 @@ const SELLER_ORDER_TYPES: NotificationType[] = [
 
 /** Jenis order yang email/WA-nya dikirim ke pembeli. */
 const BUYER_ORDER_TYPES: NotificationType[] = [
+  // Audit 2026-11-09: ORDER_CREATED ikut ke pembeli — berisi instruksi
+  // bayar + tautan invoice/akun, supaya pembeli yang menutup tab tetap
+  // punya salinannya di email/WA.
+  'ORDER_CREATED',
   'ORDER_PAID',
   'QRIS_PAID',
   'PAYMENT_VERIFIED',

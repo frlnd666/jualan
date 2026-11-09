@@ -7,6 +7,7 @@ import {
   isInvoiceTokenValid,
 } from '@/lib/invoice-access'
 import { dispatchNotify } from '@/lib/notify'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -67,7 +68,7 @@ export async function uploadPaymentProof(formData: FormData) {
 
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
-    .select('id, invoice_number, payment_status, order_id')
+    .select('id, invoice_number, payment_status, order_id, payment_proof_url')
     .eq('id', invoiceId)
     .maybeSingle()
 
@@ -91,6 +92,19 @@ export async function uploadPaymentProof(formData: FormData) {
     invoice.payment_status !== 'WAITING_VERIFICATION'
   ) {
     return { error: 'Invoice ini sudah tidak menunggu pembayaran.' }
+  }
+
+  // Audit 2026-11-09: batasi upload ulang per invoice (token valid pun
+  // tidak boleh menggelembungkan bucket tanpa batas).
+  const proofLimit = checkRateLimit(
+    `proof-upload:${invoiceId}`,
+    10,
+    10 * 60 * 1000
+  )
+  if (!proofLimit.allowed) {
+    return {
+      error: 'Terlalu banyak percobaan upload untuk invoice ini. Coba lagi beberapa menit lagi.',
+    }
   }
 
   // Nama file acak + tanpa upsert: tidak bisa ditebak dan tidak bisa
@@ -130,6 +144,23 @@ export async function uploadPaymentProof(formData: FormData) {
     // Bersihkan file yatim agar bucket tidak penuh sampah.
     await supabase.storage.from('payment-proofs').remove([filePath])
     return { error: 'Bukti transfer berhasil diupload, tetapi gagal disimpan ke invoice.' }
+  }
+
+  // Audit 2026-11-09: bukti lama invoice ini diganti — hapus objeknya
+  // supaya bucket tidak menumpuk file yatim setiap upload ulang.
+  const oldProofUrl = (invoice as { payment_proof_url?: string | null })
+    .payment_proof_url
+  if (oldProofUrl && oldProofUrl !== publicUrl) {
+    const marker = '/payment-proofs/'
+    const markerIndex = oldProofUrl.indexOf(marker)
+    if (markerIndex >= 0) {
+      const oldPath = decodeURIComponent(
+        oldProofUrl.slice(markerIndex + marker.length)
+      )
+      if (oldPath && oldPath !== filePath) {
+        await supabase.storage.from('payment-proofs').remove([oldPath])
+      }
+    }
   }
 
   revalidatePath(`/invoice/${invoiceNumber}`)

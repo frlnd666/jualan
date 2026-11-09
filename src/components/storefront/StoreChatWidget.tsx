@@ -7,6 +7,7 @@ import {
   startChatSession,
   type ChatMessageDTO,
 } from '@/lib/actions/chat'
+import { MessageCircle } from 'lucide-react'
 
 interface StoreChatWidgetProps {
   storeId: string
@@ -143,10 +144,10 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[#5b3df5] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(91,61,245,0.35)] transition hover:opacity-95 sm:right-6"
+        className="fixed bottom-5 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_32px_rgba(11,107,74,0.35)] transition hover:opacity-95 sm:right-6"
         aria-expanded={open}
       >
-        💬 Chat toko
+        <MessageCircle className="h-4 w-4" aria-hidden /> Chat toko
       </button>
 
       {open ? (
@@ -169,20 +170,20 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
                 required
                 maxLength={80}
                 placeholder="Nama kamu"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5b3df5]"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               />
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 maxLength={30}
                 placeholder="Nomor WhatsApp (opsional)"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5b3df5]"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               />
               {error ? <p className="text-xs font-medium text-rose-600">{error}</p> : null}
               <button
                 type="submit"
                 disabled={busy || !name.trim()}
-                className="mt-auto w-full rounded-xl bg-[#5b3df5] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="mt-auto w-full rounded-xl bg-[var(--primary)] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {busy ? 'Memulai...' : 'Mulai chat'}
               </button>
@@ -200,7 +201,7 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
                       key={msg.id}
                       className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-5 ${
                         msg.sender === 'buyer'
-                          ? 'ml-auto bg-[#5b3df5] text-white'
+                          ? 'ml-auto bg-[var(--primary)] text-white'
                           : 'mr-auto border border-black/5 bg-white text-[#241b17]'
                       }`}
                     >
@@ -221,7 +222,7 @@ export default function StoreChatWidget({ storeId, storeName }: StoreChatWidgetP
                     onChange={(e) => setDraft(e.target.value)}
                     maxLength={2000}
                     placeholder="Tulis pesan..."
-                    className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5b3df5]"
+                    className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                   <button
                     type="submit"

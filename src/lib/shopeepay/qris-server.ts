@@ -9,7 +9,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDecryptedCredentials } from '@/lib/shopeepay/credentials'
-import { notifyOrderEvent } from '@/lib/notify'
+import { dispatchNotify, notifyOrderEvent } from '@/lib/notify'
+import { logEvent } from '@/lib/observability'
 import {
   generateDynamicQr,
   ShopeePayError,
@@ -339,7 +340,35 @@ export async function applyQrisPaid(
           .eq('id', ord.store_id)
           .maybeSingle()
         const storeRow = store as { owner_id: string; name: string } | null
-        if (storeRow) {
+        if (storeRow && ord.status === 'CANCELLED') {
+          // Audit 2026-11-09: balapan webhook vs pembatalan seller —
+          // uang BENAR-BENAR masuk (baris qris_payments di atas sah
+          // berstatus PAID) tapi order sudah batal dan stok sudah
+          // kembali. Jangan kirim notifikasi "lunas" normal: catat
+          // anomali + peringatkan seller SAJA untuk refund manual.
+          logEvent('qris_paid_for_cancelled_order', {
+            orderId: ord.id,
+            invoiceNumber: inv.invoice_number,
+            amount: Number(ord.total),
+          })
+          void dispatchNotify(supabase, {
+            userId: storeRow.owner_id,
+            storeId: ord.store_id,
+            orderId: ord.id,
+            type: 'QRIS_PAID',
+            title: 'Pembayaran QRIS masuk untuk pesanan yang sudah dibatalkan',
+            body: `Pesanan ${inv.invoice_number} sudah dibatalkan, tetapi pembayaran QRIS-nya baru masuk. Hubungi pembeli untuk proses refund.`,
+            link: `/dashboard/orders/${ord.id}`,
+            data: {
+              storeName: storeRow.name,
+              orderNumber: inv.invoice_number,
+              customerName: ord.customer_name,
+              total: Number(ord.total),
+              link: `/dashboard/orders/${ord.id}`,
+            },
+            recipient: 'seller',
+          })
+        } else if (storeRow) {
           void notifyOrderEvent(
             supabase,
             {

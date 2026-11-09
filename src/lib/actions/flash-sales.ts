@@ -156,6 +156,18 @@ export async function createFlashSaleAction(
     return { error: 'Harga promo harus lebih murah dari harga normal produk.' }
   }
 
+  // Audit 2026-11-09: sale lama produk ini yang jadwalnya SUDAH lewat
+  // tapi is_active masih true akan menahan unique index satu-sale-aktif
+  // (23505) dan memblokir pembuatan sale baru — nonaktifkan dulu yang
+  // kedaluwarsa (perilaku setara "tidak aktif" di semua lapisan baca).
+  await supabase
+    .from('flash_sales')
+    .update({ is_active: false })
+    .eq('store_id', store.id)
+    .eq('product_id', productId)
+    .eq('is_active', true)
+    .lt('ends_at', new Date().toISOString())
+
   const { error } = await supabase.from('flash_sales').insert({
     store_id: store.id,
     product_id: productId,

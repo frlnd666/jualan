@@ -23,6 +23,7 @@ import ClearCartOnSuccess from '@/components/invoice/ClearCartOnSuccess'
 import DynamicQrisPanel from '@/components/invoice/DynamicQrisPanel'
 import PaymentDestination from '@/components/invoice/PaymentDestination'
 import { getQrisPaymentForInvoiceAction } from '@/lib/actions/qris'
+import { CheckCircle2 } from 'lucide-react'
 import PublicConfigNotice from '@/components/PublicConfigNotice'
 import OrderTimeline from '@/components/order/OrderTimeline'
 import InvoiceShareButtons from '@/components/order/InvoiceShareButtons'
@@ -48,7 +49,7 @@ function paymentBadgeClass(status: string): string {
     case 'FAILED':
       return 'bg-red-100 text-red-700'
     case 'REFUNDED':
-      return 'bg-neutral-200 text-neutral-700'
+      return 'bg-[var(--surface-muted)] text-[var(--text)]'
     default:
       return 'bg-amber-100 text-amber-800'
   }
@@ -63,7 +64,7 @@ function orderBadgeClass(status: string): string {
     case 'SHIPPED':
       return 'bg-sky-100 text-sky-800'
     default:
-      return 'bg-neutral-200 text-neutral-700'
+      return 'bg-[var(--surface-muted)] text-[var(--text)]'
   }
 }
 
@@ -232,18 +233,16 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
     !(invoice.payment_method === 'QRIS' && Boolean(existingQris?.qrContent))
 
   return (
-    <div className="min-h-screen bg-neutral-50 px-4 pb-28 pt-6 md:px-6 md:pb-6">
+    <div className="min-h-screen bg-[var(--bg)] px-4 pb-28 pt-6 md:px-6 md:pb-6">
       {/* Pesanan baru: bersihkan keranjang lokal (hanya tercapai bila
           pesanan sudah terbentuk — lihat ClearCartOnSuccess). */}
       {isNewOrder ? <ClearCartOnSuccess /> : null}
       <div className="mx-auto max-w-5xl space-y-6">
         {isNewOrder && !isCancelled ? (
-          <div className="rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white shadow-sm md:p-8">
-            <p className="text-3xl" aria-hidden>
-              ✓
-            </p>
+          <div className="rounded-[32px] bg-[var(--primary)] p-6 text-white shadow-[var(--shadow-sm)] md:p-8">
+            <CheckCircle2 className="h-9 w-9" aria-hidden />
             <h1 className="mt-2 text-2xl font-bold">Pesanan berhasil dibuat!</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-emerald-50">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-white/80">
               Satu langkah lagi: selesaikan pembayaranmu mengikuti 3 langkah di
               halaman ini. Simpan link halaman ini — kirim ke WhatsApp-mu
               sendiri supaya tidak hilang. Link ini adalah kunci pesananmu:
@@ -260,16 +259,16 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
           </div>
         ) : null}
 
-        <div className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
+        <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-sm font-medium text-neutral-500">
+              <p className="text-sm font-medium text-[var(--text-muted)]">
                 Invoice dari {store.name}
               </p>
-              <h1 className="mt-1 break-all text-2xl font-bold text-neutral-900">
+              <h1 className="mt-1 break-all text-2xl font-bold text-[var(--text)]">
                 {invoice.invoice_number}
               </h1>
-              <p className="mt-2 text-sm text-neutral-600">
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
                 {new Date(invoice.created_at).toLocaleString('id-ID', {
                   dateStyle: 'long',
                   timeStyle: 'short',
@@ -303,8 +302,8 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
           </div>
         ) : (
           <>
-            <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
-              <h2 className="text-lg font-bold text-neutral-900">Status pesanan</h2>
+            <section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
+              <h2 className="text-lg font-bold text-[var(--text)]">Status pesanan</h2>
               <div className="mt-5">
                 <OrderTimeline steps={timeline} />
               </div>
@@ -465,11 +464,11 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
             ) : null}
 
             {invoice.payment_status === 'REFUNDED' ? (
-              <section className="rounded-3xl border border-neutral-200 bg-white p-5 md:p-6">
-                <h2 className="text-lg font-bold text-neutral-900">
+              <section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 md:p-6">
+                <h2 className="text-lg font-bold text-[var(--text)]">
                   Dana sudah dikembalikan
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-neutral-600">
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                   Pembayaran untuk invoice ini telah di-refund oleh penjual.
                 </p>
               </section>
@@ -478,38 +477,38 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
         )}
 
         {shipment ? (
-          <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
-            <h2 className="text-lg font-bold text-neutral-900">Info pengiriman</h2>
+          <section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
+            <h2 className="text-lg font-bold text-[var(--text)]">Info pengiriman</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl bg-neutral-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <div className="rounded-2xl bg-[var(--bg)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Kurir
                 </p>
-                <p className="mt-1 text-sm font-semibold text-neutral-900">
+                <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                   {shipment.courier || order.shipping_method_name || '-'}
                 </p>
               </div>
-              <div className="rounded-2xl bg-neutral-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <div className="rounded-2xl bg-[var(--bg)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Status pengiriman
                 </p>
-                <p className="mt-1 text-sm font-semibold text-neutral-900">
+                <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                   {getShipmentStatusLabel(shipment.status)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-neutral-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <div className="rounded-2xl bg-[var(--bg)] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Nomor resi
                 </p>
                 {shipment.tracking_number ? (
-                  <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-neutral-900">
+                  <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                     <span className="break-all font-mono">
                       {shipment.tracking_number}
                     </span>
                     <CopyTextButton text={shipment.tracking_number} />
                   </p>
                 ) : (
-                  <p className="mt-1 text-sm font-semibold text-neutral-900">-</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">-</p>
                 )}
               </div>
             </div>
@@ -518,30 +517,30 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
 
         <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
           <div className="space-y-6">
-            <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
-              <h2 className="text-lg font-bold text-neutral-900">Item pesanan</h2>
+            <section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
+              <h2 className="text-lg font-bold text-[var(--text)]">Item pesanan</h2>
 
               <div className="mt-4 space-y-3">
                 {(orderItems || []).map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-start justify-between gap-4 rounded-2xl bg-neutral-50 px-4 py-4"
+                    className="flex items-start justify-between gap-4 rounded-2xl bg-[var(--bg)] px-4 py-4"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-neutral-900">
+                      <p className="text-sm font-semibold text-[var(--text)]">
                         {item.product_name}
                       </p>
-                      <p className="mt-1 text-xs text-neutral-500">
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
                         {item.qty} x {formatRupiah(item.price)}
                       </p>
                       {item.notes ? (
-                        <p className="mt-2 text-xs text-neutral-500">
+                        <p className="mt-2 text-xs text-[var(--text-muted)]">
                           Catatan: {item.notes}
                         </p>
                       ) : null}
                     </div>
 
-                    <p className="shrink-0 text-sm font-semibold text-neutral-900">
+                    <p className="shrink-0 text-sm font-semibold text-[var(--text)]">
                       {formatRupiah(item.subtotal)}
                     </p>
                   </div>
@@ -549,36 +548,36 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
               </div>
             </section>
 
-            <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
-              <h2 className="text-lg font-bold text-neutral-900">Data penerima</h2>
+            <section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
+              <h2 className="text-lg font-bold text-[var(--text)]">Data penerima</h2>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl bg-neutral-50 px-4 py-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                <div className="rounded-2xl bg-[var(--bg)] px-4 py-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                     Nama
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-900">
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                     {maskCustomerName(order.customer_name)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-neutral-50 px-4 py-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                <div className="rounded-2xl bg-[var(--bg)] px-4 py-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                     WhatsApp
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-900">
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                     {maskPhoneNumber(order.customer_phone)}
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-neutral-50 px-4 py-3 md:col-span-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                <div className="rounded-2xl bg-[var(--bg)] px-4 py-3 md:col-span-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                     Alamat tujuan
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-900">
+                  <p className="mt-1 text-sm font-semibold text-[var(--text)]">
                     {publicAddressLine(order)}
                   </p>
-                  <p className="mt-2 text-sm text-neutral-600">
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">
                     Alamat lengkap hanya tampil di dashboard penjual demi
                     keamanan data customer.
                   </p>
@@ -588,11 +587,11 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
           </div>
 
           <aside className="space-y-6">
-            <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
-              <h2 className="text-lg font-bold text-neutral-900">Ringkasan pembayaran</h2>
+            <section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
+              <h2 className="text-lg font-bold text-[var(--text)]">Ringkasan pembayaran</h2>
 
               <div className="mt-4 space-y-3 text-sm">
-                <div className="flex items-center justify-between text-neutral-600">
+                <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span>Subtotal</span>
                   <span>{formatRupiah(order.subtotal)}</span>
                 </div>
@@ -616,31 +615,31 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
                   </div>
                 ) : null}
 
-                <div className="flex items-center justify-between text-neutral-600">
+                <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span>Ongkir</span>
                   <span>{formatRupiah(order.shipping_cost)}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-neutral-600">
+                <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span>Pengiriman</span>
                   <span>{order.shipping_method_name || '-'}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-neutral-600">
+                <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span>Metode bayar</span>
                   <span>{getPaymentMethodLabel(invoice.payment_method)}</span>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-neutral-200 pt-3 text-base font-bold text-neutral-900">
+                <div className="flex items-center justify-between border-t border-[var(--line)] pt-3 text-base font-bold text-[var(--text)]">
                   <span>Total</span>
                   <span>{formatRupiah(invoice.total)}</span>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm md:p-6">
-              <h2 className="text-lg font-bold text-neutral-900">Simpan halaman ini</h2>
-              <p className="mt-2 text-sm leading-6 text-neutral-600">
+            <section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm md:p-6">
+              <h2 className="text-lg font-bold text-[var(--text)]">Simpan halaman ini</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 Tanpa perlu akun: link halaman ini (dengan kuncinya) adalah
                 satu-satunya cara membuka kembali pesananmu. Simpan baik-baik.
               </p>
@@ -654,7 +653,7 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
               </div>
               <Link
                 href={`/${store.slug}`}
-                className="mt-4 block w-full rounded-2xl border border-neutral-200 bg-white px-5 py-3 text-center text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
+                className="mt-4 block w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-5 py-3 text-center text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--bg)]"
               >
                 Kembali ke toko {store.name}
               </Link>

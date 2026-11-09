@@ -580,7 +580,7 @@ describe('notifyOrderEvent', () => {
     total: 150000,
   }
 
-  it('ORDER_CREATED → in-app ke seller+buyer, email/WA hanya ke seller', async () => {
+  it('ORDER_CREATED → in-app + email/WA ke seller DAN buyer (audit 2026-11-09: pembeli menerima instruksi bayar)', async () => {
     setEnv({ ...EMAIL_ENV, ...WA_ENV })
     const client = fakeClient({
       emailByUser: {
@@ -605,11 +605,14 @@ describe('notifyOrderEvent', () => {
     )
     // In-app: notifyOrderStatusChange menulis ke seller + buyer.
     expect(client.inserted).toHaveLength(2)
-    // Email/WA: hanya seller.
-    expect(sent).toHaveLength(1)
-    expect(sent[0]?.to).toBe('seller@example.id')
-    expect(bodies).toHaveLength(1)
-    expect(bodies[0]).toContain('6281111111111')
+    // Email/WA: seller dan buyer (buyer = instruksi bayar + tautan).
+    expect(sent).toHaveLength(2)
+    expect(sent.map((s) => s.to)).toEqual(
+      expect.arrayContaining(['seller@example.id', 'buyer@example.id'])
+    )
+    expect(bodies).toHaveLength(2)
+    expect(bodies.join('\n')).toContain('6281111111111')
+    expect(bodies.join('\n')).toContain('6281234567890')
   })
 
   it('ORDER_PAID → email/WA ke seller DAN buyer', async () => {

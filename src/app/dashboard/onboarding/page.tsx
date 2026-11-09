@@ -16,6 +16,7 @@ import {
   type OnboardingStore,
 } from '@/lib/actions/onboarding'
 import { createProductAction } from '@/lib/actions/subscriptions'
+import { PartyPopper } from 'lucide-react'
 
 const STEP_LABELS = [
   'Info toko',
@@ -558,7 +559,9 @@ export default function OnboardingPage() {
 
       {step === 5 && store ? (
         <section className="space-y-4 rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 text-center shadow-[var(--shadow-sm)]">
-          <p className="text-4xl">🎉</p>
+          <p className="flex justify-center">
+            <PartyPopper className="h-10 w-10 text-[var(--primary)]" aria-hidden />
+          </p>
           <h2 className="text-lg font-bold text-[var(--text)]">
             {store.name} sudah bisa dikunjungi!
           </h2>

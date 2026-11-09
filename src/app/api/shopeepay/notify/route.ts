@@ -162,11 +162,12 @@ export async function POST(request: Request) {
     return snapSuccess('Status bukan lunas — diabaikan')
   }
 
-  // Nominal harus cocok dengan yang ditagih (toleransi 1 rupiah untuk
-  // pembulatan format desimal).
+  // Nominal WAJIB ada dan harus cocok dengan yang ditagih (toleransi
+  // 1 rupiah untuk pembulatan format desimal). Notifikasi bertanda tangan
+  // tanpa nominal tidak boleh melunasi apa pun (audit 2026-11-09).
   const notifiedAmount = Number(body.amount?.value ?? NaN)
   if (
-    Number.isFinite(notifiedAmount) &&
+    !Number.isFinite(notifiedAmount) ||
     Math.abs(notifiedAmount - Number(qrisRow.amount)) > 1
   ) {
     logEvent('qris_webhook_rejected', {

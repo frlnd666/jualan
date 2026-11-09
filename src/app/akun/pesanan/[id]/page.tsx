@@ -9,6 +9,7 @@ import {
   getPaymentStatusLabel,
   getShipmentStatusLabel,
 } from '@/lib/order-status'
+import { ConfirmReceivedButton } from '@/components/akun/ConfirmReceivedButton'
 
 type OrderRow = {
   id: string
@@ -184,6 +185,10 @@ export default async function BuyerOrderDetailPage({
           {order.postal_code}
         </p>
       </section>
+
+      {order.status === 'SHIPPED' ? (
+        <ConfirmReceivedButton orderId={order.id} />
+      ) : null}
 
       {invoice ? (
         <Link

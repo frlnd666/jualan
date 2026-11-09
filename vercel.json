@@ -1,1 +1,1 @@
-{"crons":[{"path":"/api/cron/subscription-transitions","schedule":"0 0 * * *"}]}
+{"crons":[{"path":"/api/cron/subscription-transitions","schedule":"0 0 * * *"},{"path":"/api/cron/order-expiry","schedule":"30 0 * * *"}]}

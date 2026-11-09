@@ -55,7 +55,7 @@ export default function BuyerBottomNav() {
               <span className="relative">
                 <Icon size={18} strokeWidth={active ? 2.4 : 2} />
                 {showBadge ? (
-                  <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#5b3df5] px-1 text-[9px] font-bold leading-none text-white">
+                  <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[9px] font-bold leading-none text-white">
                     {count > 99 ? '99+' : count}
                   </span>
                 ) : null}

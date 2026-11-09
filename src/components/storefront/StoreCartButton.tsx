@@ -18,7 +18,7 @@ export default function StoreCartButton() {
     >
       <ShoppingCart size={18} strokeWidth={2} />
       {count > 0 ? (
-        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5b3df5] px-1 text-[10px] font-bold leading-none text-white">
+        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-bold leading-none text-white">
           {count > 99 ? '99+' : count}
         </span>
       ) : null}

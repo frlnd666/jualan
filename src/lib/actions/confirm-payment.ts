@@ -7,17 +7,8 @@ import { getDashboardAccess } from '@/lib/dashboard-access'
 import { notifyOrderEvent } from '@/lib/notify'
 import { logAudit } from '@/lib/audit'
 import { logEvent } from '@/lib/observability'
-// Diagnostik sementara 2026-11-09 (hapus setelah akar masalah ketemu):
-// aksi seller menggantung — lihat src/lib/action-timeout.ts.
-import {
-  createStepTracker,
-  DIAGNOSTIC_TIMEOUT_MS,
-  withActionTimeout,
-} from '@/lib/action-timeout'
 
-export async function confirmPayment(
-  formData: FormData
-): Promise<{ success?: string; error?: string }> {
+export async function confirmPayment(formData: FormData) {
   const invoiceId = String(formData.get('invoiceId') || '')
   const orderId = String(formData.get('orderId') || '')
   const invoiceNumber = String(formData.get('invoiceNumber') || '')
@@ -26,17 +17,11 @@ export async function confirmPayment(
     return { error: 'Data pembayaran tidak lengkap.' }
   }
 
-  // Diagnostik sementara 2026-11-09: catat langkah terakhir + batas waktu
-  // agar langkah yang menggantung terlihat dari UI (hapus setelah fix).
-  const tracker = createStepTracker()
-  const run = (async () => {
-    tracker.set('createClient')
-    const supabase = await createClient()
+  const supabase = await createClient()
 
   // Server Action bisa dipanggil lewat POST langsung di luar UI (panduan
   // keamanan data Next.js), jadi autentikasi + otorisasi WAJIB dicek ulang
   // di dalam action — cek login di halaman dashboard saja tidak cukup.
-  tracker.set('auth.getUser')
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -45,7 +30,6 @@ export async function confirmPayment(
     return { error: 'Kamu harus login untuk mengonfirmasi pembayaran.' }
   }
 
-  tracker.set('baca invoices')
   const { data: invoice, error: invoiceError } = await supabase
     .from('invoices')
     .select('id, order_id, payment_status, payment_proof_url')
@@ -63,7 +47,6 @@ export async function confirmPayment(
     return { error: 'Data pembayaran tidak cocok dengan order.' }
   }
 
-  tracker.set('baca orders')
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .select('id, store_id, payment_method, customer_name, customer_phone, total, buyer_id')
@@ -76,7 +59,6 @@ export async function confirmPayment(
 
   // Hanya pemilik toko dari order ini — atau staff toko itu (Fase 2) —
   // yang boleh mengonfirmasi.
-  tracker.set('getDashboardAccess')
   const access = await getDashboardAccess(supabase, user.id)
   if (!access || access.store.id !== order.store_id) {
     return { error: 'Kamu tidak berhak mengonfirmasi pembayaran order ini.' }
@@ -96,7 +78,6 @@ export async function confirmPayment(
     return { error: 'Pembayaran ini sudah dikonfirmasi sebelumnya.' }
   }
 
-  tracker.set('update invoices PAID')
   const { error: invoiceUpdateError } = await supabase
     .from('invoices')
     .update({
@@ -108,7 +89,6 @@ export async function confirmPayment(
     return { error: 'Gagal mengubah status invoice.' }
   }
 
-  tracker.set('update orders PROCESSING')
   const { error: orderUpdateError } = await supabase
     .from('orders')
     .update({
@@ -124,7 +104,6 @@ export async function confirmPayment(
   // Pembayaran terkonfirmasi → beri tahu pembeli (login/tamu) + pemilik
   // toko lewat in-app + email + WhatsApp. Fire-and-forget: dispatcher
   // tidak pernah melempar dan tidak boleh memperlambat konfirmasi.
-  tracker.set('notifikasi ORDER_PAID')
   try {
     const buyerId = (order as { buyer_id?: string | null }).buyer_id ?? null
     const notifyClient = await createPublicInvoiceClient()
@@ -149,7 +128,6 @@ export async function confirmPayment(
   } catch {}
 
   // Fase 4 — audit log + jejak terstruktur (best-effort).
-  tracker.set('logAudit')
   await logAudit({
     actorId: user.id,
     actorRole: access.role === 'staff' ? 'staff' : 'seller',
@@ -172,20 +150,10 @@ export async function confirmPayment(
     total: Number(order.total),
   })
 
-  tracker.set('revalidatePath')
   revalidatePath('/dashboard/payments')
   revalidatePath('/dashboard/orders')
   revalidatePath(`/invoice/${invoiceNumber}`)
   revalidatePath(`/track/${invoiceNumber}`)
 
   return { success: 'Pembayaran berhasil dikonfirmasi.' }
-  })()
-
-  try {
-    return await withActionTimeout(run, DIAGNOSTIC_TIMEOUT_MS, tracker)
-  } catch (e) {
-    return {
-      error: `Diagnostik: ${e instanceof Error ? e.message : 'timeout'}`,
-    }
-  }
 }

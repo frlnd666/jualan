@@ -7,25 +7,11 @@ import { getDashboardAccess } from '@/lib/dashboard-access'
 import { notifyOrderEvent } from '@/lib/notify'
 import type { NotificationType } from '@/lib/notifications'
 import type { OrderStatus } from '@/lib/types/order'
+import { ALLOWED_TRANSITIONS } from '@/lib/order-transitions'
 
 export interface ActionResult {
   success: boolean
   error?: string
-}
-
-/**
- * Transisi status order yang boleh dilakukan seller dari dashboard.
- * Status terminal (COMPLETED, CANCELLED) tidak punya transisi keluar.
- * Diekspor untuk dipakai bulk update (order-management.ts) — satu sumber
- * kebenaran, bukan duplikat aturan.
- */
-export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING_PAYMENT: ['CANCELLED'],
-  PAID: ['PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED'],
-  PROCESSING: ['SHIPPED', 'COMPLETED', 'CANCELLED'],
-  SHIPPED: ['COMPLETED'],
-  COMPLETED: [],
-  CANCELLED: [],
 }
 
 const ORDER_STATUSES: OrderStatus[] = [

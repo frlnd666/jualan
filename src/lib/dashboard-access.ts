@@ -4,7 +4,9 @@
 // Staff → toko dari profiles.store_id (role 'staff').
 // Admin platform tidak punya toko lewat helper ini (admin pakai panel
 // /dashboard/admin, bukan dashboard toko).
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 
 export type DashboardStore = {
   id: string
@@ -49,6 +51,20 @@ export async function getDashboardAccess(
 
   return null
 }
+
+/**
+ * Versi ter-cache per request dari getDashboardAccess (performa
+ * 2026-11-10): layout dashboard dan halaman anak sering sama-sama
+ * membutuhkan akses toko dalam satu render — sebelumnya query yang
+ * sama (sampai 3 untuk staff) jalan berulang kali. Client dibuat di
+ * dalam supaya kunci cache hanya userId.
+ */
+export const getDashboardAccessCached = cache(
+  async (userId: string): Promise<DashboardAccess> => {
+    const supabase = await createClient()
+    return getDashboardAccess(supabase, userId)
+  }
+)
 
 // Untuk server action yang hanya boleh dijalankan pemilik toko
 // (tambah/hapus staff, pengaturan, langganan).

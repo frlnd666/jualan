@@ -6,10 +6,7 @@ import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import Link from 'next/link'
 import { useCart } from '@/lib/use-cart'
 import { createOrderAction } from '@/lib/actions/checkout'
-import {
-  getAllowedPaymentMethodsAction,
-  getStoreCheckoutRulesAction,
-} from '@/lib/actions/subscriptions'
+import { getCheckoutBootstrapAction } from '@/lib/actions/subscriptions'
 import { validateVoucherCodeAction } from '@/lib/actions/vouchers'
 import {
   calcShippingCost,
@@ -212,14 +209,16 @@ export default function CheckoutClient() {
     async function fetchAllowedMethods() {
       if (!storeId) return
       try {
-        const rules = await getStoreCheckoutRulesAction(storeId)
-        setPerKgAllowed(rules.perKgAllowed)
-      } catch {
-        // Gagal memuat aturan = biarkan preview apa adanya; angka yang
-        // mengikat tetap dihitung server.
-      }
-      try {
-        const allowed = await getAllowedPaymentMethodsAction(storeId)
+        // Performa 2026-11-10: SATU action bootstrap untuk aturan
+        // per-kg + metode yang diizinkan (sebelumnya dua action
+        // berurutan yang sama-sama memuat langganan di server).
+        const bootstrap = await getCheckoutBootstrapAction(storeId)
+        setPerKgAllowed(bootstrap.perKgAllowed)
+        const allowed = bootstrap.allowedMethods
+        // Array kosong dari bootstrap berarti gagal baca (fail-closed
+        // di server) — jangan kunci UI; biarkan semua opsi tampil dan
+        // server action yang menolak metode yang tidak diizinkan.
+        if (allowed.length === 0) return
         setAllowedMethods(allowed)
         // Bila metode yang terpilih tidak diizinkan paket toko (mis. toko
         // Free yang default-nya transfer), pindah ke metode pertama yang

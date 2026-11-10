@@ -882,6 +882,32 @@ export async function getStoreCheckoutRulesAction(
   }
 }
 
+/**
+ * Bootstrap checkout dalam SATU action (performa 2026-11-10):
+ * metode pembayaran yang diizinkan + aturan per-kg, dari SATU kali
+ * muat langganan. Sebelumnya CheckoutClient memanggil dua action
+ * berurutan (rules lalu allowed methods) yang masing-masing memuat
+ * langganan yang sama — dua POST + dua kali kerja server per mount.
+ * Kegagalan baca langganan = fail-closed seperti kedua action asal:
+ * tidak ada metode ditawarkan, per-kg dianggap tidak berlaku.
+ */
+export async function getCheckoutBootstrapAction(storeId: string): Promise<{
+  allowedMethods: Array<'BANK_TRANSFER' | 'QRIS' | 'COD'>
+  perKgAllowed: boolean
+}> {
+  if (!storeId) return { allowedMethods: [], perKgAllowed: false }
+  const supabase = await createPublicInvoiceClient()
+  try {
+    const subscription = await getStoreSubscription(supabase, storeId)
+    return {
+      allowedMethods: allowedCheckoutMethods(subscription),
+      perKgAllowed: effectiveTier(subscription).tier !== 'free',
+    }
+  } catch {
+    return { allowedMethods: [], perKgAllowed: false }
+  }
+}
+
 /** Metode pembayaran yang diizinkan di checkout untuk sebuah toko. */
 export async function getAllowedPaymentMethodsAction(storeId: string) {
   if (!storeId) return [] as Array<'BANK_TRANSFER' | 'QRIS' | 'COD'>

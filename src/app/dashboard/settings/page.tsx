@@ -143,28 +143,37 @@ export default function SettingsPage() {
         } = await supabase.auth.getUser()
         if (!user) return
 
+        // Performa 2026-11-10: profil + toko + pembayaran independen
+        // (semuanya diturunkan dari user/sesi) → paralel, bukan
+        // waterfall serial. getStorePaymentAction menverifikasi
+        // pemilik di server; hasilnya hanya diterapkan bila lolos
+        // cek staff + toko ditemukan di bawah.
+        const [{ data: settingsProfile }, { data: store }, pay] =
+          await Promise.all([
+            supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', user.id)
+              .maybeSingle(),
+            supabase
+              .from('stores')
+              // Daftar kolom eksplisit, BUKAN '*' (K-03): '*' di PostgREST
+              // bisa mengembang ke kolom yang sudah dicabut hak SELECT-nya
+              // (cache skema basi) sehingga baca toko gagal total.
+              .select(
+                'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url, onboarding_step'
+              )
+              .eq('owner_id', user.id)
+              .single(),
+            getStorePaymentAction(),
+          ])
+
         // Fase 2: pengaturan hanya untuk pemilik toko — staff ditolak di
         // sini (dan di RLS: policy stores owner-only).
-        const { data: settingsProfile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle()
         if ((settingsProfile as { role?: string } | null)?.role === 'staff') {
           setDenied(true)
           return
         }
-
-        const { data: store } = await supabase
-          .from('stores')
-          // Daftar kolom eksplisit, BUKAN '*' (K-03): '*' di PostgREST
-          // bisa mengembang ke kolom yang sudah dicabut hak SELECT-nya
-          // (cache skema basi) sehingga baca toko gagal total.
-          .select(
-            'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url, onboarding_step'
-          )
-          .eq('owner_id', user.id)
-          .single()
 
         if (store) {
           setStoreId(store.id)
@@ -187,12 +196,12 @@ export default function SettingsPage() {
           // disentuh.
           void ensureStoreSubscription(store.id, 'free')
 
-          // K-05 — muat rekening lewat server action: client anon tidak
-          // bisa membaca kolom rekening sejak K-03, jadi prefill bagian
-          // Pembayaran harus lewat service_role (action memverifikasi
-          // pemilik dulu). Gagal muat = form kosong + simpan diblokir
-          // (lihat savePembayaran), bukan diam-diam menimpa data lama.
-          const pay = await getStorePaymentAction()
+          // K-05 — rekening dimuat lewat server action (sudah dipanggil
+          // paralel di atas): client anon tidak bisa membaca kolom
+          // rekening sejak K-03, jadi prefill bagian Pembayaran harus
+          // lewat service_role (action memverifikasi pemilik dulu).
+          // Gagal muat = form kosong + simpan diblokir (lihat
+          // savePembayaran), bukan diam-diam menimpa data lama.
           if ('payment' in pay && pay.payment) {
             setBankName(pay.payment.bank_name ?? '')
             setBankAccountName(pay.payment.bank_account_name ?? '')

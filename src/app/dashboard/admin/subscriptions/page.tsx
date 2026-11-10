@@ -4,7 +4,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { resolvePaymentProofUrl } from '@/lib/payment-proof'
+import { resolvePaymentProofUrls } from '@/lib/payment-proof'
 import { TIER_LABELS } from '@/lib/subscriptions'
 import {
   RunTransitionsButton,
@@ -107,9 +107,17 @@ export default async function AdminSubscriptionsPage({
     }
   }
 
+  // Performa 2026-11-10: signed URL dibuat SATU batch untuk semua
+  // pembayaran yang tampil (sebelumnya loop serial per pembayaran).
+  const signedByStoredUrl = await resolvePaymentProofUrls(
+    payments.map((p) => p.proof_url)
+  )
   const proofUrls = new Map<string, string | null>()
   for (const p of payments) {
-    proofUrls.set(p.id, await resolvePaymentProofUrl(p.proof_url))
+    proofUrls.set(
+      p.id,
+      p.proof_url ? (signedByStoredUrl.get(p.proof_url) ?? null) : null
+    )
   }
 
   return (

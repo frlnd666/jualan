@@ -461,17 +461,31 @@ export async function createOrderAction(input: CheckoutFormInput) {
   // bisa sama-sama lolos dari stok yang sama. Optimistic lock di kode
   // aplikasi (update ... where stock = nilai_lama) sudah digantikan RPC
   // ini; definisi fungsi: supabase/migrations/20261108_f0_stock_rpc.sql
-  for (const item of verifiedItems) {
-    const { data: stockDecreased, error: stockError } = await supabase.rpc(
-      'decrement_stock',
-      { p_product_id: item.product.id, p_qty: item.qty }
-    )
-
-    if (stockError || stockDecreased !== true) {
-      await rollbackOrder()
-      throw new Error(`Stok "${item.product.name}" baru saja berubah. Silakan coba lagi.`)
+  // Performa 2026-11-10: RPC per item dijalankan PARALEL (kunci baris
+  // per produk — item keranjang berbeda produk, jadi aman bersamaan;
+  // sebelumnya N+1 serial). Semantik gagal tidak berubah: semua yang
+  // berhasil tercatat di `decremented` dulu, lalu rollbackOrder
+  // mengembalikannya.
+  const stockResults = await Promise.all(
+    verifiedItems.map(async (item) => {
+      const { data: stockDecreased, error: stockError } = await supabase.rpc(
+        'decrement_stock',
+        { p_product_id: item.product.id, p_qty: item.qty }
+      )
+      return { item, ok: !stockError && stockDecreased === true }
+    })
+  )
+  for (const result of stockResults) {
+    if (result.ok) {
+      decremented.push({ product: result.item.product, qty: result.item.qty })
     }
-    decremented.push({ product: item.product, qty: item.qty })
+  }
+  const failedStock = stockResults.find((r) => !r.ok)
+  if (failedStock) {
+    await rollbackOrder()
+    throw new Error(
+      `Stok "${failedStock.item.product.name}" baru saja berubah. Silakan coba lagi.`
+    )
   }
 
   const accessToken = crypto.randomUUID()

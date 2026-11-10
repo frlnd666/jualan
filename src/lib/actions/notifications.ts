@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth-user'
 import type { NotificationType } from '@/lib/notifications'
 import { sendEmail } from '@/lib/email-resend'
 import { sendWhatsAppMessage, normalizeWhatsAppNumber } from '@/lib/whatsapp'
@@ -55,8 +56,19 @@ export async function listNotificationsAction(): Promise<{
 }
 
 export async function getUnreadNotificationCountAction(): Promise<number> {
-  const { unreadCount } = await listNotificationsAction()
-  return unreadCount
+  // Performa 2026-11-10: badge lonceng hanya butuh ANGKA. Versi lama
+  // memanggil listNotificationsAction penuh (client baru + getUser +
+  // 50 baris + count) — 4 round-trip untuk satu angka di layout.
+  // Sekarang: user ter-cache + satu query count head-only.
+  const user = await getCurrentUser()
+  if (!user) return 0
+  const supabase = await createClient()
+  const { count } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('is_read', false)
+  return count ?? 0
 }
 
 export async function markNotificationReadAction(

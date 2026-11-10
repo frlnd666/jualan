@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
   createPublicInvoiceClient,
-  getInvoiceAccessToken,
   isInvoiceTokenValid,
   tokenQuery,
 } from '@/lib/invoice-access'
@@ -77,9 +76,11 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
   const { t, baru } = await searchParams
   const supabase = await createPublicInvoiceClient()
 
-  const { data: invoice, error: invoiceError } = await supabase
-    .from('invoices')
-    .select(`
+  // Performa 2026-11-10: access_token dibaca dari select invoice yang
+  // sama (sebelumnya query kedua ke tabel yang sama hanya untuk token).
+  // Bila kolom belum ada (skema pra-migrasi), ulangi tanpa kolom itu —
+  // mode legacy tanpa token tetap berlaku lewat isInvoiceTokenValid.
+  const INVOICE_SELECT = `
       id,
       order_id,
       invoice_number,
@@ -88,11 +89,22 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
       total,
       payment_method,
       created_at
-    `)
+    `
+  let invoiceResult = await supabase
+    .from('invoices')
+    .select(`${INVOICE_SELECT}, access_token`)
     .eq('invoice_number', invoiceNumber)
     .maybeSingle()
+  if (invoiceResult.error && /access_token/.test(invoiceResult.error.message ?? '')) {
+    invoiceResult = await supabase
+      .from('invoices')
+      .select(INVOICE_SELECT)
+      .eq('invoice_number', invoiceNumber)
+      .maybeSingle()
+  }
+  const { data: invoiceData, error: invoiceError } = invoiceResult
 
-  if (invoiceError || !invoice) {
+  if (invoiceError || !invoiceData) {
     // Bedakan "invoice memang tidak ada" dari "server belum bisa membaca
     // invoice karena kunci service-role belum terpasang" — yang kedua
     // jangan menyamar sebagai 404.
@@ -101,12 +113,26 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
     }
     notFound()
   }
+  const invoice = invoiceData as typeof invoiceData & {
+    access_token?: string | null
+  }
 
   // Gerbang token: nomor invoice saja tidak cukup membuka halaman ini.
-  const storedToken = await getInvoiceAccessToken(supabase, invoice.id)
+  const storedToken = invoice.access_token
+    ? String(invoice.access_token)
+    : null
   if (!isInvoiceTokenValid(storedToken, t)) {
     notFound()
   }
+
+  // QRIS dinamis hanya bergantung pada invoice → mulai sekarang dan
+  // di-await belakangan, paralel dengan rantai order di bawah.
+  const showDynamicQrisEarly =
+    invoice.payment_method === 'QRIS' &&
+    invoice.payment_status === 'PENDING_PAYMENT'
+  const existingQrisPromise = showDynamicQrisEarly
+    ? getQrisPaymentForInvoiceAction(invoice.invoice_number, t ?? null)
+    : Promise.resolve(null)
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
@@ -138,42 +164,39 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
     notFound()
   }
 
-  const { data: store, error: storeError } = await supabase
-    .from('stores')
-    .select(`
+  // Performa 2026-11-10: toko + tujuan bayar + item + pengiriman
+  // sama-sama hanya bergantung pada order → satu Promise.all
+  // (sebelumnya 4 query serial). Semantik error tidak berubah.
+  // K-05 — tujuan pembayaran toko (rekening + QRIS statis) dibaca lewat
+  // query TERPISAH dari select toko, supaya halaman tidak 404 bila
+  // client jatuh ke anon (tanpa service_role): kolom rekening dicabut
+  // dari anon/authenticated sejak K-03, jadi query ini gagal di mode
+  // itu — dan itu ditangani sebagai "toko belum mengisi tujuan
+  // pembayaran", bukan error halaman.
+  const [
+    { data: store, error: storeError },
+    { data: paymentRow },
+    { data: orderItems, error: itemsError },
+    { data: shipment },
+  ] = await Promise.all([
+    supabase
+      .from('stores')
+      .select(`
       id,
       name,
       slug,
       whatsapp
     `)
-    .eq('id', order.store_id)
-    .maybeSingle()
-
-  if (storeError || !store) {
-    notFound()
-  }
-
-  // K-05 — tujuan pembayaran toko (rekening + QRIS statis) untuk alur
-  // manual. Dibaca lewat query TERPISAH dari select toko di atas, supaya
-  // halaman tidak 404 bila client jatuh ke anon (tanpa service_role):
-  // kolom rekening dicabut dari anon/authenticated sejak K-03, jadi
-  // query ini gagal di mode itu — dan itu ditangani sebagai "toko belum
-  // mengisi tujuan pembayaran", bukan error halaman.
-  const { data: paymentRow } = await supabase
-    .from('stores')
-    .select('bank_name, bank_account_name, bank_account_number, qris_image_url')
-    .eq('id', order.store_id)
-    .maybeSingle()
-  const paymentDetails = (paymentRow ?? null) as {
-    bank_name?: string | null
-    bank_account_name?: string | null
-    bank_account_number?: string | null
-    qris_image_url?: string | null
-  } | null
-
-  const { data: orderItems, error: itemsError } = await supabase
-    .from('order_items')
-    .select(`
+      .eq('id', order.store_id)
+      .maybeSingle(),
+    supabase
+      .from('stores')
+      .select('bank_name, bank_account_name, bank_account_number, qris_image_url')
+      .eq('id', order.store_id)
+      .maybeSingle(),
+    supabase
+      .from('order_items')
+      .select(`
       id,
       order_id,
       product_id,
@@ -183,25 +206,36 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
       subtotal,
       notes
     `)
-    .eq('order_id', order.id)
-    .order('id', { ascending: true })
-
-  if (itemsError) {
-    notFound()
-  }
-
-  // Info pengiriman kini tinggal di halaman yang sama (dulu halaman /track
-  // terpisah dengan isi yang nyaris sama).
-  const { data: shipment } = await supabase
-    .from('shipments')
-    .select(`
+      .eq('order_id', order.id)
+      .order('id', { ascending: true }),
+    // Info pengiriman kini tinggal di halaman yang sama (dulu halaman
+    // /track terpisah dengan isi yang nyaris sama).
+    supabase
+      .from('shipments')
+      .select(`
       id,
       courier,
       tracking_number,
       status
     `)
-    .eq('order_id', order.id)
-    .maybeSingle()
+      .eq('order_id', order.id)
+      .maybeSingle(),
+  ])
+
+  if (storeError || !store) {
+    notFound()
+  }
+
+  const paymentDetails = (paymentRow ?? null) as {
+    bank_name?: string | null
+    bank_account_name?: string | null
+    bank_account_number?: string | null
+    qris_image_url?: string | null
+  } | null
+
+  if (itemsError) {
+    notFound()
+  }
 
   const isNewOrder = baru === '1'
   const isCancelled = order.status === 'CANCELLED'
@@ -213,11 +247,8 @@ export default async function InvoicePage({ params, searchParams }: InvoicePageP
   // QR aktif (bila ada) untuk panel QR. Panel-nya sendiri yang akan
   // generate QR bila belum ada; bila toko belum mengaktifkan QRIS
   // dinamis, panel tidak tampil dan alur manual lama yang jalan.
-  const showDynamicQris =
-    invoice.payment_method === 'QRIS' && invoice.payment_status === 'PENDING_PAYMENT'
-  const existingQris = showDynamicQris
-    ? await getQrisPaymentForInvoiceAction(invoice.invoice_number, t ?? null)
-    : null
+  const showDynamicQris = showDynamicQrisEarly
+  const existingQris = await existingQrisPromise
 
   // K-05 — blok tujuan bayar manual tampil HANYA bila invoice masih
   // menunggu pembayaran, bukan COD, dan bukan QRIS yang QR dinamisnya

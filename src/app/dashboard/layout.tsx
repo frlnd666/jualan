@@ -7,7 +7,11 @@ import DesktopNav from '@/components/dashboard/DesktopNav'
 import LogoutButton from '@/components/dashboard/LogoutButton'
 import NotificationBell from '@/components/dashboard/NotificationBell'
 import { getUnreadNotificationCountAction } from '@/lib/actions/notifications'
-import { getDashboardAccess, type DashboardAccess } from '@/lib/dashboard-access'
+import {
+  getDashboardAccessCached,
+  type DashboardAccess,
+} from '@/lib/dashboard-access'
+import { getCurrentUser } from '@/lib/auth-user'
 
 export default async function DashboardLayout({
   children,
@@ -15,9 +19,9 @@ export default async function DashboardLayout({
   children: ReactNode
 }) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Performa 2026-11-10: user + akses toko dari cache per-request —
+  // halaman anak yang memakai helper yang sama tidak membayar ulang.
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
@@ -45,7 +49,7 @@ export default async function DashboardLayout({
   let access: DashboardAccess = null
   let accessFailed = false
   try {
-    access = await getDashboardAccess(supabase, user.id)
+    access = await getDashboardAccessCached(user.id)
   } catch (err) {
     console.error('[dashboard/layout] getDashboardAccess gagal:', err)
     accessFailed = true

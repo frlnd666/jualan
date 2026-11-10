@@ -32,7 +32,14 @@ export default async function AdminStoresPage({
   searchParams: Promise<{ q?: string; page?: string }>
 }) {
   const { q: rawQ, page: rawPage } = await searchParams
-  const q = (rawQ ?? '').trim().replace(/[%_,]/g, ' ').slice(0, 60)
+  // Sanitasi untuk filter .or() PostgREST (audit 2026-11-10 R-4):
+  // selain wildcard SQL (%, _) dan pemisah filter (,), buang juga
+  // karakter sintaks filter — kurung, titik, bintang, backslash,
+  // dan tanda kutip — supaya q tidak bisa membentuk filter malformed.
+  const q = (rawQ ?? '')
+    .trim()
+    .replace(/[%_,().*\\"']/g, ' ')
+    .slice(0, 60)
   const supabase = await createClient()
   const {
     data: { user },
@@ -135,6 +142,7 @@ export default async function AdminStoresPage({
       >
         <input
           name="q"
+          aria-label="Cari toko berdasarkan nama atau slug"
           defaultValue={q}
           placeholder="Cari nama toko atau slug…"
           className="min-w-0 flex-1 rounded-2xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"

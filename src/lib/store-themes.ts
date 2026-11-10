@@ -46,12 +46,16 @@ export const STORE_THEMES: Record<StoreThemeKey, StoreThemeDefinition> = {
       '--surface-soft': '#f4ead3',
       '--surface-muted': '#eee0c3',
       '--text': '#2b1d0e',
-      '--text-muted': '#7d6a4f',
+      // Audit 2026-11-10 (U-1): muted & primary digelapkan satu tingkat
+      // dari versi awal (#7d6a4f / #b45309) — pasangan teks kecil di
+      // atas surface-soft/primary-soft sebelumnya 4,34 & 4,40:1,
+      // di bawah ambang WCAG AA 4,5:1.
+      '--text-muted': '#6b5636',
       '--line': '#eadfc6',
-      '--primary': '#b45309',
-      '--primary-hover': '#92400e',
+      '--primary': '#92400e',
+      '--primary-hover': '#78350f',
       '--primary-soft': '#fdeeda',
-      '--primary-deep': '#b45309',
+      '--primary-deep': '#92400e',
       '--olive': '#8a7a4d',
       '--stone': '#d6c193',
     },
@@ -67,7 +71,9 @@ export const STORE_THEMES: Record<StoreThemeKey, StoreThemeDefinition> = {
       '--surface-soft': '#f1f5f9',
       '--surface-muted': '#e2e8f0',
       '--text': '#0f172a',
-      '--text-muted': '#64748b',
+      // Audit 2026-11-10 (U-1): digelapkan dari #64748b — di atas
+      // surface-soft kontrasnya 4,34:1, di bawah AA 4,5:1.
+      '--text-muted': '#5a6b82',
       '--line': '#e2e8f0',
       '--primary': '#334155',
       '--primary-hover': '#1e293b',

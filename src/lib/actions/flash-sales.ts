@@ -253,14 +253,25 @@ export async function loadActiveFlashSalesForStore(
       .eq('is_active', true)
     if (error || !data) return empty
     const map = new Map<string, number>()
-    for (const row of data as FlashSaleLike[]) {
+    // Audit 2026-11-10 (W-8): dua flash sale aktif untuk produk yang
+    // sama harus deterministik — yang starts_at TERBARU menang, sama
+    // seperti halaman produk. Urutkan menurun lalu set hanya bila
+    // belum ada (sebelumnya urutan DB yang menentukan pemenang, bisa
+    // berbeda antar permukaan).
+    const rows = [...(data as FlashSaleLike[])].sort(
+      (a, b) =>
+        new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime()
+    )
+    for (const row of rows) {
       const start = new Date(row.starts_at).getTime()
       const end = new Date(row.ends_at).getTime()
       if (Number.isNaN(start) || Number.isNaN(end)) continue
       const t = now.getTime()
       if (t < start || t > end) continue
       const promo = Math.max(0, Math.floor(Number(row.promo_price) || 0))
-      if (promo > 0) map.set(row.product_id, promo)
+      if (promo > 0 && !map.has(row.product_id)) {
+        map.set(row.product_id, promo)
+      }
     }
     return map
   } catch {

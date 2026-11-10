@@ -73,6 +73,13 @@ export default async function AdminSubscriptionsPage({
     .order('created_at', { ascending: false })
     .limit(100)
   const pending = (pendingData ?? []) as PaymentRow[]
+  // Audit 2026-11-10: total antrean asli — daftar dibatasi 100, tapi
+  // admin harus TAHU bila sebenarnya ada lebih (sebelumnya terpotong
+  // diam-diam dan judul menampilkan angka yang terpotong).
+  const { count: pendingTotal } = await supabase
+    .from('subscription_payments')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'PENDING_VERIFICATION')
 
   const { count: processedTotal } = await supabase
     .from('subscription_payments')
@@ -138,7 +145,10 @@ export default async function AdminSubscriptionsPage({
 
       <section className="rounded-[32px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] md:p-6">
         <h2 className="text-base font-bold text-[var(--text)]">
-          Menunggu verifikasi ({pending.length})
+          Menunggu verifikasi ({pendingTotal ?? pending.length})
+          {(pendingTotal ?? 0) > pending.length
+            ? ` — menampilkan ${pending.length} terbaru`
+            : ''}
         </h2>
         {pending.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--text-muted)]">

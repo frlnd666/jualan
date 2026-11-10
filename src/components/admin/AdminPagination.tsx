@@ -37,12 +37,17 @@ export default function AdminPagination({
   unitLabel,
 }: AdminPaginationProps) {
   if (total === 0) return null
+  // Audit 2026-11-10: target sentuh diperbesar (min-h 40px) + nav
+  // berlabel supaya terbedakan dari navigasi lain oleh pembaca layar.
   const linkClass =
-    'inline-flex items-center gap-1 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]'
+    'inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]'
   const disabledClass =
-    'inline-flex items-center gap-1 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-muted)] opacity-60'
+    'inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-muted)] opacity-60'
   return (
-    <nav className="mt-4 flex flex-wrap items-center justify-between gap-3">
+    <nav
+      aria-label={`Pagination ${unitLabel}`}
+      className="mt-4 flex flex-wrap items-center justify-between gap-3"
+    >
       <p className="text-xs text-[var(--text-muted)]">
         {total} {unitLabel} • Halaman {page} dari {pageCount}
       </p>

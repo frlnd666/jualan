@@ -39,21 +39,36 @@ export async function listAuditLogAction(input: {
   if ('error' in adminCheck) return { error: adminCheck.error }
 
   const pageSize = Math.min(100, Math.max(1, Math.floor(input.pageSize ?? 50)))
-  const page = Math.max(1, Math.floor(input.page ?? 1))
+  const requestedPage = Math.max(1, Math.floor(input.page ?? 1))
+
+  // Audit 2026-11-10 (W-6): hitung total DULU lalu klem halaman yang
+  // diminta — sebelumnya ?page= di luar rentang menghasilkan daftar
+  // kosong palsu ("belum ada log") padahal log ada.
+  let countQuery = supabase
+    .from('audit_log')
+    .select('id', { count: 'exact', head: true })
+  if (input.action) countQuery = countQuery.eq('action', input.action)
+  if (input.storeId) countQuery = countQuery.eq('store_id', input.storeId)
+  const { count, error: countError } = await countQuery
+  if (countError) {
+    return { error: 'Log audit belum tersedia — jalankan migrasi Fase 4 dulu.' }
+  }
+  const total = count ?? 0
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(requestedPage, pageCount)
   const from = (page - 1) * pageSize
 
   let query = supabase
     .from('audit_log')
     .select(
-      'id, actor_id, actor_role, store_id, action, entity_type, entity_id, details, created_at',
-      { count: 'exact' }
+      'id, actor_id, actor_role, store_id, action, entity_type, entity_id, details, created_at'
     )
     .order('created_at', { ascending: false })
     .range(from, from + pageSize - 1)
   if (input.action) query = query.eq('action', input.action)
   if (input.storeId) query = query.eq('store_id', input.storeId)
 
-  const { data, error, count } = await query
+  const { data, error } = await query
   if (error) {
     return { error: 'Log audit belum tersedia — jalankan migrasi Fase 4 dulu.' }
   }

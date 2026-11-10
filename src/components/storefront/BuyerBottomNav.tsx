@@ -44,13 +44,17 @@ export default function BuyerBottomNav() {
   // di luar pembungkus bertema halaman toko, jadi override tema tidak
   // merambat ke sini. Ambil tema dari slug di path dan terapkan
   // sendiri. Gagal baca / bukan halaman toko = warna platform.
-  const [themeVars, setThemeVars] = useState<CSSProperties>({})
+  // State disimpan berpasangan dengan slug pemiliknya: saat slug aktif
+  // tidak cocok (baru pindah halaman / bukan halaman toko), render
+  // memakai {} tanpa perlu setState sinkron di dalam effect
+  // (react-hooks/set-state-in-effect).
+  const slug = storeSlugFromBuyerPathname(pathname)
+  const [theme, setTheme] = useState<{
+    slug: string
+    vars: CSSProperties
+  } | null>(null)
   useEffect(() => {
-    const slug = storeSlugFromBuyerPathname(pathname)
-    if (!slug) {
-      setThemeVars({})
-      return
-    }
+    if (!slug) return
     let cancelled = false
     const supabase = createClient()
     void supabase
@@ -60,16 +64,19 @@ export default function BuyerBottomNav() {
       .maybeSingle()
       .then(({ data }) => {
         if (cancelled) return
-        setThemeVars(
-          storeThemeStyle(
+        setTheme({
+          slug,
+          vars: storeThemeStyle(
             (data as { theme?: string | null } | null)?.theme ?? null
-          )
-        )
+          ),
+        })
       })
     return () => {
       cancelled = true
     }
-  }, [pathname])
+  }, [slug])
+  const themeVars: CSSProperties =
+    slug && theme?.slug === slug ? theme.vars : {}
 
   if (!shouldShowBuyerNav(pathname)) return null
 

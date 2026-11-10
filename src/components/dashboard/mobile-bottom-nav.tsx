@@ -67,10 +67,14 @@ export default function MobileBottomNav({
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Navigasi (klik item sheet / tombol utama) menutup sheet.
-  useEffect(() => {
+  // Navigasi (klik item sheet / tombol utama) menutup sheet: sesuaikan
+  // state saat render ketika pathname berubah (pola resmi React untuk
+  // "reset state saat prop berubah" — bukan setState di dalam effect).
+  const [lastPathname, setLastPathname] = useState(pathname)
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname)
     setMenuOpen(false)
-  }, [pathname])
+  }
 
   // Escape menutup sheet; kunci scroll body selama sheet terbuka.
   useEffect(() => {

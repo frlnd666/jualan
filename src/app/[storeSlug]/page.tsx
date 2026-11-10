@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import type { CSSProperties } from 'react'
+import { cache, type CSSProperties } from 'react'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
@@ -49,19 +49,47 @@ async function getHostInfo(): Promise<{ hostKind: HostKind; hostname: string }> 
   return { hostKind: 'platform', hostname }
 }
 
+// Performa 2026-11-10: fetch toko di-cache per request (React
+// cache()) supaya generateMetadata dan body halaman berbagi SATU
+// query — sebelumnya toko yang sama ditanya dua kali serial, dan
+// seluruh rantai di bawahnya juga serial (total ±8 round-trip).
+const getStoreBySlug = cache(async (storeSlug: string) => {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('stores')
+    // Daftar kolom eksplisit, BUKAN '*' (K-03): setelah migrasi hak
+    // SELECT tingkat kolom, '*' di PostgREST bisa mengembang ke kolom
+    // yang sudah dicabut (cache skema basi) dan seluruh halaman jadi
+    // 404. Kolom di sini = semua kolom tampilan publik.
+    .select(
+      'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url'
+    )
+    .eq('slug', storeSlug)
+    .maybeSingle()
+  return data as {
+    id: string
+    name: string
+    slug: string
+    description: string | null
+    whatsapp: string | null
+    city: string | null
+    address: string | null
+    instagram: string | null
+    theme: string | null
+    logo_url: string | null
+    banner_url: string | null
+  } | null
+})
+
 // Fase 5 — SEO toko: title/description dinamis, canonical sesuai host,
 // Open Graph (logo toko / foto produk pertama).
 export async function generateMetadata({
   params,
 }: StorefrontPageProps): Promise<Metadata> {
   const { storeSlug } = await params
-  const supabase = await createClient()
-  const { data: store } = await supabase
-    .from('stores')
-    .select('id, name, slug, description, city, logo_url')
-    .eq('slug', storeSlug)
-    .maybeSingle()
+  const store = await getStoreBySlug(storeSlug)
   if (!store) return {}
+  const supabase = await createClient()
   const { hostKind, hostname } = await getHostInfo()
   const siteUrl = siteUrlFromEnv(process.env.NEXT_PUBLIC_SITE_URL)
   const canonical = storeCanonicalUrl(store, hostKind, hostname, siteUrl)
@@ -160,28 +188,21 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
     storePathForHost(hostKind, storeSlug, `/products/${productSlug}`)
   const canonicalUrl = storeUrlForHost(hostKind, hostname, storeSlug, '/', siteUrl)
 
-  const { data: store, error: storeError } = await supabase
-    .from('stores')
-    // Daftar kolom eksplisit, BUKAN '*' (K-03): setelah migrasi hak
-    // SELECT tingkat kolom, '*' di PostgREST bisa mengembang ke kolom
-    // yang sudah dicabut (cache skema basi) dan seluruh halaman jadi
-    // 404. Kolom di sini = semua kolom tampilan publik.
-    .select(
-      'id, name, slug, description, whatsapp, city, address, instagram, theme, logo_url, banner_url'
-    )
-    .eq('slug', storeSlug)
-    .maybeSingle()
-
-  if (storeError || !store) {
+  const store = await getStoreBySlug(storeSlug)
+  if (!store) {
     notFound()
   }
 
-  const { data: products } = await supabase
-    .from('products')
-    .select('id, name, slug, price, images, badge, description, category_id, weight_gram')
-    .eq('store_id', store.id)
-    .eq('available', true)
-    .order('created_at', { ascending: false })
+  // Produk + langganan hanya bergantung pada store.id → paralel.
+  const [{ data: products }, subscription] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, slug, price, images, badge, description, category_id, weight_gram')
+      .eq('store_id', store.id)
+      .eq('available', true)
+      .order('created_at', { ascending: false }),
+    getPublicStoreSubscription(store.id),
+  ])
 
   // Fase 1 (Bab 5): downgrade menyembunyikan, bukan menghapus.
   // - Toko SUSPENDED hilang dari publik.
@@ -190,7 +211,6 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
   // - Foto ke-2+ tidak ditampilkan untuk Free (max 1 foto).
   // Fase 4: foto Free tampil dengan watermark platform (overlay display,
   // file asli utuh) + banner Free menampilkan 1 slide iklan afiliasi.
-  const subscription = await getPublicStoreSubscription(store.id)
   if (subscription.status === 'SUSPENDED') {
     notFound()
   }
@@ -205,21 +225,31 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
   // Fase 4 — flash sale aktif toko ini (policy publik hanya membaca
   // yang aktif + di dalam jadwal). Bila tabel belum ada (migrasi f4
   // belum dijalankan), abaikan — harga normal yang tampil.
+  // Flash sale + banner sama-sama hanya butuh store.id → paralel.
   const now = new Date()
-  let flashSales: FlashSaleLike[] = []
-  try {
-    const { data: flashRows } = await supabase
-      .from('flash_sales')
-      .select('id, store_id, product_id, promo_price, starts_at, ends_at, is_active')
-      .eq('store_id', store.id)
-      .eq('is_active', true)
-    flashSales = ((flashRows ?? []) as FlashSaleLike[]).map((s) => ({
-      ...s,
-      promo_price: Number(s.promo_price),
-    }))
-  } catch {
-    flashSales = []
+  const loadFlashSales = async (): Promise<FlashSaleLike[]> => {
+    try {
+      const { data: flashRows } = await supabase
+        .from('flash_sales')
+        .select('id, store_id, product_id, promo_price, starts_at, ends_at, is_active')
+        .eq('store_id', store.id)
+        .eq('is_active', true)
+      return ((flashRows ?? []) as FlashSaleLike[]).map((s) => ({
+        ...s,
+        promo_price: Number(s.promo_price),
+      }))
+    } catch {
+      return []
+    }
   }
+  // Fase 4 — banner marketing aktif toko (Silver/Gold). Toko Free tidak
+  // punya banner sendiri; sebagai gantinya tampil slide iklan afiliasi.
+  const [flashSales, activeBanner] = await Promise.all([
+    loadFlashSales(),
+    !tierLimits.affiliateAds
+      ? loadActiveBanner(supabase, store.id)
+      : Promise.resolve(null),
+  ])
   const pricedProducts = visibleProducts.map((p) => {
     const sale = activeFlashSaleForProduct(flashSales, p.id, now)
     const normalPrice = Number(p.price)
@@ -230,12 +260,6 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
       displayPrice: hasFlash ? Number(sale!.promo_price) : normalPrice,
     }
   })
-
-  // Fase 4 — banner marketing aktif toko (Silver/Gold). Toko Free tidak
-  // punya banner sendiri; sebagai gantinya tampil slide iklan afiliasi.
-  const activeBanner: StoreBannerLike | null = !tierLimits.affiliateAds
-    ? await loadActiveBanner(supabase, store.id)
-    : null
 
   // Nama kategori diambil dari tabel product_categories (nama tabel asli
   // di database) dengan query terpisah — bukan embed relasi — agar tahan

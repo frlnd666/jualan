@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminUser } from '@/lib/admin-access'
+import { fetchOwnerEmails } from '@/lib/admin-emails'
 import { STATUS_LABELS, TIER_LABELS } from '@/lib/subscriptions'
 import {
   paginate,
@@ -112,14 +113,13 @@ export default async function AdminStoresPage({
   }>
   const subByStore = new Map(subs.map((s) => [s.store_id, s]))
 
-  // Email pemilik lewat Auth Admin API (dipetakan id → email).
-  const emailByUserId = new Map<string, string>()
-  try {
-    const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    for (const u of data.users) {
-      if (u.id && u.email) emailByUserId.set(u.id, u.email)
-    }
-  } catch {}
+  // Email pemilik lewat Auth Admin API — hanya untuk toko di
+  // halaman ini (performa 2026-11-10; sebelumnya listUsers 1.000
+  // user per load).
+  const emailByUserId = await fetchOwnerEmails(
+    admin,
+    stores.map((s) => s.owner_id)
+  )
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 pt-6">

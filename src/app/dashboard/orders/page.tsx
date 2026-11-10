@@ -1,17 +1,29 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { getDashboardAccess } from '@/lib/dashboard-access'
+import { getDashboardAccessCached } from '@/lib/dashboard-access'
+import { getCurrentUser } from '@/lib/auth-user'
 import { redirect } from 'next/navigation'
 import { getOrderTab, type OrderTabKey } from '@/lib/order-status'
 import OrdersListClient, {
   type OrderListItem,
 } from '@/components/dashboard/OrdersListClient'
+import { paginate } from '@/lib/admin-ui'
+import AdminPagination from '@/components/admin/AdminPagination'
 
 type OrdersPageProps = {
   searchParams: Promise<{
     tab?: string
+    page?: string
   }>
 }
+
+// Performa 2026-11-10: daftar dirender 50 per halaman (sebelumnya
+// SEMUA pesanan toko dikirim ke klien sekaligus). Hitungan tab tetap
+// dari data ringan yang sama; ekspor CSV tidak terpengaruh (action
+// tersendiri per tab). Batas ambil 1.000 pesanan terbaru menjaga
+// query tetap terbatas untuk toko yang sangat besar.
+const ORDERS_PAGE_SIZE = 50
+const ORDERS_FETCH_LIMIT = 1000
 
 type OrderRow = {
   id: string
@@ -42,18 +54,16 @@ const TABS = [
 ] as const
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
-  const { tab: rawTab } = await searchParams
+  const { tab: rawTab, page: rawPage } = await searchParams
   const activeTab: TabKey =
     TABS.find((t) => t.key === rawTab)?.key ?? 'semua'
 
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const access = await getDashboardAccess(supabase, user.id)
+  const access = await getDashboardAccessCached(user.id)
   if (!access) redirect('/dashboard/settings')
   const store = access.store
 
@@ -62,6 +72,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     .select('id, customer_name, customer_phone, total, status, created_at')
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
+    .limit(ORDERS_FETCH_LIMIT)
 
   const orders = (ordersData ?? []) as OrderRow[]
 
@@ -88,7 +99,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     counts.set('semua', (counts.get('semua') ?? 0) + 1)
   }
 
-  const visibleOrders: OrderListItem[] = (
+  const filteredOrders =
     activeTab === 'semua'
       ? orders
       : orders.filter(
@@ -96,10 +107,17 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             getOrderTab(order.status, invoiceByOrder.get(order.id)?.payment_status) ===
             activeTab
         )
-  ).map((order) => ({
-    ...order,
-    invoice: invoiceByOrder.get(order.id) ?? null,
-  }))
+  const pageInfo = paginate(
+    filteredOrders.length,
+    rawPage,
+    ORDERS_PAGE_SIZE
+  )
+  const visibleOrders: OrderListItem[] = filteredOrders
+    .slice(pageInfo.from, pageInfo.to + 1)
+    .map((order) => ({
+      ...order,
+      invoice: invoiceByOrder.get(order.id) ?? null,
+    }))
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -157,6 +175,16 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
       {/* Daftar + mode massal + export CSV (Fase 3, client). */}
       <OrdersListClient orders={visibleOrders} activeTab={activeTab} />
+      <AdminPagination
+        basePath="/dashboard/orders"
+        page={pageInfo.page}
+        pageCount={pageInfo.pageCount}
+        total={pageInfo.total}
+        params={{
+          tab: activeTab === 'semua' ? undefined : activeTab,
+        }}
+        unitLabel="pesanan"
+      />
     </div>
   )
 }

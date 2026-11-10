@@ -5,6 +5,19 @@ import {
   platformDomainFromEnv,
 } from '@/lib/domains'
 
+// Cache resolusi domain custom → slug (performa 2026-11-10): hasil
+// lookup store_domains + stores disimpan di memori isolate selama
+// TTL singkat supaya hit storefront domain custom tidak membayar
+// 2 query per request. Pemetaan domain→toko jarang berubah; negatif
+// (domain tak dikenal) di-cache lebih singkat supaya domain yang
+// baru terverifikasi cepat dikenali.
+const DOMAIN_CACHE_TTL_MS = 120_000
+const DOMAIN_CACHE_MISS_TTL_MS = 30_000
+const domainSlugCache = new Map<
+  string,
+  { slug: string | null; expiresAt: number }
+>()
+
 // Fase 5 — host yang dilayani sebagai storefront toko:
 // - platform: landing + dashboard + path /{slug} (biasa);
 // - subdomain platform {slug}.domain-platform → rewrite ke /{slug};
@@ -50,6 +63,18 @@ async function resolveStorefrontHost(
   // Domain custom — cari di store_domains yang sudah terverifikasi.
   // Tabel belum ada (migrasi f5 belum jalan) atau domain tidak dikenal
   // = halaman penjelasan, bukan crash.
+  const unknownDomain = () => {
+    const url = request.nextUrl.clone()
+    url.pathname = '/domain-tidak-dikenal'
+    url.searchParams.set('host', host)
+    return NextResponse.rewrite(url)
+  }
+  const cached = domainSlugCache.get(host)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.slug
+      ? rewriteWithStore(cached.slug, 'custom')
+      : unknownDomain()
+  }
   try {
     const { data } = await supabase
       .from('store_domains')
@@ -59,10 +84,11 @@ async function resolveStorefrontHost(
       .maybeSingle()
     const row = data as { store_id: string } | null
     if (!row) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/domain-tidak-dikenal'
-      url.searchParams.set('host', host)
-      return NextResponse.rewrite(url)
+      domainSlugCache.set(host, {
+        slug: null,
+        expiresAt: Date.now() + DOMAIN_CACHE_MISS_TTL_MS,
+      })
+      return unknownDomain()
     }
     const { data: store } = await supabase
       .from('stores')
@@ -71,17 +97,19 @@ async function resolveStorefrontHost(
       .maybeSingle()
     const storeRow = store as { slug: string } | null
     if (!storeRow?.slug) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/domain-tidak-dikenal'
-      url.searchParams.set('host', host)
-      return NextResponse.rewrite(url)
+      domainSlugCache.set(host, {
+        slug: null,
+        expiresAt: Date.now() + DOMAIN_CACHE_MISS_TTL_MS,
+      })
+      return unknownDomain()
     }
+    domainSlugCache.set(host, {
+      slug: storeRow.slug,
+      expiresAt: Date.now() + DOMAIN_CACHE_TTL_MS,
+    })
     return rewriteWithStore(storeRow.slug, 'custom')
   } catch {
-    const url = request.nextUrl.clone()
-    url.pathname = '/domain-tidak-dikenal'
-    url.searchParams.set('host', host)
-    return NextResponse.rewrite(url)
+    return unknownDomain()
   }
 }
 
@@ -101,6 +129,30 @@ export async function middleware(request: NextRequest) {
 }
 
 async function runMiddleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // Performa 2026-11-10: middleware versi lama menjalankan resolusi
+  // host + validasi sesi (auth.getUser = panggilan network) untuk
+  // SETIAP request — termasuk halaman publik, webhook, dan cron.
+  // Sekarang pekerjaan itu hanya jalan di jalur yang membutuhkannya:
+  // - resolusi storefront: hanya '/' dan '/products/*' di host
+  //   non-platform (di dalam resolveStorefrontHost);
+  // - sesi: hanya area terproteksi (/dashboard, /akun, /checkout)
+  //   dan /login//register (redirect bila sudah login).
+  // Halaman lain tetap dijaga di level route/layout masing-masing.
+  const isStorefrontPath =
+    pathname === '/' || pathname.startsWith('/products/')
+  const needsSession =
+    pathname.startsWith('/dashboard') ||
+    pathname === '/akun' ||
+    pathname.startsWith('/akun/') ||
+    pathname.startsWith('/checkout') ||
+    pathname === '/login' ||
+    pathname === '/register'
+  if (!isStorefrontPath && !needsSession) {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -128,8 +180,10 @@ async function runMiddleware(request: NextRequest) {
   const storefront = await resolveStorefrontHost(request, supabase)
   if (storefront) return storefront
 
+  // Jalur storefront di domain platform tidak butuh sesi sama sekali.
+  if (!needsSession) return response
+
   const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
 
   if (!user && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/login', request.url))

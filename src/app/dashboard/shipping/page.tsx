@@ -111,24 +111,29 @@ export default function ShippingPage() {
         return
       }
 
+      // Performa 2026-11-10: profil + toko sama-sama hanya butuh
+      // user.id → paralel (sebelumnya waterfall serial).
+      const [{ data: shippingProfile }, { data: store, error: storeError }] =
+        await Promise.all([
+          supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('stores')
+            .select('id')
+            .eq('owner_id', user.id)
+            .single(),
+        ])
+
       // Fase 2: pengiriman hanya untuk pemilik toko — staff ditolak di
       // sini (dan di RLS: tidak ada policy staff di shipping_methods).
-      const { data: shippingProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
       if ((shippingProfile as { role?: string } | null)?.role === 'staff') {
         setDenied(true)
         setLoadingPage(false)
         return
       }
-
-      const { data: store, error: storeError } = await supabase
-        .from('stores')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
 
       if (storeError || !store) {
         setErrorMessage('Toko tidak ditemukan untuk akun ini.')

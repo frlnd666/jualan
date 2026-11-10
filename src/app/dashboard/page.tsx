@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getDashboardAccess } from '@/lib/dashboard-access'
+import { getDashboardAccessCached } from '@/lib/dashboard-access'
+import { getCurrentUser } from '@/lib/auth-user'
 
 function StatCard({
   label,
@@ -45,9 +46,9 @@ type ActionItem = {
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Performa 2026-11-10: user dari cache per-request (layout dashboard
+  // sudah memvalidasinya dalam render yang sama).
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
@@ -63,22 +64,25 @@ export default async function DashboardPage() {
   if (profile?.role === 'admin') redirect('/dashboard/admin')
 
   // Fase 2: staff masuk dashboard tokonya lewat profiles.store_id.
-  const access = await getDashboardAccess(supabase, user.id)
+  // Akses dari cache per-request — layout sudah memuatnya.
+  const access = await getDashboardAccessCached(user.id)
   if (!access) redirect('/dashboard/onboarding')
   const store = access.store
   const isStaff = access.role === 'staff'
 
-  const { count: productCount } = await supabase
-    .from('products')
-    .select('id', { count: 'exact', head: true })
-    .eq('store_id', store.id)
-
-  const { data: ordersData } = await supabase
-    .from('orders')
-    .select('id, customer_name, total, status, created_at')
-    .eq('store_id', store.id)
-    .order('created_at', { ascending: false })
-    .limit(200)
+  // Hitungan produk + daftar order independen → paralel.
+  const [{ count: productCount }, { data: ordersData }] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('store_id', store.id),
+    supabase
+      .from('orders')
+      .select('id, customer_name, total, status, created_at')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false })
+      .limit(200),
+  ])
 
   const orders = ordersData ?? []
 

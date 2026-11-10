@@ -2,31 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { isAdminRoute } from '@/lib/dashboard-nav'
+import {
+  isAdminRoute,
+  SELLER_NAV_ITEMS,
+  SELLER_STAFF_NAV_ITEMS,
+} from '@/lib/dashboard-nav'
 import AdminDesktopNav from '@/components/dashboard/AdminDesktopNav'
-
-const items = [
-  { href: '/dashboard', label: 'Beranda' },
-  { href: '/dashboard/products', label: 'Produk' },
-  { href: '/dashboard/orders', label: 'Pesanan' },
-  { href: '/dashboard/chat', label: 'Chat' },
-  { href: '/dashboard/shipping', label: 'Pengiriman' },
-  { href: '/dashboard/vouchers', label: 'Voucher' },
-  { href: '/dashboard/analytics', label: 'Analitik' },
-  { href: '/dashboard/flash-sales', label: 'Flash Sale' },
-  { href: '/dashboard/banners', label: 'Banner' },
-  { href: '/dashboard/domains', label: 'Domain' },
-  { href: '/dashboard/subscription', label: 'Langganan' },
-  { href: '/dashboard/settings', label: 'Pengaturan' },
-]
-
-// Staff (Fase 2) hanya boleh Beranda, Produk, dan Pesanan — menu lain
-// disembunyikan DAN halamannya dijaga di server (bukan hanya di nav).
-const STAFF_ITEMS = [
-  { href: '/dashboard', label: 'Beranda' },
-  { href: '/dashboard/products', label: 'Produk' },
-  { href: '/dashboard/orders', label: 'Pesanan' },
-]
 
 /**
  * Navigasi desktop penjual — sebelumnya dashboard tidak punya menu sama
@@ -46,7 +27,7 @@ export default function DesktopNav({
   // Area admin punya navbar sendiri.
   if (isAdminRoute(pathname)) return <AdminDesktopNav />
 
-  const visibleItems = isStaff ? STAFF_ITEMS : items
+  const visibleItems = isStaff ? SELLER_STAFF_NAV_ITEMS : SELLER_NAV_ITEMS
 
   return (
     <nav className="mx-auto hidden max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex">

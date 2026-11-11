@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/lib/use-cart'
 import { createClient } from '@/lib/supabase/client'
 import WatermarkedImage from '@/components/storefront/WatermarkedImage'
+import ShareButton from '@/components/storefront/ShareButton'
+import { productShareText } from '@/lib/share'
 import {
   discountPercent,
   formatFlashRemaining,
@@ -84,6 +86,7 @@ export default function ProductDetailClient({
   homeHref,
 }: ProductDetailClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
   const backHref = homeHref ?? `/${storeSlug}`
   const images = useMemo(() => {
@@ -391,6 +394,14 @@ export default function ProductDetailClient({
           >
             Lihat menu lain
           </Link>
+
+          <ShareButton
+            path={pathname}
+            title={product.name}
+            text={productShareText(product.name, displayPrice)}
+            label="Bagikan"
+            className="shrink-0 px-3.5 py-3"
+          />
 
           {added && !isDisabled ? (
             <Link

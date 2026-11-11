@@ -83,9 +83,9 @@ export default function BuyerBottomNav() {
   return (
     <nav
       style={themeVars}
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[var(--surface)]/95 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden"
+      className="fixed inset-x-4 bottom-4 z-30 mx-auto max-w-sm rounded-full border border-black/5 bg-[var(--surface)]/95 px-2 py-2 pb-[calc(8px+env(safe-area-inset-bottom))] shadow-[0_16px_40px_rgba(33,24,20,0.18)] backdrop-blur-xl md:hidden"
     >
-      <div className="mx-auto grid max-w-6xl grid-cols-3 gap-1">
+      <div className="grid grid-cols-3 gap-1">
         {BUYER_NAV_ITEMS.map(({ href, label }) => {
           const Icon = ICONS[href]
           const active = isActiveItem(href, pathname)
@@ -94,16 +94,22 @@ export default function BuyerBottomNav() {
             <Link
               key={href}
               href={href}
-              className={`relative flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-2xl px-2 text-[11px] font-semibold transition active:scale-[0.98] ${
+              className={`relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-full px-2 text-[11px] font-semibold transition active:scale-[0.97] ${
                 active
-                  ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
-                  : 'text-[var(--text-muted)]'
+                  ? 'bg-[var(--primary)] text-white shadow-md'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'
               }`}
             >
               <span className="relative">
                 <Icon size={18} strokeWidth={active ? 2.4 : 2} />
                 {showBadge ? (
-                  <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[9px] font-bold leading-none text-white">
+                  <span
+                    className={`absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none ${
+                      active
+                        ? 'bg-white text-[var(--primary)]'
+                        : 'bg-[var(--primary)] text-white'
+                    }`}
+                  >
                     {count > 99 ? '99+' : count}
                   </span>
                 ) : null}

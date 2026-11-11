@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { cache, type CSSProperties } from 'react'
+import { cache, Suspense, type CSSProperties } from 'react'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
@@ -8,6 +8,10 @@ import StoreCartButton from '@/components/storefront/StoreCartButton'
 import StoreChatWidget from '@/components/storefront/StoreChatWidget'
 import WatermarkedImage from '@/components/storefront/WatermarkedImage'
 import AffiliateAdSlide from '@/components/storefront/AffiliateAdSlide'
+import StorefrontToolbar from '@/components/storefront/StorefrontToolbar'
+import QuickAddButton from '@/components/storefront/QuickAddButton'
+import ShareButton from '@/components/storefront/ShareButton'
+import { productShareText } from '@/lib/share'
 import { getPublicStoreSubscription } from '@/lib/subscriptions-server'
 import { limitsFor } from '@/lib/subscription-tiers'
 import { storePathForHost, storeUrlForHost } from '@/lib/store-links'
@@ -34,6 +38,20 @@ type StorefrontPageProps = {
   params: Promise<{
     storeSlug: string
   }>
+  searchParams?: Promise<{
+    q?: string
+    kategori?: string
+  }>
+}
+
+// Latar pastel kartu produk (ala desain referensi) — diputar per
+// indeks supaya grid terlihat hidup tanpa foto tambahan.
+const PASTEL_TILES = ['#e9f7ef', '#fdeef3', '#e8f3fd', '#fdf3e3']
+
+// Escape karakter wildcard LIKE/ILIKE di kata kunci pencarian supaya
+// "%" atau "_" dari pengguna tidak melebar jadi pola.
+function escapeIlike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
 }
 
 // Fase 5 — info host yang melayani halaman ini (middleware menulis
@@ -177,8 +195,32 @@ function getInitials(name: string) {
     .join('')
 }
 
-export default async function StorefrontPage({ params }: StorefrontPageProps) {
+// Kategori toko untuk chip filter di toolbar. Gagal/migrasi belum
+// jalan = tanpa chip (toko tetap tampil normal).
+async function loadStoreCategories(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  storeId: string
+): Promise<Array<{ id: string; name: string }>> {
+  try {
+    const { data } = await supabase
+      .from('product_categories')
+      .select('id, name')
+      .eq('store_id', storeId)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true })
+    return ((data ?? []) as Array<{ id?: string; name?: string }>)
+      .filter((c) => c?.id && c?.name)
+      .map((c) => ({ id: c.id as string, name: c.name as string }))
+  } catch {
+    return []
+  }
+}
+
+export default async function StorefrontPage({ params, searchParams }: StorefrontPageProps) {
   const { storeSlug } = await params
+  const sp = (await searchParams) ?? {}
+  const rawQuery = typeof sp.q === 'string' ? sp.q.trim().slice(0, 100) : ''
+  const rawCategory = typeof sp.kategori === 'string' ? sp.kategori.trim() : ''
   const supabase = await createClient()
   const { hostKind, hostname } = await getHostInfo()
   const siteUrl = siteUrlFromEnv(process.env.NEXT_PUBLIC_SITE_URL)
@@ -187,22 +229,39 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
   const productHref = (productSlug: string) =>
     storePathForHost(hostKind, storeSlug, `/products/${productSlug}`)
   const canonicalUrl = storeUrlForHost(hostKind, hostname, storeSlug, '/', siteUrl)
+  const storePath = storePathForHost(hostKind, storeSlug, '/')
 
   const store = await getStoreBySlug(storeSlug)
   if (!store) {
     notFound()
   }
 
-  // Produk + langganan hanya bergantung pada store.id → paralel.
-  const [{ data: products }, subscription] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, name, slug, price, images, badge, description, category_id, weight_gram')
-      .eq('store_id', store.id)
-      .eq('available', true)
-      .order('created_at', { ascending: false }),
+  // Langganan + kategori hanya bergantung pada store.id → paralel.
+  // Kategori dimuat dulu supaya nilai ?kategori= bisa divalidasi
+  // terhadap kategori toko ini (nilai asing diabaikan, bukan error).
+  const [subscription, storeCategories] = await Promise.all([
     getPublicStoreSubscription(store.id),
+    loadStoreCategories(supabase, store.id),
   ])
+  const activeCategory =
+    storeCategories.find((c) => c.id === rawCategory) ?? null
+
+  // Produk difilter di server (sebelum pemotongan batas paket) —
+  // pencarian (?q=) dan kategori (?kategori=).
+  let productsQuery = supabase
+    .from('products')
+    .select('id, name, slug, price, stock, images, badge, description, category_id, weight_gram')
+    .eq('store_id', store.id)
+    .eq('available', true)
+  if (rawQuery) {
+    productsQuery = productsQuery.ilike('name', `%${escapeIlike(rawQuery)}%`)
+  }
+  if (activeCategory) {
+    productsQuery = productsQuery.eq('category_id', activeCategory.id)
+  }
+  const { data: products } = await productsQuery.order('created_at', {
+    ascending: false,
+  })
 
   // Fase 1 (Bab 5): downgrade menyembunyikan, bukan menghapus.
   // - Toko SUSPENDED hilang dari publik.
@@ -261,26 +320,12 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
     }
   })
 
-  // Nama kategori diambil dari tabel product_categories (nama tabel asli
-  // di database) dengan query terpisah — bukan embed relasi — agar tahan
-  // terhadap perbedaan nama relasi PostgREST.
-  const categoryIds = Array.from(
-    new Set(visibleProducts.map((p) => p.category_id).filter(Boolean))
-  ) as string[]
-
-  const categoryNames = new Map<string, string>()
-  if (categoryIds.length > 0) {
-    const { data: categories } = await supabase
-      .from('product_categories')
-      .select('id, name')
-      .in('id', categoryIds)
-
-    for (const category of categories ?? []) {
-      if (category?.id && category?.name) {
-        categoryNames.set(category.id, category.name)
-      }
-    }
-  }
+  // Nama kategori dari daftar kategori toko yang sudah dimuat (tanpa
+  // query tambahan).
+  const categoryNames = new Map<string, string>(
+    storeCategories.map((c) => [c.id, c.name])
+  )
+  const isFiltering = rawQuery !== '' || activeCategory !== null
 
   const productList = pricedProducts
   const totalProducts = productList.length
@@ -418,6 +463,19 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
         </section>
 
         <main className="px-4 pb-8 pt-5 sm:px-6">
+          {/* Toolbar ala desain referensi: pencarian + chip kategori +
+              bagikan toko. useSearchParams di dalamnya butuh Suspense. */}
+          <Suspense>
+            <StorefrontToolbar
+              categories={storeCategories}
+              activeCategoryId={activeCategory?.id ?? null}
+              initialQuery={rawQuery}
+              storeName={store.name}
+              storeDescription={store.description}
+              storePath={storePath}
+            />
+          </Suspense>
+
           {/* Fase 4 — banner marketing toko (Silver/Gold) atau 1 slide
               iklan afiliasi berlabel "Iklan" (Free). */}
           {activeBanner ? (
@@ -449,7 +507,7 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
             </div>
           ) : null}
 
-          {featuredProducts.length > 0 ? (
+          {featuredProducts.length > 0 && !isFiltering ? (
             <section className="mb-6">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
@@ -536,10 +594,14 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
             <div className="mb-3 flex items-end justify-between gap-3">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                  Menu
+                  {isFiltering ? 'Hasil' : 'Menu'}
                 </p>
                 <h2 className="mt-1 text-lg font-bold text-[var(--text)]">
-                  Semua produk
+                  {rawQuery
+                    ? `Cari "${rawQuery}"`
+                    : activeCategory
+                      ? activeCategory.name
+                      : 'Semua produk'}
                 </h2>
               </div>
 
@@ -554,42 +616,62 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                   <PackageOpen className="h-8 w-8 text-[var(--text-muted)]" aria-hidden />
                 </div>
                 <p className="mt-4 text-base font-bold text-[var(--text)]">
-                  Belum ada produk tersedia
+                  {isFiltering
+                    ? 'Tidak ada produk yang cocok'
+                    : 'Belum ada produk tersedia'}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-                  Toko ini belum menampilkan produk yang siap dipesan saat ini.
+                  {isFiltering
+                    ? 'Coba kata kunci lain atau pilih kategori Semua.'
+                    : 'Toko ini belum menampilkan produk yang siap dipesan saat ini.'}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {productList.map((product) => (
-                  <Link
+                {productList.map((product, index) => (
+                  <article
                     key={product.id}
-                    href={productHref(product.slug)}
                     className="group overflow-hidden rounded-[28px] border border-black/5 bg-[var(--surface)] shadow-[0_12px_30px_rgba(33,24,20,0.06)] transition hover:-translate-y-0.5"
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden bg-[var(--surface-soft)]">
-                      {product.images?.[0] ? (
-                        <WatermarkedImage
-                          src={product.images[0]}
-                          alt={product.name}
-                          watermarked={tierLimits.watermark}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center bg-[var(--surface-soft)] px-4 text-center">
-                          <Package className="h-9 w-9 text-[var(--text-muted)]" aria-hidden />
-                          <span className="mt-3 text-xs font-medium text-[var(--text-muted)]">
-                            Foto segera hadir
-                          </span>
-                        </div>
-                      )}
+                    <div
+                      className="relative aspect-[4/5] overflow-hidden"
+                      style={{ background: PASTEL_TILES[index % PASTEL_TILES.length] }}
+                    >
+                      <Link
+                        href={productHref(product.slug)}
+                        aria-label={product.name}
+                        className="absolute inset-0"
+                      >
+                        {product.images?.[0] ? (
+                          <WatermarkedImage
+                            src={product.images[0]}
+                            alt={product.name}
+                            watermarked={tierLimits.watermark}
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center">
+                            <Package className="h-9 w-9 text-[var(--text-muted)]" aria-hidden />
+                            <span className="mt-3 text-xs font-medium text-[var(--text-muted)]">
+                              Foto segera hadir
+                            </span>
+                          </div>
+                        )}
+                      </Link>
 
                       {product.badge ? (
                         <span className="absolute left-3 top-3 rounded-full bg-[var(--text)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white shadow-sm">
                           {product.badge}
                         </span>
                       ) : null}
+
+                      <ShareButton
+                        path={productHref(product.slug)}
+                        title={product.name}
+                        text={productShareText(product.name, product.displayPrice)}
+                        label="Bagikan"
+                        className="absolute right-2.5 top-2.5 z-10 px-2.5 py-1.5"
+                      />
                     </div>
 
                     <div className="p-3.5">
@@ -598,17 +680,19 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                           {getCategoryName(product, categoryNames)}
                         </p>
                       ) : null}
-                      <p className="line-clamp-2 min-h-[2.75rem] text-sm font-bold leading-5 text-[var(--text)]">
-                        {product.name}
-                      </p>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <div>
+                      <Link href={productHref(product.slug)}>
+                        <p className="line-clamp-2 min-h-[2.75rem] text-sm font-bold leading-5 text-[var(--text)]">
+                          {product.name}
+                        </p>
+                      </Link>
+                      <div className="mt-2 flex items-end justify-between gap-2">
+                        <div className="min-w-0">
                           {product.flashSale ? (
                             <p className="text-[11px] font-medium text-[var(--text-muted)] line-through">
                               Rp {formatRupiah(product.price)}
                             </p>
                           ) : null}
-                          <p className="text-sm font-bold text-[var(--primary)]">
+                          <p className="truncate text-sm font-bold text-[var(--primary)]">
                             Rp {formatRupiah(product.displayPrice)}
                           </p>
                           {product.flashSale ? (
@@ -617,12 +701,13 @@ export default async function StorefrontPage({ params }: StorefrontPageProps) {
                             </p>
                           ) : null}
                         </div>
-                        <span className="rounded-full bg-[var(--surface-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                          Detail
-                        </span>
+                        <QuickAddButton
+                          product={{ ...product, store_id: store.id }}
+                          storeSlug={store.slug}
+                        />
                       </div>
                     </div>
-                  </Link>
+                  </article>
                 ))}
               </div>
             )}

@@ -26,6 +26,73 @@ export function rangeStart(range: AnalyticsRange, now: Date = new Date()): Date 
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 }
 
+/**
+ * Jendela periode SEBELUMNYA dengan panjang yang sama — dipakai
+ * membandingkan (delta) kartu statistik. 'all' tidak punya pembanding.
+ * Jendela [start, end): berakhir tepat saat periode sekarang mulai.
+ */
+export function previousRangeWindow(
+  range: AnalyticsRange,
+  now: Date = new Date()
+): { start: Date; end: Date } | null {
+  if (range === 'all') return null
+  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90
+  const end = rangeStart(range, now)
+  if (!end) return null
+  return {
+    start: new Date(end.getTime() - days * 24 * 60 * 60 * 1000),
+    end,
+  }
+}
+
+/**
+ * Total headline satu periode — aturan yang sama seperti
+ * computeAnalytics (GMV/order tidak termasuk CANCELLED; lunas hanya
+ * invoice PAID). Dipakai untuk periode sebelumnya (delta); periode
+ * sekarang tetap dihitung computeAnalytics yang lengkap.
+ */
+export function computePeriodTotals(
+  orders: AnalyticsOrderRow[],
+  invoices: AnalyticsInvoiceRow[]
+): {
+  gmv: number
+  paidRevenue: number
+  orderCount: number
+  avgOrderValue: number
+} {
+  const paidByOrder = new Map<string, boolean>()
+  for (const inv of invoices) {
+    if (inv.payment_status === 'PAID') paidByOrder.set(inv.order_id, true)
+  }
+  let gmv = 0
+  let paidRevenue = 0
+  let orderCount = 0
+  for (const order of orders) {
+    if (String(order.status ?? '') === 'CANCELLED') continue
+    const total = Math.max(0, Math.floor(Number(order.total) || 0))
+    orderCount += 1
+    gmv += total
+    if (paidByOrder.get(order.id) === true) paidRevenue += total
+  }
+  return {
+    gmv,
+    paidRevenue,
+    orderCount,
+    avgOrderValue: orderCount > 0 ? Math.floor(gmv / orderCount) : 0,
+  }
+}
+
+/**
+ * Perubahan persen current vs previous. previous = 0 tidak bisa
+ * dinyatakan dalam persen: 0 → 0 berarti tidak berubah (0%), 0 → ada
+ * penjualan berarti periode baru ("Baru", null di sini — UI yang
+ * memutuskan tampilannya).
+ */
+export function deltaPct(current: number, previous: number): number | null {
+  if (previous === 0) return current === 0 ? 0 : null
+  return ((current - previous) / previous) * 100
+}
+
 export interface AnalyticsOrderRow {
   id: string
   total: number
@@ -44,6 +111,7 @@ export interface AnalyticsItemRow {
 export interface AnalyticsInvoiceRow {
   order_id: string
   payment_status: string
+  invoice_number?: string | null
 }
 
 export interface DailyPoint {
@@ -57,6 +125,25 @@ export interface TopProduct {
   name: string
   qty: number
   revenue: number
+  /** Foto pertama produk (diisi server action dari tabel products). */
+  image?: string | null
+}
+
+/** Pesanan terbaru untuk kartu "Pesanan terbaru" di halaman analitik. */
+export interface RecentOrder {
+  id: string
+  invoiceNumber: string
+  total: number
+  status: string
+  createdAt: string
+}
+
+/** Perubahan persen vs periode sebelumnya (null = tidak bisa dihitung). */
+export interface AnalyticsDelta {
+  gmv: number | null
+  paidRevenue: number | null
+  orderCount: number | null
+  avgOrderValue: number | null
 }
 
 export interface AnalyticsSummary {

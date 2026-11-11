@@ -3,6 +3,9 @@ import {
   buildAnalyticsCsv,
   canExportAnalytics,
   computeAnalytics,
+  computePeriodTotals,
+  deltaPct,
+  previousRangeWindow,
   rangeStart,
   type AnalyticsInvoiceRow,
   type AnalyticsItemRow,
@@ -96,5 +99,51 @@ describe('buildAnalyticsCsv', () => {
     expect(csv).toContain('Tanggal,Jumlah Order,GMV (Rp),Lunas (Rp)')
     expect(csv).toContain('Kopi Gula Aren,4,100000')
     expect(csv).toContain('Total GMV (Rp),225000')
+  })
+})
+
+describe('previousRangeWindow', () => {
+  it('7d = 14 hari lalu sampai 7 hari lalu', () => {
+    const w = previousRangeWindow('7d', NOW)
+    expect(w?.start.toISOString()).toBe('2026-10-27T12:00:00.000Z')
+    expect(w?.end.toISOString()).toBe('2026-11-03T12:00:00.000Z')
+  })
+  it('30d = 60 hari lalu sampai 30 hari lalu', () => {
+    const w = previousRangeWindow('30d', NOW)
+    expect(w?.start.toISOString()).toBe('2026-09-11T12:00:00.000Z')
+    expect(w?.end.toISOString()).toBe('2026-10-11T12:00:00.000Z')
+  })
+  it('all = null (tidak ada pembanding)', () => {
+    expect(previousRangeWindow('all', NOW)).toBeNull()
+  })
+})
+
+describe('computePeriodTotals', () => {
+  it('aturan yang sama seperti computeAnalytics (tanpa daily/top)', () => {
+    const t = computePeriodTotals(orders(), invoices())
+    expect(t.gmv).toBe(225000)
+    expect(t.paidRevenue).toBe(100000)
+    expect(t.orderCount).toBe(3)
+    expect(t.avgOrderValue).toBe(75000)
+  })
+  it('periode kosong = semua 0', () => {
+    expect(computePeriodTotals([], [])).toEqual({
+      gmv: 0,
+      paidRevenue: 0,
+      orderCount: 0,
+      avgOrderValue: 0,
+    })
+  })
+})
+
+describe('deltaPct', () => {
+  it('naik dan turun', () => {
+    expect(deltaPct(150, 100)).toBe(50)
+    expect(deltaPct(75, 100)).toBe(-25)
+    expect(deltaPct(100, 100)).toBe(0)
+  })
+  it('previous 0: 0 → 0 = 0, 0 → ada penjualan = null', () => {
+    expect(deltaPct(0, 0)).toBe(0)
+    expect(deltaPct(50000, 0)).toBeNull()
   })
 })

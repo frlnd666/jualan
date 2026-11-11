@@ -637,20 +637,23 @@ export default async function StorefrontPage({ params, searchParams }: Storefron
                       className="relative aspect-[4/5] overflow-hidden"
                       style={{ background: PASTEL_TILES[index % PASTEL_TILES.length] }}
                     >
+                      {/* Foto dibuat inset (padding) supaya latar pastel
+                          terlihat membingkai foto — sebelumnya foto
+                          full-bleed menutupi pastel sepenuhnya. */}
                       <Link
                         href={productHref(product.slug)}
                         aria-label={product.name}
-                        className="absolute inset-0"
+                        className="absolute inset-0 p-3"
                       >
                         {product.images?.[0] ? (
                           <WatermarkedImage
                             src={product.images[0]}
                             alt={product.name}
                             watermarked={tierLimits.watermark}
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                            className="h-full w-full rounded-[20px] object-cover shadow-sm transition duration-300 group-hover:scale-[1.03]"
                           />
                         ) : (
-                          <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center">
+                          <div className="flex h-full w-full flex-col items-center justify-center rounded-[20px] bg-white/60 px-4 text-center">
                             <Package className="h-9 w-9 text-[var(--text-muted)]" aria-hidden />
                             <span className="mt-3 text-xs font-medium text-[var(--text-muted)]">
                               Foto segera hadir

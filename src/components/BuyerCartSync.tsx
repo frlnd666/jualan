@@ -75,7 +75,16 @@ export default function BuyerCartSync() {
       } = await supabase.auth.getUser()
       if (cancelled) return
       if (user) void initialSync(user.id)
-      else syncedForUserId.current = null
+      else {
+        syncedForUserId.current = null
+        // Tamu: tetap hidrasi keranjang lokal. Sebelumnya rehydrate
+        // hanya jalan di jalur login — cart tamu hilang tiap muat
+        // ulang halaman (ditemukan saat verifikasi restyle 2026-11-11:
+        // quick-add tampil di sesi, tapi /cart kosong setelah reload).
+        try {
+          await useCart.persist.rehydrate()
+        } catch {}
+      }
     }
 
     void checkSession()
@@ -83,7 +92,14 @@ export default function BuyerCartSync() {
       (_event, session) => {
         if (cancelled) return
         if (session?.user) void initialSync(session.user.id)
-        else syncedForUserId.current = null
+        else {
+          syncedForUserId.current = null
+          void (async () => {
+            try {
+              await useCart.persist.rehydrate()
+            } catch {}
+          })()
+        }
       }
     )
 

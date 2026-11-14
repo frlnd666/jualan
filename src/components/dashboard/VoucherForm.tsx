@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createVoucherAction } from '@/lib/actions/vouchers'
+import { localInputToIso } from '@/lib/datetime'
 
 const inputClassName =
   'w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]'
@@ -23,7 +24,15 @@ export default function VoucherForm({ disabled }: { disabled: boolean }) {
     setSuccessMessage('')
     setSaving(true)
     try {
-      const result = await createVoucherAction(new FormData(e.currentTarget))
+      const formData = new FormData(e.currentTarget)
+      // Sama seperti flash sale: datetime-local tidak membawa zona
+      // waktu — konversi ke ISO di browser penjual dulu, kalau tidak
+      // masa berlaku voucher bergeser +7 jam di server (UTC).
+      for (const key of ['startsAt', 'endsAt'] as const) {
+        const value = String(formData.get(key) ?? '')
+        if (value) formData.set(key, localInputToIso(value))
+      }
+      const result = await createVoucherAction(formData)
       if (result.error) {
         setErrorMessage(result.error)
         return

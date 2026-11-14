@@ -4,14 +4,7 @@
 
 import { useState, useTransition } from 'react'
 import { createFlashSaleAction } from '@/lib/actions/flash-sales'
-
-function toLocalInput(iso: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
+import { isoToLocalInput, localInputToIso } from '@/lib/datetime'
 
 export default function FlashSaleForm({
   products,
@@ -25,6 +18,14 @@ export default function FlashSaleForm({
 
   async function handleSubmit(formData: FormData) {
     setMessage(null)
+    // datetime-local tidak membawa zona waktu — konversi ke ISO di
+    // browser penjual SEBELUM dikirim, kalau tidak server (UTC)
+    // membacanya sebagai UTC dan jadwal bergeser +7 jam (lihat
+    // src/lib/datetime.ts).
+    for (const key of ['startsAt', 'endsAt'] as const) {
+      const value = String(formData.get(key) ?? '')
+      if (value) formData.set(key, localInputToIso(value))
+    }
     startTransition(async () => {
       try {
         const result = await createFlashSaleAction(formData)
@@ -42,8 +43,8 @@ export default function FlashSaleForm({
   }
 
   const now = new Date()
-  const defaultStart = toLocalInput(new Date(now.getTime() + 60 * 60 * 1000).toISOString())
-  const defaultEnd = toLocalInput(new Date(now.getTime() + 25 * 60 * 60 * 1000).toISOString())
+  const defaultStart = isoToLocalInput(new Date(now.getTime() + 60 * 60 * 1000).toISOString())
+  const defaultEnd = isoToLocalInput(new Date(now.getTime() + 25 * 60 * 60 * 1000).toISOString())
 
   return (
     <form

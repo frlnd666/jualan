@@ -16,6 +16,9 @@ type ShareButtonProps = {
   text: string
   label?: string
   className?: string
+  /** Kelas tambahan untuk span label — mis. "hidden sm:inline" untuk
+   *  tombol ikon-saja di layar sempit (aria-label tetap membawa label). */
+  labelClassName?: string
 }
 
 export default function ShareButton({
@@ -24,6 +27,7 @@ export default function ShareButton({
   text,
   label = 'Bagikan',
   className = '',
+  labelClassName = '',
 }: ShareButtonProps) {
   const [state, setState] = useState<'idle' | 'shared' | 'copied' | 'failed'>('idle')
 
@@ -69,7 +73,7 @@ export default function ShareButton({
       ) : (
         <Share2 className="h-4 w-4" aria-hidden />
       )}
-      <span className="text-[11px] font-semibold">
+      <span className={`text-[11px] font-semibold ${labelClassName}`}>
         {state === 'copied'
           ? 'Disalin'
           : state === 'shared'

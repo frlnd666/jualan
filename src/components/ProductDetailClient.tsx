@@ -377,10 +377,15 @@ export default function ProductDetailClient({
         </main>
       </div>
 
+      {/* Bar bawah: di HP hanya harga + bagikan (ikon) + CTA — "Lihat
+          menu lain" disembunyikan di bawah sm karena empat elemen
+          sebaris membuat harga tertutup tombol (terverifikasi live
+          14 Nov 2026 di lebar 500px, lebih parah di 390px). Di sm+
+          semua elemen tampil seperti sebelumnya. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/5 bg-[var(--surface)]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-2 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 sm:gap-3 sm:px-6">
+          <div className="min-w-0 flex-1 sm:flex-initial">
+            <p className="truncate text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
               Harga
             </p>
             <p className="truncate text-base font-bold text-[var(--text)]">
@@ -390,7 +395,7 @@ export default function ProductDetailClient({
 
           <Link
             href={backHref}
-            className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)]"
+            className="hidden shrink-0 items-center justify-center rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-soft)] sm:inline-flex"
           >
             Lihat menu lain
           </Link>
@@ -400,7 +405,8 @@ export default function ProductDetailClient({
             title={product.name}
             text={productShareText(product.name, displayPrice)}
             label="Bagikan"
-            className="shrink-0 px-3.5 py-3"
+            className="shrink-0 p-3 sm:px-3.5 sm:py-3"
+            labelClassName="hidden sm:inline"
           />
 
           {added && !isDisabled ? (
@@ -408,7 +414,9 @@ export default function ProductDetailClient({
               href="/cart"
               className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-[var(--primary)] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,0,0,0.18)] transition hover:opacity-95"
             >
-              <Check className="h-4 w-4" /> Ditambahkan — Lihat keranjang
+              <Check className="h-4 w-4" />
+              <span className="sm:hidden">Lihat keranjang</span>
+              <span className="hidden sm:inline">Ditambahkan — Lihat keranjang</span>
             </Link>
           ) : (
             <button

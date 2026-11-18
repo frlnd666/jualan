@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCart } from '@/lib/use-cart'
@@ -225,10 +226,12 @@ export default function ProductDetailClient({
                             : 'border-black/5'
                         }`}
                       >
-                        <img
+                        <Image
                           src={image}
                           alt={`${product.name} ${index + 1}`}
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="80px"
+                          className="object-cover"
                         />
                       </button>
                     )

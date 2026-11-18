@@ -2,6 +2,7 @@
 // Maks 1 slide aktif. Banner milik toko Silver/Gold; toko Free
 // menampilkan slide iklan afiliasi platform di storefront.
 import Link from 'next/link'
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getOwnerStore } from '@/lib/dashboard-access'
@@ -93,11 +94,14 @@ export default async function BannersPage() {
                 className="overflow-hidden rounded-[28px] border border-[var(--line)] bg-white"
               >
                 {banner.image_url ? (
-                  <img
-                    src={banner.image_url}
-                    alt={banner.title}
-                    className="h-32 w-full object-cover"
-                  />
+                  <div className="relative h-32 w-full">
+                    <Image
+                      src={banner.image_url}
+                      alt={banner.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
                 ) : null}
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-3">

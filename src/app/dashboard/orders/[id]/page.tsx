@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getDashboardAccess } from '@/lib/dashboard-access'
@@ -594,13 +595,14 @@ export default async function DashboardOrderDetailPage({
                       href={proofUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-2xl border border-[var(--line)]"
+                      className="relative block h-72 w-full overflow-hidden rounded-2xl border border-[var(--line)]"
                     >
-                      <img
+                      <Image
                         src={proofUrl}
                         alt="Bukti transfer"
-                        className="w-full object-cover"
-                        loading="lazy"
+                        fill
+                        unoptimized
+                        className="object-cover"
                       />
                     </a>
                   </div>

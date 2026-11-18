@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -589,10 +590,13 @@ export default function SettingsPage() {
             className="w-full text-sm text-[var(--text-muted)]"
           />
           {logoUrl ? (
-            <img
+            <Image
               src={logoUrl}
               alt="logo"
-              className="mt-2 h-12 rounded-lg object-cover"
+              width={48}
+              height={48}
+              unoptimized
+              className="mt-2 h-12 w-12 rounded-lg object-cover"
             />
           ) : null}
         </Field>
@@ -607,11 +611,15 @@ export default function SettingsPage() {
             className="w-full text-sm text-[var(--text-muted)]"
           />
           {bannerUrl ? (
-            <img
-              src={bannerUrl}
-              alt="banner"
-              className="mt-2 h-24 w-full rounded-xl object-cover"
-            />
+            <div className="relative mt-2 h-24 w-full">
+              <Image
+                src={bannerUrl}
+                alt="banner"
+                fill
+                unoptimized
+                className="rounded-xl object-cover"
+              />
+            </div>
           ) : null}
         </Field>
       </SectionCard>
@@ -680,10 +688,13 @@ export default function SettingsPage() {
             />
           </Field>
           {qrisImageUrl ? (
-            <img
+            <Image
               src={qrisImageUrl}
               alt="QRIS toko"
-              className="h-32 rounded-xl border border-[var(--line)] object-contain"
+              width={128}
+              height={128}
+              unoptimized
+              className="h-32 w-32 rounded-xl border border-[var(--line)] object-contain"
             />
           ) : null}
           <label className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">

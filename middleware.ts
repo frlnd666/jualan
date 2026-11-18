@@ -222,6 +222,10 @@ async function runMiddleware(request: NextRequest) {
   return response
 }
 
+// Optimasi aset statis (2026-11-18): kecualikan gambar, font, css, dan
+// file statis lainnya dari eksekusi middleware agar tidak membebani worker/edge.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|css|js)).*)',
+  ],
 }

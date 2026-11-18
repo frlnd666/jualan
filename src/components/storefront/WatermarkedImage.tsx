@@ -3,21 +3,35 @@
 // (versi display saja — file asli di storage TIDAK diubah).
 // Overlay CSS murni, tanpa dependensi image-processing.
 
+import Image from 'next/image'
+
 export default function WatermarkedImage({
   src,
   alt,
   className,
   watermarked,
+  priority,
 }: {
   src: string
   alt: string
   className?: string
   /** false = tampilkan foto polos (Silver/Gold). */
   watermarked: boolean
+  priority?: boolean
 }) {
+  const isExternalOrData = src.startsWith('data:') || src.startsWith('blob:')
+
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <img src={src} alt={alt} className={className} />
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        priority={priority}
+        unoptimized={isExternalOrData}
+        className={className ?? 'h-full w-full object-cover'}
+      />
       {watermarked ? (
         <div
           aria-hidden="true"

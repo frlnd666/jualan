@@ -6,6 +6,7 @@
 // lama bisa setengah terisi — wizard dulu tidak memvalidasi trio
 // rekening). Bila toko tidak mengisi apa pun, tampil pesan singkat
 // agar pembeli tahu harus meminta tujuan bayar lewat chat.
+import Image from 'next/image'
 import CopyTextButton from '@/components/order/CopyTextButton'
 
 export type PaymentDestinationProps = {
@@ -77,11 +78,12 @@ export default function PaymentDestination({
           <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
             QRIS toko
           </p>
-          {/* URL gambar dari penjual (bisa host mana pun) — <img> biasa,
-              bukan next/image yang butuh remotePatterns per host. */}
-          <img
+          <Image
             src={qris}
             alt="Kode QRIS toko"
+            width={192}
+            height={192}
+            unoptimized
             className="mt-2 w-48 rounded-xl border border-neutral-200"
           />
         </div>

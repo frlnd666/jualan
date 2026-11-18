@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -78,24 +78,29 @@ export default function ShippingPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
-  async function loadShippingMethods(currentStoreId?: string) {
-    const activeStoreId = currentStoreId || storeId
+  const loadShippingMethods = useCallback(
+    async (currentStoreId?: string) => {
+      const activeStoreId = currentStoreId || storeId
 
-    if (!activeStoreId) return
+      if (!activeStoreId) return
 
-    const { data, error } = await supabase
-      .from('shipping_methods')
-      .select('id, store_id, name, price, estimated_days, is_active, created_at, courier_code, per_kg_price, base_weight_gram')
-      .eq('store_id', activeStoreId)
-      .order('created_at', { ascending: false })
+      const { data, error } = await supabase
+        .from('shipping_methods')
+        .select(
+          'id, store_id, name, price, estimated_days, is_active, created_at, courier_code, per_kg_price, base_weight_gram'
+        )
+        .eq('store_id', activeStoreId)
+        .order('created_at', { ascending: false })
 
-    if (error) {
-      setErrorMessage('Gagal memuat metode pengiriman.')
-      return
-    }
+      if (error) {
+        setErrorMessage('Gagal memuat metode pengiriman.')
+        return
+      }
 
-    setMethods((data || []) as ShippingMethodRow[])
-  }
+      setMethods((data || []) as ShippingMethodRow[])
+    },
+    [storeId, supabase]
+  )
 
   useEffect(() => {
     async function initialize() {
@@ -147,7 +152,7 @@ export default function ShippingPage() {
     }
 
     initialize()
-  }, [supabase, router])
+  }, [supabase, router, loadShippingMethods])
 
   function resetForm() {
     setName('')

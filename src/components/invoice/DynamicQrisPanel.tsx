@@ -9,6 +9,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import { generateDynamicQrAction } from '@/lib/actions/qris'
@@ -212,11 +213,12 @@ export default function DynamicQrisPanel({
 
       <div className="mt-5 flex flex-col items-center">
         {qrDataUrl ? (
-          <img
+          <Image
             src={qrDataUrl}
             alt="Kode QR pembayaran"
             width={280}
             height={280}
+            unoptimized
             className="rounded-2xl border border-white bg-white p-2 shadow-sm"
           />
         ) : (

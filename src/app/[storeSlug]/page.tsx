@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { cache, Suspense, type CSSProperties } from 'react'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
@@ -362,9 +363,11 @@ export default async function StorefrontPage({ params, searchParams }: Storefron
         <section className="relative overflow-hidden bg-[var(--text)] text-white">
           {store.banner_url ? (
             <>
-              <img
+              <Image
                 src={store.banner_url}
                 alt={store.name}
+                fill
+                priority
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/45 to-[var(--text)]/95" />
@@ -392,9 +395,11 @@ export default async function StorefrontPage({ params, searchParams }: Storefron
 
             <div className="mt-10 flex items-end gap-4">
               {store.logo_url ? (
-                <img
+                <Image
                   src={store.logo_url}
                   alt={store.name}
+                  width={64}
+                  height={64}
                   className="h-16 w-16 rounded-[22px] border border-white/15 object-cover shadow-lg"
                 />
               ) : (
@@ -481,11 +486,14 @@ export default async function StorefrontPage({ params, searchParams }: Storefron
           {activeBanner ? (
             <section className="mb-6 overflow-hidden rounded-[28px] border border-black/5 bg-[var(--surface)] shadow-[0_12px_30px_rgba(33,24,20,0.06)]">
               {activeBanner.image_url ? (
-                <img
-                  src={activeBanner.image_url}
-                  alt={activeBanner.title}
-                  className="h-36 w-full object-cover"
-                />
+                <div className="relative h-36 w-full">
+                  <Image
+                    src={activeBanner.image_url}
+                    alt={activeBanner.title}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
               ) : null}
               <div className="p-4">
                 <p className="text-base font-bold text-[var(--text)]">

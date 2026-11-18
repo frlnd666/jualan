@@ -28,6 +28,7 @@ export interface CloudinarySignature {
  * unsigned lama agar aplikasi tidak rusak sebelum env diset.
  */
 export async function getCloudinarySignature(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _folder?: string
 ): Promise<CloudinarySignature | null> {
   const apiSecret = process.env.CLOUDINARY_API_SECRET

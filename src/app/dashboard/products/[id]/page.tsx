@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { removeProductImageObject } from '@/lib/product-image'
@@ -486,11 +487,13 @@ export default function EditProductPage({ params }: EditProductPageProps) {
 
           {imagePreview ? (
             <div className="space-y-2">
-              <div className="overflow-hidden rounded-[28px] border border-[var(--line)] bg-white">
-                <img
+              <div className="relative h-56 w-full overflow-hidden rounded-[28px] border border-[var(--line)] bg-white">
+                <Image
                   src={imagePreview}
                   alt="Preview foto produk"
-                  className="h-56 w-full object-cover"
+                  fill
+                  unoptimized
+                  className="object-cover"
                 />
               </div>
               <button

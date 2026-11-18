@@ -5,6 +5,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   submitSubscriptionPayment,
@@ -164,9 +165,12 @@ export default function SubscriptionPaymentForm({
               </p>
             ) : null}
             {PLATFORM_PAYMENT_DETAILS.qrisImageUrl ? (
-              <img
+              <Image
                 src={PLATFORM_PAYMENT_DETAILS.qrisImageUrl}
                 alt="QRIS platform"
+                width={160}
+                height={160}
+                unoptimized
                 className="mt-2 h-40 w-40 rounded-xl border border-[var(--line)] bg-white object-contain"
               />
             ) : null}
